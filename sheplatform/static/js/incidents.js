@@ -36,14 +36,17 @@ async function loadIncidents() {
                 `<button class="btn btn-sm" onclick="approveReport(${inc.id}, ${inc.pending_step.id}, 'rejected')">Reject</button>`;
     }
     tr.innerHTML = `
-      <td>${inc.incident_ref}</td>
+      <td><a href="/incidents/${inc.id}">${inc.incident_ref}</a></td>
       <td>${inc.title}</td>
       <td>${inc.severity}</td>
       <td>${inc.incident_type}</td>
       <td>${inc.status}</td>
       <td>${deadline}</td>
       <td>${inc.reported_at || ""}</td>
-      <td>${actions}</td>`;
+      <td>
+        <a class="btn btn-sm" href="/incidents/${inc.id}">Open</a>
+        ${actions}
+      </td>`;
     tbody.appendChild(tr);
   }
 }

@@ -79,8 +79,26 @@ async def api_detail(request: Request, incident_id: int):
         incident = data_service.get_incident(db, incident_id)
         if incident is None:
             return JSONResponse({"ok": False, "message": "not found"}, status_code=404)
+        org_id = request.state.user.get("org_id")
+        if org_id and incident.get("org_id") and incident["org_id"] != org_id:
+            return JSONResponse({"ok": False, "message": "not found"}, status_code=404)
         incident["timeline"] = data_service.get_timeline(db, incident_id)
         return JSONResponse({"incident": incident})
+    finally:
+        db.close()
+
+
+@router.get("/{incident_id}", response_class=HTMLResponse)
+@require_auth
+@require_capability("module.incidents.access")
+async def incident_detail_page(request: Request, incident_id: int):
+    db = get_db()
+    try:
+        incident = data_service.get_incident(db, incident_id)
+        if incident is None:
+            return RedirectResponse(url="/incidents", status_code=303)
+        return templates.TemplateResponse(request, "incidents/templates/detail.html",
+                                          {"user": request.state.user, "incident_id": incident_id})
     finally:
         db.close()
 

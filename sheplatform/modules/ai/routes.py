@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from sheplatform.core.middleware import require_auth
+from sheplatform.core.middleware import require_auth, require_capability
 from sheplatform.modules.ai import service
 from sheplatform.templating import templates
 
@@ -39,21 +39,36 @@ async def api_briefing(request: Request):
 
 @router.post("/api/incident-copilot/{incident_id}")
 @require_auth
+@require_capability("incident.investigate")
 async def api_incident_copilot(request: Request, incident_id: int):
-    return JSONResponse(await service.incident_copilot(incident_id, request.state.user.get("org_id")))
+    result = await service.incident_copilot(incident_id, request.state.user.get("org_id"))
+    if not result.get("ok"):
+        status = 404 if "not found" in result.get("message", "") else 400
+        return JSONResponse(result, status_code=status)
+    return JSONResponse(result)
 
 
 @router.post("/api/root-cause/{incident_id}")
 @require_auth
+@require_capability("incident.investigate")
 async def api_root_cause(request: Request, incident_id: int):
-    return JSONResponse(await service.root_cause_assistant(incident_id, request.state.user.get("org_id")))
+    result = await service.root_cause_assistant(incident_id, request.state.user.get("org_id"))
+    if not result.get("ok"):
+        status = 404 if "not found" in result.get("message", "") else 400
+        return JSONResponse(result, status_code=status)
+    return JSONResponse(result)
 
 
 @router.post("/api/draft-actions/{incident_id}")
 @require_auth
+@require_capability("incident.investigate")
 async def api_draft_actions(request: Request, incident_id: int):
-    return JSONResponse(await service.draft_corrective_actions(
-        incident_id, request.state.user.get("org_id")))
+    result = await service.draft_corrective_actions(
+        incident_id, request.state.user.get("org_id"))
+    if not result.get("ok"):
+        status = 404 if "not found" in result.get("message", "") else 400
+        return JSONResponse(result, status_code=status)
+    return JSONResponse(result)
 
 
 @router.post("/api/predictive-risk")
