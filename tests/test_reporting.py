@@ -9,9 +9,9 @@ from __future__ import annotations
 def _mk_user(db, role, email):
     from sheplatform.core.auth import hash_password
     db.execute(
-        "INSERT INTO users (email, password_hash, first_name, last_name, role_key) "
-        "VALUES (%s, %s, %s, %s, %s)",
-        (email, hash_password("Test1234!"), "T", "U", role),
+        "INSERT INTO users (email, password_hash, first_name, last_name, role_key, org_id) "
+        "VALUES (%s, %s, %s, %s, %s, %s)",
+        (email, hash_password("Test1234!"), "T", "U", role, 1),
     )
     db.commit()
     row = db.execute("SELECT * FROM users WHERE email = %s", (email,)).fetchone()

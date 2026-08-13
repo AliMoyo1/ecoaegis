@@ -54,9 +54,10 @@ def list_actions(db, status: str | None = None, org_id: int | None = None) -> li
     if status:
         conds.append("ca.status = %s")
         params.append(status)
-    if org_id:
-        conds.append("ca.org_id = %s")
-        params.append(org_id)
+    if not org_id:
+        return []  # fail closed: no tenant scope -> no data (audit S5)
+    conds.append("ca.org_id = %s")
+    params.append(org_id)
     if conds:
         sql += " WHERE " + " AND ".join(conds)
     sql += " ORDER BY ca.id DESC"

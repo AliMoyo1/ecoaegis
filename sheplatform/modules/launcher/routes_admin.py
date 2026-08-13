@@ -53,11 +53,16 @@ async def user_create(request: Request,
                       phone: str = Form("")):
     db = get_db()
     try:
+        # tenant-isolation: new users must belong to the creator's organisation
+        org_id = request.state.user.get("org_id")
+        if not org_id:
+            return JSONResponse({"ok": False, "message": "cannot create user without organisation"},
+                                status_code=400)
         hashed = auth.hash_password(password)
         db.execute(
-            "INSERT INTO users (email, password_hash, first_name, last_name, phone, role_key) "
-            "VALUES (%s, %s, %s, %s, %s, %s)",
-            (email, hashed, first_name, last_name, phone, role_key),
+            "INSERT INTO users (email, password_hash, first_name, last_name, phone, role_key, org_id) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            (email, hashed, first_name, last_name, phone, role_key, org_id),
         )
         db.commit()
         log_audit(db, request.state.user["id"], None, "user.create", "users",

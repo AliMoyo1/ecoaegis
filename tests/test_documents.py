@@ -7,9 +7,9 @@ import pytest
 def _mk_user(db, role, email):
     from sheplatform.core.auth import hash_password
     db.execute(
-        "INSERT INTO users (email, password_hash, first_name, last_name, role_key) "
-        "VALUES (%s, %s, %s, %s, %s)",
-        (email, hash_password("Test1234!"), "F", "L", role),
+        "INSERT INTO users (email, password_hash, first_name, last_name, role_key, org_id) "
+        "VALUES (%s, %s, %s, %s, %s, %s)",
+        (email, hash_password("Test1234!"), "F", "L", role, 1),
     )
     db.commit()
     return dict(db.execute("SELECT * FROM users WHERE email = %s", (email,)).fetchone())
@@ -52,7 +52,7 @@ class TestDocumentLifecycle:
                              version="2.0", supersedes=v1["id"], created_by=officer["id"])
         assert v2["supersedes"] == v1["id"]
         # v1 now superseded
-        docs = list_documents(db)
+        docs = list_documents(db, org_id=1)
         v1_row = next(d for d in docs if d["id"] == v1["id"])
         assert v1_row["status"] == "superseded"
 

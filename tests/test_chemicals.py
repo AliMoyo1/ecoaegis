@@ -7,9 +7,9 @@ import pytest
 def _mk_user(db, role, email):
     from sheplatform.core.auth import hash_password
     db.execute(
-        "INSERT INTO users (email, password_hash, first_name, last_name, role_key) "
-        "VALUES (%s, %s, %s, %s, %s)",
-        (email, hash_password("Test1234!"), "F", "L", role),
+        "INSERT INTO users (email, password_hash, first_name, last_name, role_key, org_id) "
+        "VALUES (%s, %s, %s, %s, %s, %s)",
+        (email, hash_password("Test1234!"), "F", "L", role, 1),
     )
     db.commit()
     return dict(db.execute("SELECT * FROM users WHERE email = %s", (email,)).fetchone())
@@ -22,10 +22,10 @@ class TestChemicals:
         chem = create_chemical(
             db, name="Diesel", cas_number="68476-34-6", supplier="Total Energies",
             hazard_class="flammable", sds_path="docs/SDS/diesel.pdf",
-            storage_location="Generator room", created_by=officer["id"])
+            storage_location="Generator room", created_by=officer["id"], org_id=1)
         assert chem["chem_ref"].startswith("CHEM-")
 
-        items = list_chemicals(db, hazard_class="flammable")
+        items = list_chemicals(db, hazard_class="flammable", org_id=1)
         assert any(c["name"] == "Diesel" for c in items)
 
     def test_invalid_hazard_class(self, db):

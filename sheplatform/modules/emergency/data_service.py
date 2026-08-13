@@ -58,11 +58,11 @@ def get_plan(db, plan_id: int) -> dict | None:
 
 
 def list_plans(db, org_id: int | None = None) -> list[dict]:
-    if org_id:
-        return [dict(r) for r in db.execute(
-            "SELECT * FROM emergency_plans WHERE org_id = %s ORDER BY id DESC",
-            (org_id,)).fetchall()]
-    return [dict(r) for r in db.execute("SELECT * FROM emergency_plans ORDER BY id DESC").fetchall()]
+    if not org_id:
+        return []  # fail closed: no tenant scope -> no data (audit S5)
+    return [dict(r) for r in db.execute(
+        "SELECT * FROM emergency_plans WHERE org_id = %s ORDER BY id DESC",
+        (org_id,)).fetchall()]
 
 
 def approve_plan(db, plan_id: int, approver_id: int) -> dict:
@@ -157,11 +157,11 @@ def get_emergency(db, emergency_id: int) -> dict | None:
 
 
 def list_emergencies(db, org_id: int | None = None) -> list[dict]:
-    if org_id:
-        return [dict(r) for r in db.execute(
-            "SELECT * FROM emergency_events WHERE org_id = %s ORDER BY id DESC",
-            (org_id,)).fetchall()]
-    return [dict(r) for r in db.execute("SELECT * FROM emergency_events ORDER BY id DESC").fetchall()]
+    if not org_id:
+        return []  # fail closed: no tenant scope -> no data (audit S5)
+    return [dict(r) for r in db.execute(
+        "SELECT * FROM emergency_events WHERE org_id = %s ORDER BY id DESC",
+        (org_id,)).fetchall()]
 
 
 def issue_site_safe_certificate(db, emergency_id: int, *, she_manager_id: int,
@@ -194,10 +194,18 @@ def issue_site_safe_certificate(db, emergency_id: int, *, she_manager_id: int,
 
 
 def transition_post_crisis(db, emergency_id: int, *, root_cause: str = "") -> dict:
-    """Move to post_crisis. Emits emergency.post_crisis -> EPRP improvement queue (BRS row 6)."""
+    """Move to post_crisis. Emits emergency.post_crisis -> EPRP improvement queue (BRS row 6).
+
+    Gate (audit P0-2): site re-entry / post-crisis transition is BLOCKED until
+    the Site Safe for Occupation certificate is issued (BRN-SHE-007 dual
+    sign-off). Previously the certificate blocked nothing.
+    """
     emergency = get_emergency(db, emergency_id)
     if emergency is None:
         return {"ok": False, "message": "emergency not found"}
+    if not emergency.get("site_safe_certificate"):
+        return {"ok": False, "message": "BRN-007: site safe certificate required before re-entry",
+                "code": "BRN-007"}
     db.execute(
         "UPDATE emergency_events SET status = 'post_crisis', root_cause = %s WHERE id = %s",
         (root_cause, emergency_id))

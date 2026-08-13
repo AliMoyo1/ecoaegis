@@ -11,6 +11,7 @@ import re
 from datetime import datetime, timezone
 
 from sheplatform.core import events
+from sheplatform.database import resolve_org
 
 
 def next_project_ref(db) -> str:
@@ -29,6 +30,7 @@ def next_project_ref(db) -> str:
 def create_project(db, *, project_name: str, department: str = "", project_type: str = "",
                    location: str = "", created_by: int | None = None,
                    org_id: int | None = None) -> dict:
+    org_id = resolve_org(db, org_id, created_by)
     ref = next_project_ref(db)
     db.execute(
         "INSERT INTO eia_projects (project_ref, project_name, department, project_type, "
@@ -58,9 +60,10 @@ def list_projects(db, status: str | None = None, org_id: int | None = None) -> l
     if status:
         conds.append("status = %s")
         params.append(status)
-    if org_id:
-        conds.append("org_id = %s")
-        params.append(org_id)
+    if not org_id:
+        return []  # fail closed: no tenant scope -> no data (audit S5)
+    conds.append("org_id = %s")
+    params.append(org_id)
     if conds:
         sql += " WHERE " + " AND ".join(conds)
     sql += " ORDER BY id DESC"
@@ -86,14 +89,19 @@ def complete_screening(db, project_id: int, *, eia_required: bool) -> dict:
 def register_consultant(db, *, name: str, company: str = "",
                         ema_accreditation_number: str = "",
                         org_id: int | None = None) -> dict:
-    """Register an EIA consultant. BRN-014: generates a procurement ref."""
+    """Register an EIA consultant. BRN-014: generates a procurement ref.
+
+    Audit P0-5 fix: accreditation is NOT self-attested. The number is recorded
+    but the consultant starts 'pending' until a SHE Manager verifies it
+    (verify_consultant_accreditation). Previously bool(number) auto-verified.
+    """
     db.execute(
         "INSERT INTO eia_consultants (name, company, ema_accreditation_number, "
         "ema_accreditation_verified, procurement_ref, status, org_id) "
         "VALUES (%s,%s,%s,%s,%s,%s,%s)",
-        (name, company, ema_accreditation_number, bool(ema_accreditation_number),
+        (name, company, ema_accreditation_number, 0,
          f"PRC-EIA-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{name[:4].upper()}",
-         "verified" if ema_accreditation_number else "pending", org_id),
+         "pending", org_id),
     )
     db.commit()
     row = db.execute(
@@ -101,12 +109,38 @@ def register_consultant(db, *, name: str, company: str = "",
     return dict(row)
 
 
+def verify_consultant_accreditation(db, consultant_id: int, verified_by: int,
+                                    verified: bool = True) -> dict:
+    """Second-person verification of EMA accreditation (audit P0-5 fix).
+
+    Only a SHE Manager (or above) may verify; the verifier is recorded.
+    """
+    from sheplatform.core.rbac import has_capability
+    from sheplatform.core.audit import log_audit
+    verifier = db.execute("SELECT * FROM users WHERE id = %s", (verified_by,)).fetchone()
+    if verifier is None:
+        return {"ok": False, "message": "verifier not found"}
+    if not has_capability(dict(verifier), "module.eia.access") or \
+            verifier["role_key"] not in ("she_manager", "she_hod", "super_admin"):
+        return {"ok": False, "message": "verification requires SHE Manager role"}
+    db.execute(
+        "UPDATE eia_consultants SET ema_accreditation_verified = %s, "
+        "accreditation_verified_by = %s, accreditation_verified_at = %s, status = %s "
+        "WHERE id = %s",
+        (1 if verified else 0, verified_by, datetime.now(timezone.utc).isoformat(),
+         "verified" if verified else "rejected", consultant_id))
+    db.commit()
+    log_audit(db, verified_by, None, "consultant.accreditation", "eia_consultants",
+              consultant_id, new_value={"verified": verified})
+    return {"ok": True, "consultant": dict(db.execute(
+        "SELECT * FROM eia_consultants WHERE id = %s", (consultant_id,)).fetchone())}
+
+
 def list_consultants(db, org_id: int | None = None) -> list[dict]:
-    if org_id:
-        rows = db.execute("SELECT * FROM eia_consultants WHERE org_id = %s ORDER BY id DESC",
-                          (org_id,)).fetchall()
-    else:
-        rows = db.execute("SELECT * FROM eia_consultants ORDER BY id DESC").fetchall()
+    if not org_id:
+        return []  # fail closed: no tenant scope -> no data (audit S5)
+    rows = db.execute("SELECT * FROM eia_consultants WHERE org_id = %s ORDER BY id DESC",
+                      (org_id,)).fetchall()
     return [dict(r) for r in rows]
 
 

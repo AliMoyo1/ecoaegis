@@ -53,9 +53,10 @@ def list_comms(db, status: str | None = None, org_id: int | None = None) -> list
     if status:
         conds.append("status = %s")
         params.append(status)
-    if org_id:
-        conds.append("org_id = %s")
-        params.append(org_id)
+    if not org_id:
+        return []  # fail closed: no tenant scope -> no data (audit S5)
+    conds.append("org_id = %s")
+    params.append(org_id)
     if conds:
         sql += " WHERE " + " AND ".join(conds)
     sql += " ORDER BY id DESC"

@@ -9,9 +9,9 @@ from __future__ import annotations
 def _mk_user(db, role, email):
     from sheplatform.core.auth import hash_password
     db.execute(
-        "INSERT INTO users (email, password_hash, first_name, last_name, role_key) "
-        "VALUES (%s, %s, %s, %s, %s)",
-        (email, hash_password("Test1234!"), "T", "U", role),
+        "INSERT INTO users (email, password_hash, first_name, last_name, role_key, org_id) "
+        "VALUES (%s, %s, %s, %s, %s, %s)",
+        (email, hash_password("Test1234!"), "T", "U", role, 1),
     )
     db.commit()
     row = db.execute("SELECT * FROM users WHERE email = %s", (email,)).fetchone()
@@ -53,7 +53,7 @@ class TestBrn010:
         g = _mk_grievance(db, officer["id"])
 
         from sheplatform.modules.community_complaints import data_service
-        data_service.record_notification(db, g["id"], method="phone")
+        data_service.record_notification(db, g["id"], method="phone", notified_by=officer["id"])
         data_service.resolve_grievance(db, g["id"], resolution_outcome="Resolved",
                                        is_residual_risk=False)
         result = data_service.close_grievance(db, g["id"], officer["id"])
@@ -68,7 +68,7 @@ class TestBrn003:
         g = _mk_grievance(db, officer["id"], severity="high")
 
         from sheplatform.modules.community_complaints import data_service
-        data_service.record_notification(db, g["id"], method="email")
+        data_service.record_notification(db, g["id"], method="email", notified_by=officer["id"])
         data_service.resolve_grievance(db, g["id"], resolution_outcome="Partial mitigation",
                                        is_residual_risk=True, asset_id="site-dam")
         result = data_service.close_grievance(db, g["id"], officer["id"])
@@ -76,7 +76,7 @@ class TestBrn003:
 
         # Risk created from grievance
         from sheplatform.modules.risk_register import data_service as risk_svc
-        risks = risk_svc.list_risks(db)
+        risks = risk_svc.list_risks(db, org_id=1)
         assert len(risks) == 1
         assert risks[0]["source_type"] == "grievance"
         assert risks[0]["origin_module"] == "SHECCM"
@@ -91,11 +91,11 @@ class TestBrn003:
         g = _mk_grievance(db, officer["id"])
 
         from sheplatform.modules.community_complaints import data_service
-        data_service.record_notification(db, g["id"])
+        data_service.record_notification(db, g["id"], notified_by=officer["id"])
         data_service.resolve_grievance(db, g["id"], resolution_outcome="Fully resolved",
                                        is_residual_risk=False)
         data_service.close_grievance(db, g["id"], officer["id"])
 
         from sheplatform.modules.risk_register import data_service as risk_svc
-        assert len(risk_svc.list_risks(db)) == 0
+        assert len(risk_svc.list_risks(db, org_id=1)) == 0
         assert len(db.execute("SELECT * FROM mock_drills").fetchall()) == 0

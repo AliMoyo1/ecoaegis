@@ -7,9 +7,9 @@ import pytest
 def _mk_user(db, role, email):
     from sheplatform.core.auth import hash_password
     db.execute(
-        "INSERT INTO users (email, password_hash, first_name, last_name, role_key) "
-        "VALUES (%s, %s, %s, %s, %s)",
-        (email, hash_password("Test1234!"), "F", "L", role),
+        "INSERT INTO users (email, password_hash, first_name, last_name, role_key, org_id) "
+        "VALUES (%s, %s, %s, %s, %s, %s)",
+        (email, hash_password("Test1234!"), "F", "L", role, 1),
     )
     db.commit()
     return dict(db.execute("SELECT * FROM users WHERE email = %s", (email,)).fetchone())
@@ -22,11 +22,11 @@ class TestCompliance:
         ob = create_obligation(
             db, regulation="EMA Regulations 2007", obligation="Annual effluent discharge report",
             regulator="EMA", owner_id=officer["id"], frequency="annual",
-            next_due_date="2099-03-31T00:00:00+00:00", created_by=officer["id"])
+            next_due_date="2099-03-31T00:00:00+00:00", created_by=officer["id"], org_id=1)
         assert ob["obligation_ref"].startswith("OBL-")
         assert ob["status"] == "active"
 
-        items = list_obligations(db, regulator="EMA")
+        items = list_obligations(db, regulator="EMA", org_id=1)
         assert any(o["obligation_ref"] == ob["obligation_ref"] for o in items)
 
     def test_mark_compliant(self, db):
@@ -52,7 +52,7 @@ class TestCompliance:
 
         aged = age_obligations(db)
         assert aged >= 1
-        overdue = list_obligations(db, status="overdue")
+        overdue = list_obligations(db, status="overdue", org_id=1)
         assert any(o["regulator"] == "ZRP" for o in overdue)
 
     def test_invalid_frequency(self, db):

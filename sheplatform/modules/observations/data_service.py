@@ -50,9 +50,10 @@ def list_observations(db, status: str | None = None, severity: str | None = None
     if severity:
         conds.append("o.severity = %s")
         params.append(severity)
-    if org_id:
-        conds.append("o.org_id = %s")
-        params.append(org_id)
+    if not org_id:
+        return []  # fail closed: no tenant scope -> no data (audit S5)
+    conds.append("o.org_id = %s")
+    params.append(org_id)
     if conds:
         sql += " WHERE " + " AND ".join(conds)
     sql += " ORDER BY o.id DESC"
@@ -77,6 +78,7 @@ def raise_corrective_action(db, obs_id: int, user_id: int, org_id: int | None = 
     if row["status"] == "corrective_action":
         raise ValueError("already raised")
     row = dict(row)
+    org_id = org_id or row.get("org_id")  # inherit tenant from the observation
 
     from sheplatform.modules.capa import data_service as capa
     from sheplatform.core.rbac import get_capa_default_assignee

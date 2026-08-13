@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from sheplatform.core.audit import log_audit
+from sheplatform.database import resolve_org
 
 HAZARD_CLASSES = ("flammable", "corrosive", "toxic", "oxidising", "explosive",
                   "environmental_hazard", "irritant", "compressed_gas")
@@ -25,6 +26,7 @@ def create_chemical(db, *, name: str, cas_number: str = "", supplier: str = "",
                     quantity_units: str = "", storage_location: str = "",
                     site_id: int | None = None, created_by: int,
                     org_id: int | None = None) -> dict:
+    org_id = resolve_org(db, org_id, created_by)
     if hazard_class and hazard_class not in HAZARD_CLASSES:
         raise ValueError("invalid hazard_class")
     ref = _next_ref(db)
@@ -52,9 +54,10 @@ def list_chemicals(db, hazard_class: str | None = None, site_id: int | None = No
     if site_id:
         conds.append("c.site_id = %s")
         params.append(site_id)
-    if org_id:
-        conds.append("c.org_id = %s")
-        params.append(org_id)
+    if not org_id:
+        return []  # fail closed: no tenant scope -> no data (audit S5)
+    conds.append("c.org_id = %s")
+    params.append(org_id)
     if conds:
         sql += " WHERE " + " AND ".join(conds)
     sql += " ORDER BY c.id DESC"

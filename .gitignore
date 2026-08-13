@@ -38,3 +38,6 @@ Thumbs.db
 
 # ---- Test artifacts ----
 c*.txt
+
+# one-off scripts
+scripts/_fail_closed.py

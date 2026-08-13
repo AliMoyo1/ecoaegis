@@ -11,6 +11,7 @@ import re
 from datetime import datetime, timezone
 
 from sheplatform.core import events
+from sheplatform.database import resolve_org
 
 
 def next_case_ref(db) -> str:
@@ -30,6 +31,7 @@ def create_grievance(db, *, description: str, source_channel: str,
                      complainant_name: str = "", complainant_contact: str = "",
                      classification: str = "", severity: str = "medium",
                      created_by: int | None = None, org_id: int | None = None) -> dict:
+    org_id = resolve_org(db, org_id, created_by)
     ref = next_case_ref(db)
     db.execute(
         "INSERT INTO grievances (case_ref, complainant_name, complainant_contact, "
@@ -63,9 +65,10 @@ def list_grievances(db, status: str | None = None, org_id: int | None = None) ->
     if status:
         conds.append("status = %s")
         params.append(status)
-    if org_id:
-        conds.append("org_id = %s")
-        params.append(org_id)
+    if not org_id:
+        return []  # fail closed: no tenant scope -> no data (audit S5)
+    conds.append("org_id = %s")
+    params.append(org_id)
     if conds:
         sql += " WHERE " + " AND ".join(conds)
     sql += " ORDER BY id DESC"
@@ -106,13 +109,24 @@ def resolve_grievance(db, grievance_id: int, *, resolution_outcome: str,
     return {"ok": True, "grievance": get_grievance(db, grievance_id)}
 
 
-def record_notification(db, grievance_id: int, method: str = "phone") -> dict:
-    """BRN-010: record that the complainant was notified."""
+def record_notification(db, grievance_id: int, method: str = "phone",
+                        notified_by: int | None = None, notes: str = "") -> dict:
+    """BRN-010: record that the complainant was notified.
+
+    Audit P0-5 fix: notification is no longer anonymous self-attestation.
+    The acting user is captured and an audit trail entry is written, so
+    'complainant_notified' is attributable to a named SHE officer.
+    """
+    if not notified_by:
+        return {"ok": False, "message": "notified_by is required (attestation must be attributable)"}
+    from sheplatform.core.audit import log_audit
     db.execute(
         "UPDATE grievances SET complainant_notified = 1, complainant_notified_at = %s, "
-        "notification_method = %s WHERE id = %s",
-        (datetime.now(timezone.utc).isoformat(), method, grievance_id))
+        "notification_method = %s, notified_by = %s WHERE id = %s",
+        (datetime.now(timezone.utc).isoformat(), method, notified_by, grievance_id))
     db.commit()
+    log_audit(db, notified_by, None, "grievance.notified", "grievances", grievance_id,
+              new_value={"method": method, "notes": notes})
     return {"ok": True, "grievance": get_grievance(db, grievance_id)}
 
 
