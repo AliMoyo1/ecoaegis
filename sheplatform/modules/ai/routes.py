@@ -28,40 +28,40 @@ async def api_status(request: Request):
 @router.post("/api/chat")
 @require_auth
 async def api_chat(request: Request, question: str = Form(...)):
-    return JSONResponse(await service.chat(question))
+    return JSONResponse(await service.chat(question, request.state.user.get("org_id")))
 
 
 @router.post("/api/briefing")
 @require_auth
 async def api_briefing(request: Request):
-    return JSONResponse(await service.daily_briefing())
+    return JSONResponse(await service.daily_briefing(request.state.user.get("org_id")))
 
 
 @router.post("/api/incident-copilot/{incident_id}")
 @require_auth
 async def api_incident_copilot(request: Request, incident_id: int):
-    return JSONResponse(await service.incident_copilot(incident_id))
+    return JSONResponse(await service.incident_copilot(incident_id, request.state.user.get("org_id")))
 
 
 @router.post("/api/root-cause/{incident_id}")
 @require_auth
 async def api_root_cause(request: Request, incident_id: int):
-    return JSONResponse(await service.root_cause_assistant(incident_id))
+    return JSONResponse(await service.root_cause_assistant(incident_id, request.state.user.get("org_id")))
 
 
 @router.post("/api/predictive-risk")
 @require_auth
 async def api_predictive(request: Request):
-    return JSONResponse(await service.predictive_risk())
+    return JSONResponse(await service.predictive_risk(request.state.user.get("org_id")))
 
 
 @router.post("/api/training-gaps")
 @require_auth
 async def api_training_gaps(request: Request):
-    return JSONResponse(await service.training_gap_detection())
+    return JSONResponse(await service.training_gap_detection(request.state.user.get("org_id")))
 
 
 @router.post("/api/statutory-report")
 @require_auth
 async def api_statutory(request: Request, report_type: str = Form("nssa")):
-    return JSONResponse(await service.statutory_report_generator(report_type))
+    return JSONResponse(await service.statutory_report_generator(report_type, request.state.user.get("org_id")))

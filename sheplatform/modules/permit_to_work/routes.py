@@ -29,6 +29,9 @@ async def api_list(request: Request, status: str = ""):
     try:
         items = data_service.list_permits(db, status=status or None,
                                           org_id=request.state.user.get("org_id"))
+        # attach pending approval step so the UI can show an Approve button
+        for p in items:
+            p["pending_step"] = data_service.get_pending_approval_step(db, p["id"])
         return JSONResponse({"permits": items})
     finally:
         db.close()
@@ -64,6 +67,23 @@ async def api_create(request: Request,
                   "permit.create", "permits", result["permit"]["id"],
                   new_value={"permit_ref": result["permit"]["permit_ref"]})
         return JSONResponse(result, status_code=201)
+    finally:
+        db.close()
+
+
+@router.post("/api/{permit_id}/approve")
+@require_auth
+@require_capability("ptw.approve")
+async def api_approve(request: Request, permit_id: int, step_id: int = Form(...),
+                      decision: str = Form("approved"), comments: str = Form("")):
+    db = get_db()
+    try:
+        result = data_service.approve_permit_step(
+            db, permit_id, step_id, request.state.user, decision, comments)
+        if not result["ok"]:
+            return JSONResponse({"ok": False, "message": result["message"]}, status_code=400)
+        return JSONResponse({"ok": True, "result": result,
+                             "permit": data_service.get_permit(db, permit_id)})
     finally:
         db.close()
 

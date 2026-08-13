@@ -1,6 +1,7 @@
-"""AI feature service (guide 23). Every feature is GROUNDED: DB first, AI second.
+"""AI service org-scoping fix (tenant isolation audit finding).
 
-Never pass a question to the AI without real query results as context.
+Threads org_id through every data-gathering function so the AI copilot
+only ever sees the caller's organisation's data.
 """
 from __future__ import annotations
 
@@ -12,10 +13,19 @@ from sheplatform.database import get_db
 # ---------- data gathering (grounding) ----------
 
 
-def _recent_incidents(db, limit: int = 10) -> list[dict]:
+def _org_cond(org_id, alias: str = "") -> tuple[str, list]:
+    """Return (sql_fragment, params) for org scoping."""
+    if org_id:
+        return f" AND {alias + '.' if alias else ''}org_id = %s", [org_id]
+    return "", []
+
+
+def _recent_incidents(db, limit: int = 10, org_id: int | None = None) -> list[dict]:
+    frag, params = _org_cond(org_id)
     rows = db.execute(
         "SELECT id, incident_ref, title, description, severity, incident_type, status, "
-        "root_cause FROM incidents ORDER BY id DESC LIMIT %s", (limit,)).fetchall()
+        f"root_cause FROM incidents WHERE 1=1{frag} ORDER BY id DESC LIMIT %s",
+        params + [limit]).fetchall()
     return [dict(r) for r in rows]
 
 
@@ -24,10 +34,12 @@ def _incident_detail(db, incident_id: int) -> dict | None:
     return dict(row) if row else None
 
 
-def _risk_summary(db) -> list[dict]:
+def _risk_summary(db, org_id: int | None = None) -> list[dict]:
+    frag, params = _org_cond(org_id)
     rows = db.execute(
         "SELECT risk_ref, hazard_description, risk_category, likelihood, impact, "
-        "residual_score, status FROM risks ORDER BY residual_score DESC LIMIT 15").fetchall()
+        f"residual_score, status FROM risks WHERE 1=1{frag} "
+        "ORDER BY residual_score DESC LIMIT 15", params).fetchall()
     return [dict(r) for r in rows]
 
 
@@ -38,27 +50,31 @@ def _training_summary(db) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def _monthly_trend(db, months: int = 12) -> list[dict]:
+def _monthly_trend(db, months: int = 12, org_id: int | None = None) -> list[dict]:
+    frag, params = _org_cond(org_id)
     rows = db.execute(
         "SELECT substr(reported_at, 1, 7) AS month, COUNT(*) AS n, "
         "SUM(CASE WHEN severity = 'critical' THEN 1 ELSE 0 END) AS critical "
-        "FROM incidents GROUP BY month ORDER BY month DESC LIMIT %s",
-        (months,)).fetchall()
+        f"FROM incidents WHERE 1=1{frag} GROUP BY month ORDER BY month DESC LIMIT %s",
+        params + [months]).fetchall()
     return [dict(r) for r in rows]
 
 
-def _deadline_snapshot(db) -> list[dict]:
+def _deadline_snapshot(db, org_id: int | None = None) -> list[dict]:
+    frag, params = _org_cond(org_id)
     rows = db.execute(
         "SELECT incident_ref, title, severity, statutory_deadline, status "
-        "FROM incidents WHERE statutory_deadline IS NOT NULL AND status != 'closed' "
-        "ORDER BY statutory_deadline LIMIT 8").fetchall()
+        f"FROM incidents WHERE statutory_deadline IS NOT NULL AND status != 'closed'{frag} "
+        "ORDER BY statutory_deadline LIMIT 8", params).fetchall()
     return [dict(r) for r in rows]
 
 
-def _overdue_items(db) -> list[dict]:
+def _overdue_items(db, org_id: int | None = None) -> list[dict]:
+    frag, params = _org_cond(org_id)
     rows = db.execute(
         "SELECT title, age_days, escalation_threshold, status FROM key_issues "
-        "WHERE status IN ('open','in_progress') ORDER BY age_days DESC LIMIT 8").fetchall()
+        f"WHERE status IN ('open','in_progress'){frag} ORDER BY age_days DESC LIMIT 8",
+        params).fetchall()
     return [dict(r) for r in rows]
 
 
@@ -69,14 +85,17 @@ def _fmt(items: list[dict]) -> str:
     return json.dumps(items, default=str, indent=1)
 
 
-async def incident_copilot(incident_id: int) -> dict:
+async def incident_copilot(incident_id: int, org_id: int | None = None) -> dict:
     """FNR-SHE-022 enhancement: similar incidents, investigation questions, draft report."""
     db = get_db()
     try:
         incident = _incident_detail(db, incident_id)
         if not incident:
             return {"ok": False, "message": "incident not found"}
-        similar = [i for i in _recent_incidents(db, 20)
+        # tenant guard: only see the incident if it belongs to your org
+        if org_id and incident.get("org_id") and incident["org_id"] != org_id:
+            return {"ok": False, "message": "incident not found"}
+        similar = [i for i in _recent_incidents(db, 20, org_id)
                    if i["id"] != incident_id and
                    (i.get("incident_type") == incident.get("incident_type")
                     or i.get("severity") == incident.get("severity"))][:5]
@@ -97,12 +116,14 @@ async def incident_copilot(incident_id: int) -> dict:
         db.close()
 
 
-async def root_cause_assistant(incident_id: int) -> dict:
+async def root_cause_assistant(incident_id: int, org_id: int | None = None) -> dict:
     """5-Why analysis from incident description."""
     db = get_db()
     try:
         incident = _incident_detail(db, incident_id)
         if not incident:
+            return {"ok": False, "message": "incident not found"}
+        if org_id and incident.get("org_id") and incident["org_id"] != org_id:
             return {"ok": False, "message": "incident not found"}
         prompt = (
             f"Incident: {incident.get('title')}\n"
@@ -117,12 +138,12 @@ async def root_cause_assistant(incident_id: int) -> dict:
         db.close()
 
 
-async def predictive_risk() -> dict:
+async def predictive_risk(org_id: int | None = None) -> dict:
     """Monthly trend analysis -> risk forecast."""
     db = get_db()
     try:
-        trend = _monthly_trend(db)
-        risks = _risk_summary(db)
+        trend = _monthly_trend(db, org_id=org_id)
+        risks = _risk_summary(db, org_id)
         prompt = (
             f"Incident trend (last {len(trend)} months):\n{_fmt(trend)}\n\n"
             f"Open risk register (top by residual score):\n{_fmt(risks)}\n\n"
@@ -136,11 +157,11 @@ async def predictive_risk() -> dict:
         db.close()
 
 
-async def training_gap_detection() -> dict:
+async def training_gap_detection(org_id: int | None = None) -> dict:
     """Cross-reference incidents with training records."""
     db = get_db()
     try:
-        incidents = _recent_incidents(db, 15)
+        incidents = _recent_incidents(db, 15, org_id)
         competencies = _training_summary(db)
         prompt = (
             f"Recent incidents:\n{_fmt(incidents)}\n\n"
@@ -154,11 +175,11 @@ async def training_gap_detection() -> dict:
         db.close()
 
 
-async def statutory_report_generator(report_type: str) -> dict:
+async def statutory_report_generator(report_type: str, org_id: int | None = None) -> dict:
     """Auto-draft NSSA / EMA / ZRP submissions from live data."""
     db = get_db()
     try:
-        incidents = _recent_incidents(db, 10)
+        incidents = _recent_incidents(db, 10, org_id)
         prompt = (
             f"Draft a statutory {report_type.upper()} submission for a "
             f"telecommunications company, using ONLY these incidents:\n"
@@ -172,15 +193,15 @@ async def statutory_report_generator(report_type: str) -> dict:
         db.close()
 
 
-async def chat(question: str) -> dict:
+async def chat(question: str, org_id: int | None = None) -> dict:
     """Grounded free-text Q&A over platform data."""
     db = get_db()
     try:
         context = {
-            "open_incidents": _recent_incidents(db, 10),
-            "top_risks": _risk_summary(db),
-            "deadlines": _deadline_snapshot(db),
-            "overdue_items": _overdue_items(db),
+            "open_incidents": _recent_incidents(db, 10, org_id),
+            "top_risks": _risk_summary(db, org_id),
+            "deadlines": _deadline_snapshot(db, org_id),
+            "overdue_items": _overdue_items(db, org_id),
             "competencies": _training_summary(db),
         }
         prompt = (
@@ -195,14 +216,14 @@ async def chat(question: str) -> dict:
         db.close()
 
 
-async def daily_briefing() -> dict:
+async def daily_briefing(org_id: int | None = None) -> dict:
     """Page-load briefing: deadlines, overdue, compliance alerts."""
     db = get_db()
     try:
         snapshot = {
-            "upcoming_deadlines": _deadline_snapshot(db),
-            "overdue_items": _overdue_items(db),
-            "top_risks": _risk_summary(db)[:5],
+            "upcoming_deadlines": _deadline_snapshot(db, org_id),
+            "overdue_items": _overdue_items(db, org_id),
+            "top_risks": _risk_summary(db, org_id)[:5],
         }
         prompt = (
             f"Generate a 5-bullet daily SHE briefing from this snapshot:\n"

@@ -28,7 +28,7 @@ async def emergency_shell(request: Request):
 async def api_plans(request: Request):
     db = get_db()
     try:
-        return JSONResponse({"plans": data_service.list_plans(db)})
+        return JSONResponse({"plans": data_service.list_plans(db, org_id=request.state.user.get("org_id"))})
     finally:
         db.close()
 
@@ -107,7 +107,7 @@ async def api_drill_complete(request: Request, drill_id: int,
 async def api_events(request: Request):
     db = get_db()
     try:
-        return JSONResponse({"emergencies": data_service.list_emergencies(db)})
+        return JSONResponse({"emergencies": data_service.list_emergencies(db, org_id=request.state.user.get("org_id"))})
     finally:
         db.close()
 

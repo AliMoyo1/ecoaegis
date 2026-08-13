@@ -26,7 +26,7 @@ async def training_shell(request: Request):
 async def api_needs(request: Request, status: str = ""):
     db = get_db()
     try:
-        return JSONResponse({"needs": data_service.list_needs(db, status=status or None)})
+        return JSONResponse({"needs": data_service.list_needs(db, status=status or None, org_id=request.state.user.get("org_id"))})
     finally:
         db.close()
 

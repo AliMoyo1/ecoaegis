@@ -14,18 +14,35 @@ from datetime import datetime, timezone
 from sheplatform.core import events
 
 
-def _next_ref(db, table, column, prefix) -> str:
-    row = db.execute(f"SELECT {column} FROM {table} ORDER BY id DESC LIMIT 1").fetchone()
+# ---- ref generators (audit fix: identifiers hardcoded, no interpolation) ----
+def _next_plan_ref(db) -> str:
+    row = db.execute("SELECT plan_ref FROM emergency_plans ORDER BY id DESC LIMIT 1").fetchone()
     if row is None:
-        return f"{prefix}0001"
-    m = re.search(r"(\d+)$", row[column])
-    return f"{prefix}{(int(m.group(1)) if m else 0) + 1:04d}"
+        return "EPRP-0001"
+    m = re.search(r"(\d+)$", row["plan_ref"])
+    return f"EPRP-{(int(m.group(1)) if m else 0) + 1:04d}"
+
+
+def _next_drill_ref(db) -> str:
+    row = db.execute("SELECT drill_ref FROM mock_drills ORDER BY id DESC LIMIT 1").fetchone()
+    if row is None:
+        return "DRL-0001"
+    m = re.search(r"(\d+)$", row["drill_ref"])
+    return f"DRL-{(int(m.group(1)) if m else 0) + 1:04d}"
+
+
+def _next_event_ref(db) -> str:
+    row = db.execute("SELECT event_ref FROM emergency_events ORDER BY id DESC LIMIT 1").fetchone()
+    if row is None:
+        return "EMG-0001"
+    m = re.search(r"(\d+)$", row["event_ref"])
+    return f"EMG-{(int(m.group(1)) if m else 0) + 1:04d}"
 
 
 # ---- Emergency plans (SHEEPRP) ----
 def create_plan(db, *, title: str, created_by: int | None = None,
                 org_id: int | None = None) -> dict:
-    ref = _next_ref(db, "emergency_plans", "plan_ref", "EPRP-")
+    ref = _next_plan_ref(db)
     db.execute(
         "INSERT INTO emergency_plans (plan_ref, title, status, created_by, org_id) "
         "VALUES (%s, %s, %s, %s, %s)",
@@ -40,7 +57,11 @@ def get_plan(db, plan_id: int) -> dict | None:
     return dict(row) if row else None
 
 
-def list_plans(db) -> list[dict]:
+def list_plans(db, org_id: int | None = None) -> list[dict]:
+    if org_id:
+        return [dict(r) for r in db.execute(
+            "SELECT * FROM emergency_plans WHERE org_id = %s ORDER BY id DESC",
+            (org_id,)).fetchall()]
     return [dict(r) for r in db.execute("SELECT * FROM emergency_plans ORDER BY id DESC").fetchall()]
 
 
@@ -68,7 +89,7 @@ def add_team_member(db, plan_id: int, *, team_type: str, member_name: str,
 # ---- Mock drills ----
 def schedule_drill(db, *, plan_id: int | None, drill_type: str, scheduled_date: str,
                    created_by: int | None = None, org_id: int | None = None) -> dict:
-    ref = _next_ref(db, "mock_drills", "drill_ref", "DRL-")
+    ref = _next_drill_ref(db)
     db.execute(
         "INSERT INTO mock_drills (drill_ref, plan_id, drill_type, scheduled_date, status, "
         "created_by, org_id) VALUES (%s,%s,%s,%s,%s,%s,%s)",
@@ -120,7 +141,7 @@ def add_drill_improvement(db, drill_id: int, description: str) -> dict:
 def create_emergency(db, *, title: str, description: str, severity: str,
                      site_location: str = "", created_by: int | None = None,
                      org_id: int | None = None) -> dict:
-    ref = _next_ref(db, "emergency_events", "event_ref", "EMG-")
+    ref = _next_event_ref(db)
     db.execute(
         "INSERT INTO emergency_events (event_ref, title, description, severity, "
         "site_location, status, created_by, org_id) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
@@ -135,7 +156,11 @@ def get_emergency(db, emergency_id: int) -> dict | None:
     return dict(row) if row else None
 
 
-def list_emergencies(db) -> list[dict]:
+def list_emergencies(db, org_id: int | None = None) -> list[dict]:
+    if org_id:
+        return [dict(r) for r in db.execute(
+            "SELECT * FROM emergency_events WHERE org_id = %s ORDER BY id DESC",
+            (org_id,)).fetchall()]
     return [dict(r) for r in db.execute("SELECT * FROM emergency_events ORDER BY id DESC").fetchall()]
 
 

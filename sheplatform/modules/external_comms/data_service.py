@@ -47,12 +47,19 @@ def get_comms_by_ref(db, ref: str) -> dict | None:
     return dict(row) if row else None
 
 
-def list_comms(db, status: str | None = None) -> list[dict]:
+def list_comms(db, status: str | None = None, org_id: int | None = None) -> list[dict]:
     sql = "SELECT * FROM external_communications"
+    conds, params = [], []
     if status:
-        sql += f" WHERE status = '{status}'"
+        conds.append("status = %s")
+        params.append(status)
+    if org_id:
+        conds.append("org_id = %s")
+        params.append(org_id)
+    if conds:
+        sql += " WHERE " + " AND ".join(conds)
     sql += " ORDER BY id DESC"
-    return [dict(r) for r in db.execute(sql).fetchall()]
+    return [dict(r) for r in db.execute(sql, params).fetchall()]
 
 
 def submit_for_hod_review(db, comms_id: int) -> dict:

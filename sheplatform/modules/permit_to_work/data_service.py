@@ -83,6 +83,47 @@ def list_permits(db, status: str | None = None, org_id: int | None = None) -> li
     return [dict(r) for r in db.execute(sql, params).fetchall()]
 
 
+def get_pending_approval_step(db, permit_id: int) -> dict | None:
+    """Return the pending step in the permit's active approval chain (for UI)."""
+    row = db.execute(
+        "SELECT s.id, s.step_order, s.role_required, s.sla_hours, s.status "
+        "FROM approval_chain_steps s "
+        "JOIN approval_chains c ON c.id = s.chain_id "
+        "WHERE c.entity_type = 'permit' AND c.entity_id = %s AND c.status = 'active' "
+        "AND s.status = 'pending' ORDER BY s.step_order LIMIT 1",
+        (permit_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def approve_permit_step(db, permit_id: int, step_id: int, approver: dict,
+                        decision: str, comments: str = "") -> dict:
+    """Approve/reject one step of the permit approval chain.
+
+    On chain completion the permit is ACTIVATED (the missing downstream call).
+    """
+    from sheplatform.core.workflow import advance_approval
+
+    result = advance_approval(db, "permit", permit_id, step_id, approver, decision, comments)
+    if not result["ok"]:
+        return result
+
+    if result.get("complete"):
+        if decision == "rejected":
+            # schema status set has no 'rejected'; 'revoked' is the terminal denied state
+            db.execute("UPDATE permits SET status = 'revoked' WHERE id = %s", (permit_id,))
+        else:
+            activate_permit(db, permit_id)
+            events.emit("permit.approved", {
+                "permit_id": permit_id,
+                "permit_ref": get_permit(db, permit_id)["permit_ref"],
+                "vendor_id": get_permit(db, permit_id)["vendor_id"],
+                "org_id": get_permit(db, permit_id).get("org_id"),
+                "entity_type": "permit", "entity_id": permit_id,
+            }, db, user_id=approver.get("id"), source_module="permit_to_work")
+        db.commit()
+    return result
+
+
 def activate_permit(db, permit_id: int) -> dict:
     """After the approval chain completes, activate the permit."""
     db.execute(

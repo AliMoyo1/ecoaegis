@@ -1,0 +1,71 @@
+{% extends "base_shell.html" %}
+{% block title %}MFA Setup - EcoAegis{% endblock %}
+{% block content %}
+<h1>Two-factor authentication</h1>
+
+<div class="card" id="enroll-card" {% if mfa.enabled %}style="display:none"{% endif %}>
+  <h2>Enable two-factor authentication</h2>
+  <p style="color:var(--muted);font-size:14px">
+    Scan the QR code with Google Authenticator, Authy, or your preferred TOTP app.
+  </p>
+  <button class="btn btn-primary" onclick="startEnroll()">Generate QR code</button>
+  <div id="enroll-box" style="display:none;margin-top:16px;text-align:center">
+    <img id="qr-img" alt="QR code" style="max-width:220px;border-radius:8px">
+    <p style="font-size:12px;color:var(--muted)">Manual entry secret: <code id="secret" style="font-family:var(--mono)"></code></p>
+    <label style="display:block;margin:10px 0">Enter the 6-digit code from your app
+      <input type="text" id="confirm-code" style="width:160px">
+    </label>
+    <button class="btn btn-primary" onclick="confirmEnroll()">Confirm & enable</button>
+    <div id="backup-box" style="display:none;margin-top:16px;text-align:left">
+      <h3>Save these backup codes</h3>
+      <p style="font-size:12px;color:var(--red)">Each code works once. Store them somewhere safe.</p>
+      <div id="backup-codes" style="font-family:var(--mono);font-size:14px;line-height:1.8"></div>
+    </div>
+  </div>
+</div>
+
+<div class="card" id="status-card" {% if not mfa.enabled %}style="display:none"{% endif %}>
+  <h2>Status: <span style="color:var(--good)">ENABLED</span></h2>
+  <p style="color:var(--muted);font-size:14px">Two-factor authentication is protecting your account.</p>
+  <form id="disable-form">
+    <label>Enter current code to disable <input type="text" name="code" style="width:160px" required></label>
+    <button class="btn" type="submit">Disable MFA</button>
+  </form>
+</div>
+
+<script>
+async function startEnroll() {
+  const resp = await fetch("/mfa/api/enroll", { method: "POST" });
+  const data = await resp.json();
+  if (!data.ok) { alert(data.message); return; }
+  document.getElementById("qr-img").src = data.qr_svg;
+  document.getElementById("secret").textContent = data.secret;
+  document.getElementById("enroll-box").style.display = "block";
+  const box = document.getElementById("backup-codes");
+  box.innerHTML = data.backup_codes.map(c => `<div>${c}</div>`).join("");
+}
+
+async function confirmEnroll() {
+  const code = document.getElementById("confirm-code").value.trim();
+  if (!code) { alert("Enter the code from your authenticator app"); return; }
+  const fd = new FormData();
+  fd.append("code", code);
+  const resp = await fetch("/mfa/api/confirm", { method: "POST", body: fd });
+  const data = await resp.json();
+  if (!data.ok) { alert(data.message); return; }
+  document.getElementById("backup-box").style.display = "block";
+  document.getElementById("enroll-card").style.display = "none";
+  document.getElementById("status-card").style.display = "block";
+}
+
+document.getElementById("disable-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const resp = await fetch("/mfa/api/disable", { method: "POST", body: fd });
+  const data = await resp.json();
+  if (!data.ok) { alert(data.message); return; }
+  alert("MFA disabled");
+  window.location.reload();
+});
+</script>
+{% endblock %}

@@ -22,11 +22,17 @@
     <span class="topbar-title">{% block topbar_title %}Dashboard{% endblock %}</span>
   </div>
   <div class="topbar-right">
+    {% if user and user.id %}
+    <a href="/mfa/setup" title="Two-factor authentication" style="display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;text-decoration:none;margin-right:8px">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10 V7 a4 4 0 0 1 8 0 v3"/></svg>
+      2FA</a>
+    {% endif %}
     <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Toggle theme">&#9681;</button>
     {% if user %}
     <div class="user-box">
       <span>{{ user.first_name }} {{ user.last_name }} <span style="color:var(--muted)">({{ user.role_key }})</span></span>
       <form method="post" action="/logout" class="inline">
+        {% if user and user.csrf_token %}<input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">{% endif %}
         <button class="btn btn-sm" type="submit">Logout</button>
       </form>
     </div>
@@ -110,6 +116,27 @@
 </div>
 
 <script>
+  // CSRF: auto-attach the double-submit token to every state-changing fetch
+  // (audit fix: CSRF was never enforced - the header is now sent everywhere).
+  (function () {
+    function csrfToken() {
+      var m = document.cookie.match(/(?:^|;\s*)she_csrf=([^;]+)/);
+      return m ? decodeURIComponent(m[1]) : "";
+    }
+    var originalFetch = window.fetch;
+    window.fetch = function (url, opts) {
+      opts = opts || {};
+      var method = (opts.method || "GET").toUpperCase();
+      if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
+        var token = csrfToken();
+        if (token && !(opts.headers || {}).hasOwnProperty && !(opts.headers && opts.headers["X-CSRF-Token"])) {
+          opts.headers = Object.assign({}, opts.headers, { "X-CSRF-Token": token });
+        }
+      }
+      return originalFetch(url, opts);
+    };
+  })();
+
   // Theme toggle with persistence
   (function () {
     function applyTheme(theme) {

@@ -26,7 +26,7 @@ async def workplan_shell(request: Request):
 async def api_list(request: Request):
     db = get_db()
     try:
-        return JSONResponse({"workplans": data_service.list_workplans(db)})
+        return JSONResponse({"workplans": data_service.list_workplans(db, org_id=request.state.user.get("org_id"))})
     finally:
         db.close()
 

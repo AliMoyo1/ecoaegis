@@ -75,7 +75,7 @@ async def api_screening(request: Request, project_id: int,
 async def api_consultants(request: Request):
     db = get_db()
     try:
-        return JSONResponse({"consultants": data_service.list_consultants(db)})
+        return JSONResponse({"consultants": data_service.list_consultants(db, org_id=request.state.user.get("org_id"))})
     finally:
         db.close()
 

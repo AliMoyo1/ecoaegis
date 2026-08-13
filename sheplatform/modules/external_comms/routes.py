@@ -25,7 +25,7 @@ async def comms_shell(request: Request):
 async def api_list(request: Request, status: str = ""):
     db = get_db()
     try:
-        return JSONResponse({"comms": data_service.list_comms(db, status=status or None)})
+        return JSONResponse({"comms": data_service.list_comms(db, status=status or None, org_id=request.state.user.get("org_id"))})
     finally:
         db.close()
 

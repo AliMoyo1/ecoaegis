@@ -33,6 +33,8 @@ async def api_list(request: Request, status: str = "", severity: str = "", type:
         items = data_service.list_incidents(
             db, status=status or None, severity=severity or None, incident_type=type or None,
             org_id=request.state.user.get("org_id"))
+        for i in items:
+            i["pending_step"] = data_service.get_pending_approval_step(db, i["id"])
         return JSONResponse({"incidents": items})
     finally:
         db.close()
@@ -135,6 +137,23 @@ async def api_close(request: Request, incident_id: int):
     try:
         result = data_service.close_incident(db, incident_id, request.state.user["id"])
         return JSONResponse(result)
+    finally:
+        db.close()
+
+
+@router.post("/api/{incident_id}/approve-report")
+@require_auth
+@require_capability("incident.approve_report")
+async def api_approve_report(request: Request, incident_id: int, step_id: int = Form(...),
+                             decision: str = Form("approved"), comments: str = Form("")):
+    db = get_db()
+    try:
+        result = data_service.approve_report_step(
+            db, incident_id, step_id, request.state.user, decision, comments)
+        if not result["ok"]:
+            return JSONResponse({"ok": False, "message": result["message"]}, status_code=400)
+        return JSONResponse({"ok": True, "result": result,
+                             "incident": data_service.get_incident(db, incident_id)})
     finally:
         db.close()
 

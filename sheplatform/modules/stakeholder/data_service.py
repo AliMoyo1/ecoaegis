@@ -31,7 +31,11 @@ def create_stakeholder(db, *, name: str, category: str = "community",
     return dict(row)
 
 
-def list_stakeholders(db) -> list[dict]:
+def list_stakeholders(db, org_id: int | None = None) -> list[dict]:
+    if org_id:
+        return [dict(r) for r in db.execute(
+            "SELECT * FROM stakeholders WHERE org_id = %s ORDER BY id DESC",
+            (org_id,)).fetchall()]
     return [dict(r) for r in db.execute("SELECT * FROM stakeholders ORDER BY id DESC").fetchall()]
 
 
@@ -67,8 +71,14 @@ def record_quarterly_feedback(db, engagement_id: int, quarter: int, feedback: st
     if col is None:
         return {"ok": False, "message": "quarter must be 1-4"}
     db.execute(
-        f"UPDATE stakeholder_engagements SET {col} = %s WHERE id = %s",
-        (feedback, engagement_id))
+        "UPDATE stakeholder_engagements SET "
+        "q1_feedback = CASE WHEN %s = 1 THEN %s ELSE q1_feedback END, "
+        "q2_feedback = CASE WHEN %s = 2 THEN %s ELSE q2_feedback END, "
+        "q3_feedback = CASE WHEN %s = 3 THEN %s ELSE q3_feedback END, "
+        "q4_feedback = CASE WHEN %s = 4 THEN %s ELSE q4_feedback END "
+        "WHERE id = %s",
+        (quarter, feedback, quarter, feedback, quarter, feedback, quarter, feedback,
+         engagement_id))
     db.commit()
     row = db.execute("SELECT * FROM stakeholder_engagements WHERE id = %s", (engagement_id,)).fetchone()
     return {"ok": True, "engagement": dict(row)}

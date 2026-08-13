@@ -5,7 +5,8 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from sheplatform.core import auth
-from sheplatform.core.middleware import SESSION_COOKIE, get_current_user, require_auth
+from sheplatform.core.middleware import (
+    CSRF_COOKIE, SESSION_COOKIE, get_current_user, make_csrf_token, require_auth)
 from sheplatform.core.rbac import ROLES
 from sheplatform.database import get_db
 from sheplatform.templating import templates
@@ -39,6 +40,10 @@ async def login_submit(request: Request, email: str = Form(...), password: str =
         auth.update_last_login(db, user["id"])
         response = RedirectResponse(url="/", status_code=303)
         response.set_cookie(SESSION_COOKIE, raw, httponly=True, samesite="strict",
+                            max_age=24 * 60 * 60, secure=request.url.scheme == "https")
+        # CSRF double-submit cookie (audit fix: CSRF code was dead - never enforced)
+        csrf_token = make_csrf_token()
+        response.set_cookie(CSRF_COOKIE, csrf_token, httponly=False, samesite="strict",
                             max_age=24 * 60 * 60, secure=request.url.scheme == "https")
         return response
     finally:
