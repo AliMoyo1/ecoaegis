@@ -81,3 +81,32 @@ def destroy_session(db, raw_token: str) -> None:
     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
     db.execute("DELETE FROM sessions WHERE token_hash = %s", (token_hash,))
     db.commit()
+
+
+# ---- Login rate limiting (audit S4 fix) ----
+# guide 5.5 spec: 5 failed attempts per identifier (IP) per 5-minute window.
+RATE_LIMIT_WINDOW_MINUTES = 5
+RATE_LIMIT_MAX_ATTEMPTS = 5
+
+
+def record_failed_login(db, identifier: str) -> None:
+    # Written explicitly (not DEFAULT NOW()): SQLite's datetime('now') formats
+    # as 'YYYY-MM-DD HH:MM:SS' (space, no offset), which does not compare
+    # correctly as a string against Python's isoformat() 'T'-separated cutoff
+    # below. Same convention as sla_deadline/expires_at elsewhere in core/.
+    db.execute(
+        "INSERT INTO login_attempts (identifier, created_at) VALUES (%s, %s)",
+        (identifier, datetime.now(timezone.utc).isoformat()))
+    db.commit()
+
+
+def is_login_rate_limited(db, identifier: str) -> bool:
+    if not identifier:
+        return False
+    cutoff = (datetime.now(timezone.utc)
+              - timedelta(minutes=RATE_LIMIT_WINDOW_MINUTES)).isoformat()
+    row = db.execute(
+        "SELECT COUNT(*) AS c FROM login_attempts WHERE identifier = %s AND created_at > %s",
+        (identifier, cutoff),
+    ).fetchone()
+    return (row["c"] if row else 0) >= RATE_LIMIT_MAX_ATTEMPTS

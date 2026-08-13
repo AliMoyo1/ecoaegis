@@ -86,6 +86,19 @@ def submit_for_review(db, plan_id: int) -> dict:
 
 
 def approve_workplan(db, plan_id: int, approver_id: int) -> dict:
+    """FNR-SHE-029: plan routes to CRO and COO for executive sign-off.
+
+    Audit P0-7 fix: module.workplan.access is held by both the drafting
+    roles (she_manager, she_officer) and the intended approvers (cro, coo),
+    and this function previously had no role check of its own, so a plan's
+    own author could approve it. Enforce the executive role here.
+    """
+    approver = db.execute("SELECT * FROM users WHERE id = %s", (approver_id,)).fetchone()
+    if approver is None:
+        return {"ok": False, "message": "approver not found"}
+    if approver["role_key"] not in ("cro", "coo", "super_admin"):
+        return {"ok": False, "message": "FNR-029: executive sign-off requires CRO or COO",
+                "code": "FNR-029"}
     db.execute(
         "UPDATE annual_workplan SET status = 'active', approved_by = %s WHERE id = %s",
         (approver_id, plan_id))

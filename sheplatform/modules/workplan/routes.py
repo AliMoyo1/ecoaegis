@@ -95,7 +95,10 @@ async def api_submit(request: Request, plan_id: int):
 async def api_approve(request: Request, plan_id: int):
     db = get_db()
     try:
-        return JSONResponse(data_service.approve_workplan(db, plan_id, request.state.user["id"]))
+        result = data_service.approve_workplan(db, plan_id, request.state.user["id"])
+        if not result["ok"]:
+            return JSONResponse(result, status_code=400)
+        return JSONResponse(result)
     finally:
         db.close()
 
