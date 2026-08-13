@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import pytest
+from fastapi.testclient import TestClient
 
 
 def _mk_user(db, role, email):
@@ -124,6 +125,90 @@ class TestPTWApproval:
 
         rows = db.execute("SELECT event_type FROM events WHERE event_type = 'permit.approved'").fetchall()
         assert len(rows) == 1
+
+
+class TestPTWApprovalHTTP:
+    """Re-audit fix: the data-service tests above call approve_permit_step()
+    directly and always passed, even while the HTTP route 403'd every step-4
+    (she_hod) approver. module.permits.access was missing she_hod. These
+    tests go through the real route + capability gate, the thing that was
+    actually broken, so they would have failed before the fix.
+    """
+
+    def _login(self, client, email) -> str:
+        resp = client.post("/login", data={"email": email, "password": "Test1234!"})
+        assert resp.status_code in (200, 303), f"login failed for {email}: {resp.status_code}"
+        return client.cookies.get("she_csrf", "")
+
+    def _approve(self, client, email, permit_id, step_id):
+        token = self._login(client, email)
+        return client.post(
+            f"/permits/api/{permit_id}/approve",
+            data={"step_id": step_id, "decision": "approved"},
+            headers={"X-CSRF-Token": token})
+
+    def test_every_chain_role_can_reach_the_approve_route(self, db):
+        officer = _mk_user(db, "she_officer", "http-officer@test.com")
+        _mk_user(db, "she_manager", "http-manager@test.com")
+        _mk_user(db, "line_manager", "http-linemgr@test.com")
+        _mk_user(db, "she_hod", "http-hod@test.com")
+        permit = _mk_permit(db, officer)
+
+        from sheplatform.main import app
+        client = TestClient(app)
+
+        from sheplatform.modules.permit_to_work.data_service import get_pending_approval_step
+        chain = [
+            ("http-linemgr@test.com", "line_manager"),
+            ("http-officer@test.com", "she_officer"),
+            ("http-manager@test.com", "she_manager"),
+            ("http-hod@test.com", "she_hod"),
+        ]
+        for email, expected_role in chain:
+            step = get_pending_approval_step(db, permit["id"])
+            assert step["role_required"] == expected_role
+            resp = self._approve(client, email, permit["id"], step["id"])
+            assert resp.status_code == 200, (
+                f"{expected_role} ({email}) got {resp.status_code} approving step "
+                f"{step['step_order']}, expected 200. Body: {resp.text}")
+
+        from sheplatform.modules.permit_to_work.data_service import get_permit
+        assert get_permit(db, permit["id"])["status"] == "active"
+
+    def test_she_hod_alone_is_not_blocked_by_capability_gate(self, db):
+        """Narrow regression test for the exact bug: she_hod on step 4 got a
+        blanket 403 from @require_capability before ever reaching the
+        workflow engine's own role check.
+        """
+        officer = _mk_user(db, "she_officer", "http-officer2@test.com")
+        _mk_user(db, "she_hod", "http-hod2@test.com")
+        permit = _mk_permit(db, officer)
+
+        # fast-forward the first three steps at the data-service level;
+        # only step 4 (she_hod) is what this test is checking.
+        from sheplatform.modules.permit_to_work.data_service import (
+            get_pending_approval_step, approve_permit_step)
+        _mk_user(db, "line_manager", "http-linemgr2@test.com")
+        _mk_user(db, "she_manager", "http-manager2@test.com")
+        line_mgr = dict(db.execute(
+            "SELECT * FROM users WHERE email = 'http-linemgr2@test.com'").fetchone())
+        manager = dict(db.execute(
+            "SELECT * FROM users WHERE email = 'http-manager2@test.com'").fetchone())
+        for approver in (line_mgr, officer, manager):
+            step = get_pending_approval_step(db, permit["id"])
+            approve_permit_step(db, permit["id"], step["id"], approver, "approved")
+
+        step = get_pending_approval_step(db, permit["id"])
+        assert step["role_required"] == "she_hod"
+
+        from sheplatform.main import app
+        client = TestClient(app)
+        resp = self._approve(client, "http-hod2@test.com", permit["id"], step["id"])
+        assert resp.status_code != 403, (
+            "she_hod was blocked by the route's capability gate, "
+            "module.permits.access is missing she_hod again"
+        )
+        assert resp.status_code == 200
 
     def test_http_route_allows_line_manager_step1(self, db):
         """REGRESSION (re-audit): the HTTP route was gated by ptw.approve which

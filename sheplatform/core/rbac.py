@@ -22,7 +22,7 @@ CAPABILITIES = {
     "module.incidents.access": {"super_admin", "she_manager", "she_officer", "she_champion", "cro", "line_manager", "employee"},
     "module.risk_register.access": {"super_admin", "she_manager", "she_officer", "cro", "coo", "ceo", "board_chair"},
     "module.risk_register.write": {"super_admin", "she_manager", "she_officer"},
-    "module.permits.access": {"super_admin", "she_manager", "she_officer", "line_manager"},
+    "module.permits.access": {"super_admin", "she_manager", "she_officer", "line_manager", "she_hod"},
     "module.permits.approve": {"super_admin", "she_manager"},
     "module.vendors.access": {"super_admin", "she_manager", "she_officer"},
     "module.grievances.access": {"super_admin", "she_manager", "she_officer", "she_hod"},

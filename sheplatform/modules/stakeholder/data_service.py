@@ -59,10 +59,12 @@ def create_engagement(db, *, stakeholder_id: int, engagement_issue: str,
 
 def list_engagements(db, status: str | None = None) -> list[dict]:
     sql = "SELECT * FROM stakeholder_engagements"
+    params = []
     if status:
-        sql += f" WHERE status = '{status}'"
+        sql += " WHERE status = %s"
+        params.append(status)
     sql += " ORDER BY id DESC"
-    return [dict(r) for r in db.execute(sql).fetchall()]
+    return [dict(r) for r in db.execute(sql, params).fetchall()]
 
 
 def record_quarterly_feedback(db, engagement_id: int, quarter: int, feedback: str) -> dict:

@@ -159,10 +159,12 @@ def add_key_issue(db, report_id: int, title: str, description: str = "",
 
 def list_key_issues(db, status: str | None = None) -> list[dict]:
     sql = "SELECT * FROM key_issues"
+    params = []
     if status:
-        sql += f" WHERE status = '{status}'"
+        sql += " WHERE status = %s"
+        params.append(status)
     sql += " ORDER BY id DESC"
-    return [dict(r) for r in db.execute(sql).fetchall()]
+    return [dict(r) for r in db.execute(sql, params).fetchall()]
 
 
 def check_overdue_reports(db) -> list[dict]:
