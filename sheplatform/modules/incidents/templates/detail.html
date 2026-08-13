@@ -12,6 +12,21 @@
     <button class="btn btn-sm btn-primary" onclick="runRootCause()">AI: root cause</button>
     <button class="btn btn-sm" onclick="runDraftActions()">AI: draft corrective actions</button>
   </div>
+
+  <div style="margin-top:24px">
+    <h3>Similar incidents</h3>
+    <button class="btn btn-sm" id="ai-similar-btn">Find similar</button>
+    <div id="ai-similar-result" style="margin-top:8px"></div>
+  </div>
+
+  <div style="margin-top:24px">
+    <h3>Ask data a question</h3>
+    <form id="sql-chat-form" class="filters">
+      <input type="text" name="question" placeholder="e.g. recent critical incidents" style="flex:1">
+      <button class="btn btn-sm btn-primary" type="submit">Ask</button>
+    </form>
+    <div id="sql-chat-result" style="margin-top:8px"></div>
+  </div>
 </div>
 
 <div class="card" id="ai-result-card" style="display:none">
@@ -132,6 +147,39 @@ document.getElementById("timeline-form").addEventListener("submit", async (e) =>
   await fetch(`${API}/${incidentId}/timeline`, { method: "POST", body: fd });
   e.target.reset();
   loadIncident();
+});
+
+document.getElementById("ai-similar-btn").addEventListener("click", async () => {
+  const mount = document.getElementById("ai-similar-result");
+  mount.textContent = "Searching...";
+  const fd = new FormData();
+  fd.append("incident_id", incidentId);
+  const resp = await fetch(`${AI_API}/similar-incidents`, { method: "POST", body: fd });
+  const data = await resp.json();
+  if (!data.ok || !data.matches.length) {
+    mount.innerHTML = "<em>No similar incidents found.</em>";
+    return;
+  }
+  mount.innerHTML = data.matches.map(m =>
+    `<div><strong>${m.incident_ref}</strong> - ${m.title} (${m.severity})</div>`).join("");
+});
+
+document.getElementById("sql-chat-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const mount = document.getElementById("sql-chat-result");
+  mount.textContent = "Thinking...";
+  const fd = new FormData(e.target);
+  const resp = await fetch(`${AI_API}/sql-chat`, { method: "POST", body: fd });
+  const data = await resp.json();
+  if (data.answer) {
+    mount.innerHTML = `<p>${data.answer}</p>`;
+  } else if (data.rows && data.rows.length) {
+    const keys = Object.keys(data.rows[0]);
+    mount.innerHTML = `<table class="data-table"><thead><tr>${keys.map(k => `<th>${k}</th>`).join("")}</tr></thead>` +
+      `<tbody>${data.rows.map(r => `<tr>${keys.map(k => `<td>${r[k] || "-"}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+  } else {
+    mount.innerHTML = "<em>No results.</em>";
+  }
 });
 
 loadIncident();

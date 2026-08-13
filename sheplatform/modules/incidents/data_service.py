@@ -67,6 +67,9 @@ def create_incident(db, *, title: str, description: str, severity: str,
         "incident_id": incident["id"], "ref": ref, "severity": severity, "title": title,
         "entity_type": "incident", "entity_id": incident["id"],
     }, db, user_id=reported_by, source_module="incidents")
+    # Index for FTS/hybrid retrieval (A4)
+    from sheplatform.modules.incidents.retrieval import index_incident
+    index_incident(db, incident["id"], title, description, incident_type, severity)
     return incident
 
 

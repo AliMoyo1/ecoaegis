@@ -179,6 +179,18 @@ SCHEMA = [
     CREATE INDEX IF NOT EXISTS idx_incidents_org ON incidents(org_id)
     """,
     """
+    -- FTS5 for similar-incident retrieval (A4). In PostgreSQL we use a regular
+    -- table populated by triggers; in SQLite dev mode this is rewritten to a
+    -- VIRTUAL TABLE below.
+    CREATE TABLE IF NOT EXISTS incidents_fts (
+        incident_id INTEGER PRIMARY KEY,
+        title       TEXT,
+        description TEXT,
+        incident_type TEXT,
+        severity    TEXT,
+        content     TEXT
+    )""",
+    """
     CREATE TABLE IF NOT EXISTS incident_timeline (
         id              SERIAL PRIMARY KEY,
         incident_id     INTEGER REFERENCES incidents(id) ON DELETE CASCADE,
@@ -1076,6 +1088,10 @@ _SQLITE_REWRITES = [
         "GENERATED ALWAYS AS (CAST(likelihood * impact AS REAL) / NULLIF(control_effectiveness, 0)) STORED",
     ),
     (r"DEFAULT NOW\(\)", "DEFAULT (datetime('now'))"),
+    (
+        r"CREATE TABLE IF NOT EXISTS incidents_fts \(\s*incident_id INTEGER PRIMARY KEY,\s*title\s+TEXT,\s*description\s+TEXT,\s*incident_type\s+TEXT,\s*severity\s+TEXT,\s*content\s+TEXT\s*\)",
+        "CREATE VIRTUAL TABLE IF NOT EXISTS incidents_fts USING fts5(incident_id UNINDEXED, title, description, incident_type, severity, content)"
+    ),
     # SQLite supports ON DELETE CASCADE natively (with PRAGMA foreign_keys=ON),
     # so do NOT strip it - child rows must cascade (guide 4: FK rules).
 ]

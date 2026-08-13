@@ -5,6 +5,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from sheplatform.core.middleware import require_auth, require_capability
+from sheplatform.database import get_db
 from sheplatform.modules.ai import service
 from sheplatform.templating import templates
 
@@ -79,6 +80,34 @@ async def api_classify_incident(request: Request, description: str = Form(...)):
     if not result.get("ok"):
         return JSONResponse(result, status_code=400)
     return JSONResponse(result)
+
+
+@router.post("/api/similar-incidents")
+@require_auth
+async def api_similar_incidents(request: Request, description: str = Form(""),
+                                incident_id: int = Form(0)):
+    org_id = request.state.user.get("org_id")
+    if incident_id:
+        from sheplatform.modules.incidents.data_service import get_incident
+        db = get_db()
+        try:
+            inc = get_incident(db, incident_id)
+            if inc and org_id and inc.get("org_id") == org_id:
+                description = f"{inc.get('title', '')} {inc.get('description', '')}"
+                exclude = incident_id
+            else:
+                exclude = None
+        finally:
+            db.close()
+    else:
+        exclude = None
+    return JSONResponse(await service.similar_incidents(description, org_id, exclude_id=exclude))
+
+
+@router.post("/api/sql-chat")
+@require_auth
+async def api_sql_chat(request: Request, question: str = Form(...)):
+    return JSONResponse(await service.safe_sql_chat(question, request.state.user.get("org_id")))
 
 
 @router.post("/api/predictive-risk")
