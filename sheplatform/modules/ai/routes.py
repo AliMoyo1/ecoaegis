@@ -71,6 +71,16 @@ async def api_draft_actions(request: Request, incident_id: int):
     return JSONResponse(result)
 
 
+@router.post("/api/classify-incident")
+@require_auth
+@require_capability("incident.create")
+async def api_classify_incident(request: Request, description: str = Form(...)):
+    result = await service.classify_incident(description)
+    if not result.get("ok"):
+        return JSONResponse(result, status_code=400)
+    return JSONResponse(result)
+
+
 @router.post("/api/predictive-risk")
 @require_auth
 async def api_predictive(request: Request):

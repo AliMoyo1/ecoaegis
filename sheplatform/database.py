@@ -164,6 +164,7 @@ SCHEMA = [
         closed_at       TIMESTAMPTZ,
         closed_by       INTEGER REFERENCES users(id),
         org_id          INTEGER REFERENCES organisations(id),
+        ai_metadata     JSONB DEFAULT '{}',
         created_by      INTEGER REFERENCES users(id),
         created_at      TIMESTAMPTZ DEFAULT NOW(),
         updated_at      TIMESTAMPTZ DEFAULT NOW()

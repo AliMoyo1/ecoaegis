@@ -1,5 +1,6 @@
 /* Incidents module JS - vanilla, no framework (guide 2). */
 const API = "/incidents/api";
+let currentSuggestion = null;
 
 // Deep links from dashboard tiles: ?status=open, ?type=near_miss
 const params = new URLSearchParams(location.search);
@@ -69,13 +70,49 @@ document.getElementById("incident-form").addEventListener("submit", async (e) =>
   e.preventDefault();
   const form = e.target;
   const body = new FormData(form);
+  if (currentSuggestion) body.append("ai_classify", "true");
   const resp = await fetch(`${API}/create`, { method: "POST", body });
   const data = await resp.json();
   if (data.ok) {
     form.reset();
+    currentSuggestion = null;
+    document.getElementById("ai-suggestion-card").style.display = "none";
     loadIncidents();
   } else {
     alert(data.message || "Failed to create incident");
+  }
+});
+
+async function classifyIncident() {
+  const description = document.querySelector("[name='description']").value.trim();
+  const status = document.getElementById("ai-suggestion-status");
+  const card = document.getElementById("ai-suggestion-card");
+  if (!description) { status.textContent = "Enter a description first"; return; }
+  status.textContent = "Analysing...";
+  const fd = new FormData();
+  fd.append("description", description);
+  const resp = await fetch("/ai/api/classify-incident", { method: "POST", body: fd });
+  const data = await resp.json();
+  if (!data.ok) { status.textContent = "AI classification failed"; return; }
+  currentSuggestion = data.suggestion;
+  const s = data.suggestion;
+  document.getElementById("ai-suggestion-body").innerHTML = `
+    <strong>Title:</strong> ${s.title}<br>
+    <strong>Severity:</strong> ${s.severity}<br>
+    <strong>Type:</strong> ${s.incident_type}<br>
+    <strong>Summary:</strong> ${s.summary}`;
+  card.style.display = "block";
+  status.textContent = "Suggestion ready";
+}
+
+document.getElementById("ai-classify-btn").addEventListener("click", classifyIncident);
+
+document.getElementById("accept-ai").addEventListener("change", (e) => {
+  if (!currentSuggestion) return;
+  if (e.target.checked) {
+    document.querySelector("[name='title']").value = currentSuggestion.title || "";
+    document.querySelector("[name='severity']").value = currentSuggestion.severity || "medium";
+    document.querySelector("[name='incident_type']").value = currentSuggestion.incident_type || "accident";
   }
 });
 

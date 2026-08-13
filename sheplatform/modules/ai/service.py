@@ -183,6 +183,28 @@ async def root_cause_assistant(incident_id: int, org_id: int | None = None) -> d
         db.close()
 
 
+async def classify_incident(description: str) -> dict:
+    """AI auto-classification on intake: title, severity, type, summary."""
+    prompt = (
+        "Analyse the following incident description and return ONLY a JSON object with keys: "
+        "title (short, under 80 chars), severity (one of: critical, high, medium, low), "
+        "incident_type (one of: accident, near_miss, environmental, vehicle, medical, fatality), "
+        "summary (one sentence). No prose, no markdown fences.\n\nDescription: "
+        + description
+    )
+    raw = await ask_ai(prompt, max_tokens=400)
+    parsed = _safe_json(raw)
+    return {
+        "ok": True,
+        "suggestion": {
+            "title": parsed.get("title", ""),
+            "severity": parsed.get("severity", ""),
+            "incident_type": parsed.get("incident_type", ""),
+            "summary": parsed.get("summary", ""),
+        }
+    }
+
+
 async def draft_corrective_actions(incident_id: int, org_id: int | None = None) -> dict:
     """AI drafts corrective/preventive actions as structured records."""
     db = get_db()
