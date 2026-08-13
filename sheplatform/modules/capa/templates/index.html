@@ -1,0 +1,61 @@
+{% extends "base_shell.html" %}
+{% block title %}Corrective Actions - EcoAegis{% endblock %}
+{% block content %}
+<h1>Corrective Actions (CAPA)</h1>
+<div class="login-sub" style="color:var(--muted);font-size:13px;margin-bottom:16px">
+  Closed-loop workflow: open -&gt; in progress -&gt; completed -&gt; verified (2-person rule).
+</div>
+
+<div class="card">
+  <h2>New corrective action</h2>
+  <form id="capa-form">
+    <label>Title <input type="text" name="title" required></label>
+    <label>Description <textarea name="description" rows="2"></textarea></label>
+    <div class="filters">
+      <label>Source
+        <select name="source_type" id="src-type">
+          <option value="incident">Incident</option>
+          <option value="audit">Audit</option>
+          <option value="inspection">Inspection</option>
+          <option value="grievance">Grievance</option>
+          <option value="drill">Drill</option>
+          <option value="report">Report</option>
+        </select>
+      </label>
+      <label>Priority
+        <select name="priority">
+          <option value="critical">Critical</option>
+          <option value="high">High</option>
+          <option value="medium" selected>Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </label>
+      <label>Assigned to
+        <select name="assigned_to" id="assignee-select" required></select>
+      </label>
+      <label>Due date <input type="date" name="due_date"></label>
+    </div>
+    <button class="btn btn-primary" type="submit">Create action</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Action list</h2>
+  <div class="filters">
+    <select id="f-status">
+      <option value="">All statuses</option>
+      <option value="open">Open</option>
+      <option value="in_progress">In progress</option>
+      <option value="overdue">Overdue</option>
+      <option value="completed">Completed</option>
+      <option value="verified">Verified</option>
+    </select>
+  </div>
+  <table class="data-table" id="capa-table">
+    <thead><tr><th>Ref</th><th>Title</th><th>Source</th><th>Priority</th><th>Assignee</th><th>Due</th><th>Status</th><th>Verifier</th><th>Actions</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script src="/static/js/capa.js"></script>
+{% endblock %}

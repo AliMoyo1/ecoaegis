@@ -1,0 +1,25 @@
+{% extends "base_shell.html" %}
+{% block title %}Site Benchmark - EcoAegis{% endblock %}
+{% block content %}
+<h1>Site Benchmarking</h1>
+<div class="login-sub" style="color:var(--muted);font-size:13px;margin-bottom:16px">
+  Cross-site SHE performance. Red sites need attention first.
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi-card"><span class="kpi-value" id="total-sites">-</span><span class="kpi-label">Sites</span></div>
+  <div class="kpi-card"><span class="kpi-value red" id="red-sites">-</span><span class="kpi-label">Red (needs attention)</span></div>
+  <div class="kpi-card"><span class="kpi-value amber" id="amber-sites">-</span><span class="kpi-label">Amber</span></div>
+  <div class="kpi-card"><span class="kpi-value" style="color:var(--good)">-</span><span class="kpi-label">Green</span></div>
+</div>
+
+<div class="card">
+  <h2>Site ranking (worst first)</h2>
+  <table class="data-table" id="bench-table">
+    <thead><tr><th>Rank</th><th>Site</th><th>City</th><th>Type</th><th>Incidents</th><th>Observations</th><th>Overdue Insp.</th><th>Open CAs</th><th>Chemicals</th><th>Band</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script src="/static/js/benchmark.js"></script>
+{% endblock %}

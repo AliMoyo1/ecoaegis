@@ -1,0 +1,33 @@
+{% extends "base_shell.html" %}
+{% block title %}Emergency - EcoAegis{% endblock %}
+{% block content %}
+<h1>Emergency Preparedness & Response (SHEEPRP + SHEER)</h1>
+
+<div class="card">
+  <h2>Log emergency event</h2>
+  <form id="emergency-form">
+    <label>Title <input type="text" name="title" required></label>
+    <label>Description <textarea name="description" rows="2"></textarea></label>
+    <label>Severity
+      <select name="severity">
+        <option value="low">Low</option>
+        <option value="medium">Medium</option>
+        <option value="high" selected>High</option>
+        <option value="critical">Critical</option>
+      </select>
+    </label>
+    <label>Site location <input type="text" name="site_location"></label>
+    <button class="btn btn-primary" type="submit">Log emergency</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Emergency events</h2>
+  <table class="data-table" id="emergency-table">
+    <thead><tr><th>Ref</th><th>Title</th><th>Severity</th><th>Status</th><th>Site safe</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script src="/static/js/emergency.js"></script>
+{% endblock %}

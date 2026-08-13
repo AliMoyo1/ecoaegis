@@ -1,0 +1,38 @@
+{% extends "base_shell.html" %}
+{% block title %}Stakeholders - EcoAegis{% endblock %}
+{% block content %}
+<h1>Stakeholder Engagement</h1>
+
+<div class="card">
+  <h2>Register stakeholder</h2>
+  <form id="stakeholder-form">
+    <label>Name <input type="text" name="name" required></label>
+    <label>Category
+      <select name="category">
+        <option value="regulator">Regulator</option>
+        <option value="community" selected>Community</option>
+        <option value="emergency_authority">Emergency authority</option>
+        <option value="consultant">Consultant</option>
+        <option value="government">Government</option>
+        <option value="business_association">Business association</option>
+        <option value="academic">Academic</option>
+        <option value="other">Other</option>
+      </select>
+    </label>
+    <label>Contact person <input type="text" name="contact_person"></label>
+    <label>Phone <input type="text" name="phone"></label>
+    <label>Email <input type="email" name="email"></label>
+    <button class="btn btn-primary" type="submit">Register</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Stakeholders</h2>
+  <table class="data-table" id="stakeholder-table">
+    <thead><tr><th>Name</th><th>Category</th><th>Contact</th><th>Phone</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script src="/static/js/stakeholders.js"></script>
+{% endblock %}

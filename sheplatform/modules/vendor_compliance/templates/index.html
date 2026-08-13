@@ -1,0 +1,33 @@
+{% extends "base_shell.html" %}
+{% block title %}Vendor Compliance - EcoAegis{% endblock %}
+{% block content %}
+<h1>Vendor Compliance (SHECMV)</h1>
+
+<div class="card">
+  <h2>Register vendor</h2>
+  <form id="vendor-form">
+    <label>Company name <input type="text" name="company_name" required></label>
+    <label>Contact person <input type="text" name="contact_person"></label>
+    <label>Email <input type="email" name="email"></label>
+    <label>Phone <input type="text" name="phone"></label>
+    <label>Risk profile
+      <select name="risk_profile">
+        <option value="low">Low</option>
+        <option value="medium" selected>Medium</option>
+        <option value="high">High</option>
+      </select>
+    </label>
+    <button class="btn btn-primary" type="submit">Register vendor</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Vendor list</h2>
+  <table class="data-table" id="vendor-table">
+    <thead><tr><th>Ref</th><th>Company</th><th>Contact</th><th>Risk</th><th>PTW eligible</th><th>Cert status</th><th>Status</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script src="/static/js/vendors.js"></script>
+{% endblock %}

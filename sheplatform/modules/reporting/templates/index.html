@@ -1,0 +1,37 @@
+{% extends "base_shell.html" %}
+{% block title %}Reporting - EcoAegis{% endblock %}
+{% block content %}
+<h1>Reporting (SHER)</h1>
+
+<div class="card">
+  <h2>Create report</h2>
+  <form id="report-form">
+    <label>Title <input type="text" name="title" required></label>
+    <label>Type
+      <select name="report_type">
+        <option value="weekly_operational">Weekly operational</option>
+        <option value="monthly_management">Monthly management</option>
+        <option value="project">Project</option>
+        <option value="board">Board</option>
+        <option value="nssa">NSSA</option>
+        <option value="ema">EMA</option>
+        <option value="annual_sustainability">Annual sustainability</option>
+      </select>
+    </label>
+    <label>Period start <input type="datetime-local" name="period_start"></label>
+    <label>Period end <input type="datetime-local" name="period_end"></label>
+    <label>Submission deadline <input type="datetime-local" name="submission_deadline"></label>
+    <button class="btn btn-primary" type="submit">Create report</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Reports</h2>
+  <table class="data-table" id="report-table">
+    <thead><tr><th>Ref</th><th>Title</th><th>Type</th><th>Status</th><th>Deadline</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script src="/static/js/reports.js"></script>
+{% endblock %}

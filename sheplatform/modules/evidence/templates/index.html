@@ -1,0 +1,25 @@
+{% extends "base_shell.html" %}
+{% block title %}Evidence Vault - EcoAegis{% endblock %}
+{% block content %}
+<h1>Evidence Vault</h1>
+
+<div class="card">
+  <h2>Upload evidence</h2>
+  <form id="evidence-form" enctype="multipart/form-data">
+    <label>Entity type <input type="text" name="entity_type" placeholder="incident" required></label>
+    <label>Entity ID <input type="number" name="entity_id" required></label>
+    <label>File <input type="file" name="file" required></label>
+    <button class="btn btn-primary" type="submit">Upload</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Evidence</h2>
+  <table class="data-table" id="evidence-table">
+    <thead><tr><th>ID</th><th>Original name</th><th>Entity</th><th>Size</th><th>SHA-256 (first 16)</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script src="/static/js/evidence.js"></script>
+{% endblock %}

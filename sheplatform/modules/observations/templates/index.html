@@ -1,0 +1,63 @@
+{% extends "base_shell.html" %}
+{% block title %}Observations - EcoAegis{% endblock %}
+{% block content %}
+<h1>Observations</h1>
+<div class="login-sub" style="color:var(--muted);font-size:13px;margin-bottom:16px">
+  See something, say something. Report hazards and near misses in seconds.
+</div>
+
+<div class="card">
+  <h2>Report an observation</h2>
+  <form id="obs-form">
+    <div class="filters">
+      <label>Type
+        <select name="obs_type">
+          <option value="hazard">Hazard</option>
+          <option value="near_miss">Near miss</option>
+          <option value="unsafe_act">Unsafe act</option>
+          <option value="unsafe_condition">Unsafe condition</option>
+          <option value="good_practice">Good practice</option>
+        </select>
+      </label>
+      <label>Severity
+        <select name="severity">
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+          <option value="critical">Critical</option>
+        </select>
+      </label>
+      <label>Location <input type="text" name="location"></label>
+    </div>
+    <label>Title <input type="text" name="title" required></label>
+    <label>Description <textarea name="description" rows="2"></textarea></label>
+    <button class="btn btn-primary" type="submit">Report</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Observation log</h2>
+  <div class="filters">
+    <select id="f-status">
+      <option value="">All statuses</option>
+      <option value="open">Open</option>
+      <option value="acknowledged">Acknowledged</option>
+      <option value="corrective_action">Corrective action</option>
+      <option value="closed">Closed</option>
+    </select>
+    <select id="f-severity">
+      <option value="">All severities</option>
+      <option value="critical">Critical</option>
+      <option value="high">High</option>
+      <option value="medium">Medium</option>
+      <option value="low">Low</option>
+    </select>
+  </div>
+  <table class="data-table" id="obs-table">
+    <thead><tr><th>Ref</th><th>Type</th><th>Title</th><th>Severity</th><th>Reporter</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script src="/static/js/observations.js"></script>
+{% endblock %}

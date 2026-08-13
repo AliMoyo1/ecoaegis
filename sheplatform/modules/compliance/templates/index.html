@@ -1,0 +1,69 @@
+{% extends "base_shell.html" %}
+{% block title %}Compliance - EcoAegis{% endblock %}
+{% block content %}
+<h1>Compliance Obligations</h1>
+<div class="login-sub" style="color:var(--muted);font-size:13px;margin-bottom:16px">
+  Statutory calendar: NSSA, EMA, ZRP and labour obligations with owners and renewals.
+</div>
+
+<div class="card">
+  <h2>Register obligation</h2>
+  <form id="obl-form">
+    <label>Regulation <input type="text" name="regulation" required></label>
+    <label>Obligation <input type="text" name="obligation" required></label>
+    <div class="filters">
+      <label>Regulator
+        <select name="regulator">
+          <option value="EMA">EMA</option>
+          <option value="NSSA">NSSA</option>
+          <option value="ZRP">ZRP</option>
+          <option value="Labour">Ministry of Labour</option>
+          <option value="NEC">NEC</option>
+          <option value="Other">Other</option>
+        </select>
+      </label>
+      <label>Frequency
+        <select name="frequency">
+          <option value="annual">Annual</option>
+          <option value="semi_annual">Semi-annual</option>
+          <option value="quarterly">Quarterly</option>
+          <option value="monthly">Monthly</option>
+          <option value="event_based">Event based</option>
+          <option value="continuous">Continuous</option>
+        </select>
+      </label>
+      <label>Owner
+        <select name="owner_id" id="owner-select" required></select>
+      </label>
+      <label>Next due <input type="date" name="next_due_date"></label>
+    </div>
+    <button class="btn btn-primary" type="submit">Register</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Obligation register</h2>
+  <div class="filters">
+    <select id="f-status">
+      <option value="">All statuses</option>
+      <option value="active">Active</option>
+      <option value="overdue">Overdue</option>
+      <option value="compliant">Compliant</option>
+      <option value="waived">Waived</option>
+    </select>
+    <select id="f-regulator">
+      <option value="">All regulators</option>
+      <option value="EMA">EMA</option>
+      <option value="NSSA">NSSA</option>
+      <option value="ZRP">ZRP</option>
+      <option value="Labour">Ministry of Labour</option>
+    </select>
+  </div>
+  <table class="data-table" id="obl-table">
+    <thead><tr><th>Ref</th><th>Regulation</th><th>Obligation</th><th>Regulator</th><th>Owner</th><th>Frequency</th><th>Due</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script src="/static/js/compliance.js"></script>
+{% endblock %}

@@ -1,0 +1,215 @@
+"""AI feature service (guide 23). Every feature is GROUNDED: DB first, AI second.
+
+Never pass a question to the AI without real query results as context.
+"""
+from __future__ import annotations
+
+import json
+
+from sheplatform.core.ai_client import ask_ai
+from sheplatform.database import get_db
+
+# ---------- data gathering (grounding) ----------
+
+
+def _recent_incidents(db, limit: int = 10) -> list[dict]:
+    rows = db.execute(
+        "SELECT id, incident_ref, title, description, severity, incident_type, status, "
+        "root_cause FROM incidents ORDER BY id DESC LIMIT %s", (limit,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def _incident_detail(db, incident_id: int) -> dict | None:
+    row = db.execute("SELECT * FROM incidents WHERE id = %s", (incident_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def _risk_summary(db) -> list[dict]:
+    rows = db.execute(
+        "SELECT risk_ref, hazard_description, risk_category, likelihood, impact, "
+        "residual_score, status FROM risks ORDER BY residual_score DESC LIMIT 15").fetchall()
+    return [dict(r) for r in rows]
+
+
+def _training_summary(db) -> list[dict]:
+    rows = db.execute(
+        "SELECT competency_name, COUNT(*) AS n FROM competency_matrix "
+        "GROUP BY competency_name ORDER BY n DESC LIMIT 15").fetchall()
+    return [dict(r) for r in rows]
+
+
+def _monthly_trend(db, months: int = 12) -> list[dict]:
+    rows = db.execute(
+        "SELECT substr(reported_at, 1, 7) AS month, COUNT(*) AS n, "
+        "SUM(CASE WHEN severity = 'critical' THEN 1 ELSE 0 END) AS critical "
+        "FROM incidents GROUP BY month ORDER BY month DESC LIMIT %s",
+        (months,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def _deadline_snapshot(db) -> list[dict]:
+    rows = db.execute(
+        "SELECT incident_ref, title, severity, statutory_deadline, status "
+        "FROM incidents WHERE statutory_deadline IS NOT NULL AND status != 'closed' "
+        "ORDER BY statutory_deadline LIMIT 8").fetchall()
+    return [dict(r) for r in rows]
+
+
+def _overdue_items(db) -> list[dict]:
+    rows = db.execute(
+        "SELECT title, age_days, escalation_threshold, status FROM key_issues "
+        "WHERE status IN ('open','in_progress') ORDER BY age_days DESC LIMIT 8").fetchall()
+    return [dict(r) for r in rows]
+
+
+# ---------- prompt builders ----------
+
+
+def _fmt(items: list[dict]) -> str:
+    return json.dumps(items, default=str, indent=1)
+
+
+async def incident_copilot(incident_id: int) -> dict:
+    """FNR-SHE-022 enhancement: similar incidents, investigation questions, draft report."""
+    db = get_db()
+    try:
+        incident = _incident_detail(db, incident_id)
+        if not incident:
+            return {"ok": False, "message": "incident not found"}
+        similar = [i for i in _recent_incidents(db, 20)
+                   if i["id"] != incident_id and
+                   (i.get("incident_type") == incident.get("incident_type")
+                    or i.get("severity") == incident.get("severity"))][:5]
+        prompt = (
+            f"Incident: {incident.get('title')}\n"
+            f"Description: {incident.get('description')}\n"
+            f"Severity: {incident.get('severity')} | Type: {incident.get('incident_type')}\n\n"
+            f"Similar historical incidents:\n{_fmt(similar)}\n\n"
+            "Tasks:\n"
+            "1. List 5 investigation questions tailored to this incident.\n"
+            "2. Draft a preliminary incident report for SHE Officer review, "
+            "based ONLY on the data above.\n"
+            "3. Note what data is missing that an investigation should collect."
+        )
+        reply = await ask_ai(prompt, max_tokens=2500)
+        return {"ok": True, "incident_ref": incident.get("incident_ref"), "result": reply}
+    finally:
+        db.close()
+
+
+async def root_cause_assistant(incident_id: int) -> dict:
+    """5-Why analysis from incident description."""
+    db = get_db()
+    try:
+        incident = _incident_detail(db, incident_id)
+        if not incident:
+            return {"ok": False, "message": "incident not found"}
+        prompt = (
+            f"Incident: {incident.get('title')}\n"
+            f"Description: {incident.get('description')}\n"
+            f"Reported root cause (if any): {incident.get('root_cause') or 'none recorded'}\n\n"
+            "Using the 5-Why method, identify the likely root causes. "
+            "Format as a numbered Why chain. Only use the data provided."
+        )
+        reply = await ask_ai(prompt, max_tokens=1500)
+        return {"ok": True, "incident_ref": incident.get("incident_ref"), "result": reply}
+    finally:
+        db.close()
+
+
+async def predictive_risk() -> dict:
+    """Monthly trend analysis -> risk forecast."""
+    db = get_db()
+    try:
+        trend = _monthly_trend(db)
+        risks = _risk_summary(db)
+        prompt = (
+            f"Incident trend (last {len(trend)} months):\n{_fmt(trend)}\n\n"
+            f"Open risk register (top by residual score):\n{_fmt(risks)}\n\n"
+            "Produce a concise risk forecast for the next month: which risk "
+            "categories are trending up, and what preventive actions are "
+            "suggested. Only use the data provided."
+        )
+        reply = await ask_ai(prompt, max_tokens=1500)
+        return {"ok": True, "result": reply}
+    finally:
+        db.close()
+
+
+async def training_gap_detection() -> dict:
+    """Cross-reference incidents with training records."""
+    db = get_db()
+    try:
+        incidents = _recent_incidents(db, 15)
+        competencies = _training_summary(db)
+        prompt = (
+            f"Recent incidents:\n{_fmt(incidents)}\n\n"
+            f"Staff competencies (name -> count certified):\n{_fmt(competencies)}\n\n"
+            "Identify competency gaps: which incident themes lack matching "
+            "training coverage? Suggest training needs. Only use the data provided."
+        )
+        reply = await ask_ai(prompt, max_tokens=1500)
+        return {"ok": True, "result": reply}
+    finally:
+        db.close()
+
+
+async def statutory_report_generator(report_type: str) -> dict:
+    """Auto-draft NSSA / EMA / ZRP submissions from live data."""
+    db = get_db()
+    try:
+        incidents = _recent_incidents(db, 10)
+        prompt = (
+            f"Draft a statutory {report_type.upper()} submission for a "
+            f"telecommunications company, using ONLY these incidents:\n"
+            f"{_fmt(incidents)}\n\n"
+            "Include: incident summary table, statutory reporting obligations, "
+            "and a highlighted data-gaps section for SHE Manager review."
+        )
+        reply = await ask_ai(prompt, max_tokens=2500)
+        return {"ok": True, "report_type": report_type, "result": reply}
+    finally:
+        db.close()
+
+
+async def chat(question: str) -> dict:
+    """Grounded free-text Q&A over platform data."""
+    db = get_db()
+    try:
+        context = {
+            "open_incidents": _recent_incidents(db, 10),
+            "top_risks": _risk_summary(db),
+            "deadlines": _deadline_snapshot(db),
+            "overdue_items": _overdue_items(db),
+            "competencies": _training_summary(db),
+        }
+        prompt = (
+            f"Platform data snapshot:\n{_fmt(context)}\n\n"
+            f"Question: {question}\n\n"
+            "Answer ONLY from the data snapshot. If the data does not contain "
+            "the answer, say so and suggest what data would help."
+        )
+        reply = await ask_ai(prompt, max_tokens=2000)
+        return {"ok": True, "result": reply}
+    finally:
+        db.close()
+
+
+async def daily_briefing() -> dict:
+    """Page-load briefing: deadlines, overdue, compliance alerts."""
+    db = get_db()
+    try:
+        snapshot = {
+            "upcoming_deadlines": _deadline_snapshot(db),
+            "overdue_items": _overdue_items(db),
+            "top_risks": _risk_summary(db)[:5],
+        }
+        prompt = (
+            f"Generate a 5-bullet daily SHE briefing from this snapshot:\n"
+            f"{_fmt(snapshot)}\n\n"
+            "Order by urgency. Only use the data provided."
+        )
+        reply = await ask_ai(prompt, max_tokens=1000)
+        return {"ok": True, "result": reply}
+    finally:
+        db.close()

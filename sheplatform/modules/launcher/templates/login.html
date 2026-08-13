@@ -1,0 +1,26 @@
+{% extends "base_shell.html" %}
+{% block title %}Login - EcoAegis{% endblock %}
+{% block content %}
+<div class="login-wrap">
+  <div class="login-card">
+    <div style="text-align:center;margin-bottom:16px">
+      <div class="brand-mark" style="margin:0 auto;width:56px;height:56px;border-radius:15px">
+        <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" width="30" height="30">
+          <path d="M16 2 L28 6.5 V15 C28 23 22.5 28.5 16 30 C9.5 28.5 4 23 4 15 V6.5 Z" fill="rgba(255,255,255,0.16)" stroke="white" stroke-width="1.6" stroke-linejoin="round"/>
+          <path d="M16 9 L19 15 L25.5 15.5 L20.8 19.6 L22.5 26 L16 22.4 L9.5 26 L11.2 19.6 L6.5 15.5 L13 15 Z" fill="white" opacity="0.95"/>
+        </svg>
+      </div>
+    </div>
+    <h1>EcoAegis</h1>
+    <div class="login-sub">Safety, Health &amp; Environment - one integrated system</div>
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    <form method="post" action="/login">
+      <label>Email</label>
+      <input type="email" name="email" required autofocus>
+      <label>Password</label>
+      <input type="password" name="password" required>
+      <button class="btn btn-primary" type="submit">Sign in</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

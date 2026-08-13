@@ -1,0 +1,36 @@
+{% extends "base_shell.html" %}
+{% block title %}Users - EcoAegis{% endblock %}
+{% block content %}
+<h1>User Management</h1>
+<form method="post" action="/admin/users/create" class="card">
+  <h2>Create user</h2>
+  <label>Email <input type="email" name="email" required></label>
+  <label>First name <input type="text" name="first_name" required></label>
+  <label>Last name <input type="text" name="last_name" required></label>
+  <label>Phone <input type="text" name="phone"></label>
+  <label>Role
+    <select name="role_key">
+      {% for key, name in roles.items() %}
+      <option value="{{ key }}">{{ name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Password <input type="password" name="password" required minlength="8"></label>
+  <button class="btn btn-primary" type="submit">Create</button>
+</form>
+<table class="data-table">
+  <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Active</th><th>Last login</th></tr></thead>
+  <tbody>
+    {% for u in users %}
+    <tr>
+      <td>{{ u.id }}</td>
+      <td>{{ u.first_name }} {{ u.last_name }}</td>
+      <td>{{ u.email }}</td>
+      <td>{{ u.role_key }}</td>
+      <td>{{ 'Yes' if u.is_active else 'No' }}</td>
+      <td>{{ u.last_login or '' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

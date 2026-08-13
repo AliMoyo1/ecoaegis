@@ -1,0 +1,33 @@
+{% extends "base_shell.html" %}
+{% block title %}Training & Awareness - EcoAegis{% endblock %}
+{% block content %}
+<h1>Training & Awareness (SHET&amp;A)</h1>
+
+<div class="card">
+  <h2>Identify training need</h2>
+  <form id="need-form">
+    <label>Title <input type="text" name="title" required></label>
+    <label>Description <textarea name="description" rows="2"></textarea></label>
+    <label>Source trigger
+      <select name="source_trigger">
+        <option value="audit">Audit</option>
+        <option value="incident">Incident</option>
+        <option value="change_management">Change management</option>
+        <option value="training_plan">Training plan</option>
+        <option value="gap_analysis">Gap analysis</option>
+      </select>
+    </label>
+    <button class="btn btn-primary" type="submit">Add need</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Training needs</h2>
+  <table class="data-table" id="need-table">
+    <thead><tr><th>Ref</th><th>Title</th><th>Trigger</th><th>Delivery</th><th>Status</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script src="/static/js/training.js"></script>
+{% endblock %}

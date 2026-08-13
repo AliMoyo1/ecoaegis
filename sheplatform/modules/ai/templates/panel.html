@@ -1,0 +1,73 @@
+{% extends "base_shell.html" %}
+{% block title %}AI Assistant - EcoAegis{% endblock %}
+{% block content %}
+<h1>AI Assistant</h1>
+<div class="login-sub" style="margin-bottom:20px;color:var(--muted);font-size:13px">
+  Grounded copilot - answers only from platform data.
+  Active provider: <strong id="provider-label" style="color:var(--accent)">...</strong>
+  (<span id="provider-model">...</span>)
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi-card"><span class="kpi-value" style="font-size:14px;font-weight:600">Daily briefing</span>
+    <button class="btn btn-sm btn-primary" style="margin-top:10px" onclick="runAI('/ai/api/briefing')">Generate</button>
+  </div>
+  <div class="kpi-card"><span class="kpi-value" style="font-size:14px;font-weight:600">Predictive risk</span>
+    <button class="btn btn-sm btn-primary" style="margin-top:10px" onclick="runAI('/ai/api/predictive-risk')">Forecast</button>
+  </div>
+  <div class="kpi-card"><span class="kpi-value" style="font-size:14px;font-weight:600">Training gaps</span>
+    <button class="btn btn-sm btn-primary" style="margin-top:10px" onclick="runAI('/ai/api/training-gaps')">Analyse</button>
+  </div>
+  <div class="kpi-card"><span class="kpi-value" style="font-size:14px;font-weight:600">Statutory report</span>
+    <button class="btn btn-sm btn-primary" style="margin-top:10px" onclick="runAI('/ai/api/statutory-report', {report_type: 'nssa'})">Draft NSSA</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Ask about platform data</h2>
+  <form id="chat-form">
+    <input type="text" name="question" placeholder="e.g. What are the most urgent open risks?" required>
+    <button class="btn btn-primary" type="submit">Ask</button>
+  </form>
+</div>
+
+<div class="card" id="result-card" style="display:none">
+  <h2>Result</h2>
+  <pre id="result-text" style="white-space:pre-wrap;font-family:var(--font);font-size:14px;line-height:1.6;color:var(--text)"></pre>
+</div>
+
+<script>
+async function loadProviderStatus() {
+  try {
+    const resp = await fetch("/ai/api/status");
+    const data = await resp.json();
+    document.getElementById("provider-label").textContent = data.label || data.provider;
+    document.getElementById("provider-model").textContent = data.model || "";
+    if (!data.configured) {
+      document.getElementById("provider-label").style.color = "var(--red)";
+    }
+  } catch (e) { /* status is informational */ }
+}
+
+async function runAI(url, extra) {
+  const card = document.getElementById("result-card");
+  const text = document.getElementById("result-text");
+  card.style.display = "block";
+  text.textContent = "Thinking...";
+  const fd = new FormData();
+  if (extra) for (const [k, v] of Object.entries(extra)) fd.append(k, v);
+  const resp = await fetch(url, { method: "POST", body: fd });
+  const data = await resp.json();
+  text.textContent = data.result || data.message || JSON.stringify(data);
+}
+
+document.getElementById("chat-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  await runAI("/ai/api/chat", { question: fd.get("question") });
+  e.target.reset();
+});
+
+loadProviderStatus();
+</script>
+{% endblock %}

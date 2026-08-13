@@ -1,0 +1,69 @@
+{% extends "base_shell.html" %}
+{% block title %}Incidents - EcoAegis{% endblock %}
+{% block content %}
+<h1>Incidents (SHEIMI)</h1>
+
+<div class="card">
+  <h2>Report an incident</h2>
+  <form id="incident-form">
+    <label>Title <input type="text" name="title" required></label>
+    <label>Description <textarea name="description" rows="3" required></textarea></label>
+    <label>Severity
+      <select name="severity">
+        <option value="critical">Critical (48h statutory deadline)</option>
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+        <option value="low">Low</option>
+        <option value="near_miss">Near miss</option>
+      </select>
+    </label>
+    <label>Type
+      <select name="incident_type">
+        <option value="accident">Accident</option>
+        <option value="near_miss">Near miss</option>
+        <option value="environmental">Environmental</option>
+        <option value="vehicle">Vehicle</option>
+        <option value="medical">Medical</option>
+        <option value="fatality">Fatality</option>
+      </select>
+    </label>
+    <label>Location <input type="text" name="location"></label>
+    <button class="btn btn-primary" type="submit">Report incident</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Incident list</h2>
+  <div class="filters">
+    <select id="f-status">
+      <option value="">All statuses</option>
+      <option value="open">Open</option>
+      <option value="investigation">Investigation</option>
+      <option value="report_review">Report review</option>
+      <option value="closed">Closed</option>
+    </select>
+    <select id="f-severity">
+      <option value="">All severities</option>
+      <option value="critical">Critical</option>
+      <option value="high">High</option>
+      <option value="medium">Medium</option>
+      <option value="low">Low</option>
+    </select>
+    <select id="f-type">
+      <option value="">All types</option>
+      <option value="accident">Accident</option>
+      <option value="near_miss">Near miss</option>
+      <option value="environmental">Environmental</option>
+      <option value="vehicle">Vehicle</option>
+      <option value="medical">Medical</option>
+      <option value="fatality">Fatality</option>
+    </select>
+  </div>
+  <table class="data-table" id="incident-table">
+    <thead><tr><th>Ref</th><th>Title</th><th>Severity</th><th>Type</th><th>Status</th><th>Deadline</th><th>Reported</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script src="/static/js/incidents.js"></script>
+{% endblock %}

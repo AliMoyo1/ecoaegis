@@ -1,0 +1,44 @@
+{% extends "base_shell.html" %}
+{% block title %}Risk Register - EcoAegis{% endblock %}
+{% block content %}
+<h1>Risk Register</h1>
+
+<div class="card">
+  <h2>Register a risk</h2>
+  <form id="risk-form">
+    <label>Hazard description <textarea name="hazard_description" rows="2" required></textarea></label>
+    <label>Category
+      <select name="risk_category">
+        <option value="operational">Operational</option>
+        <option value="financial">Financial</option>
+        <option value="regulatory">Regulatory</option>
+        <option value="strategic">Strategic</option>
+      </select>
+    </label>
+    <div class="row">
+      <label>Likelihood (1-5) <input type="number" name="likelihood" min="1" max="5" value="3"></label>
+      <label>Impact (1-5) <input type="number" name="impact" min="1" max="5" value="3"></label>
+      <label>Control effectiveness (1-5) <input type="number" name="control_effectiveness" min="1" max="5" value="3"></label>
+    </div>
+    <label>Response
+      <select name="managerial_response">
+        <option value="mitigate">Mitigate</option>
+        <option value="accept">Accept</option>
+        <option value="transfer">Transfer</option>
+        <option value="avoid">Avoid</option>
+      </select>
+    </label>
+    <button class="btn btn-primary" type="submit">Register risk</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Risk list (sorted by residual score)</h2>
+  <table class="data-table" id="risk-table">
+    <thead><tr><th>Ref</th><th>Hazard</th><th>Category</th><th>L x I</th><th>CE</th><th>Residual</th><th>Priority</th><th>Status</th><th>Source</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script src="/static/js/risks.js"></script>
+{% endblock %}

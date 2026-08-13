@@ -1,0 +1,182 @@
+{% extends "base_shell.html" %}
+{% block title %}Dashboard - EcoAegis{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+<div class="login-sub" style="color:var(--muted);font-size:13px;margin-bottom:16px">
+  Operations at a glance - click any tile to drill into the module.
+</div>
+
+<!-- KPI TILES - every tile deep-links to its module with a filter -->
+<div class="kpi-grid">
+  <a href="/incidents" class="kpi-card kpi-link">
+    <span class="kpi-value">{{ stats.active_incidents }}</span>
+    <span class="kpi-label">Active Incidents</span>
+  </a>
+  <a href="/incidents?status=open" class="kpi-card kpi-link">
+    <span class="kpi-value {{ 'red' if stats.overdue_cas > 0 }}">{{ stats.open_corrective_actions }}</span>
+    <span class="kpi-label">Open Corrective Actions</span>
+  </a>
+  <a href="/risks" class="kpi-card kpi-link">
+    <span class="kpi-value">{{ stats.open_risks }}</span>
+    <span class="kpi-label">Open Risks</span>
+  </a>
+  <a href="/risks?level=high" class="kpi-card kpi-link">
+    <span class="kpi-value {{ 'red' if stats.high_risks > 0 }}">{{ stats.high_risks }}</span>
+    <span class="kpi-label">High Risks (residual >= 12)</span>
+  </a>
+  <a href="/grievances" class="kpi-card kpi-link">
+    <span class="kpi-value">{{ stats.open_grievances }}</span>
+    <span class="kpi-label">Open Grievances</span>
+  </a>
+  <a href="/permits?status=pending_approval" class="kpi-card kpi-link">
+    <span class="kpi-value {{ 'amber' if stats.pending_approvals > 0 }}">{{ stats.pending_approvals }}</span>
+    <span class="kpi-label">Permits Pending Approval</span>
+  </a>
+  <a href="/emergency" class="kpi-card kpi-link">
+    <span class="kpi-value">{{ stats.scheduled_drills }}</span>
+    <span class="kpi-label">Drills Scheduled</span>
+  </a>
+  <a href="/training" class="kpi-card kpi-link">
+    <span class="kpi-value">{{ stats.training_sessions }}</span>
+    <span class="kpi-label">Upcoming Training</span>
+  </a>
+  <a href="/eia" class="kpi-card kpi-link">
+    <span class="kpi-value">{{ stats.eia_projects }}</span>
+    <span class="kpi-label">Active EIA Projects</span>
+  </a>
+  <a href="/incidents?type=near_miss" class="kpi-card kpi-link">
+    <span class="kpi-value">{{ stats.near_miss_ratio }}%</span>
+    <span class="kpi-label">Near-Miss Ratio</span>
+  </a>
+  <a href="/reports" class="kpi-card kpi-link">
+    <span class="kpi-value">{{ stats.ca_closure_rate }}%</span>
+    <span class="kpi-label">CA Closure Rate</span>
+  </a>
+  <a href="/esg" class="kpi-card kpi-link">
+    <span class="kpi-value">{{ stats.unread }}</span>
+    <span class="kpi-label">Unread Notifications</span>
+  </a>
+</div>
+
+<!-- CHARTS ROW -->
+<div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+  <div class="card" style="margin-bottom:0">
+    <h2>Incident Trend (12 months)</h2>
+    <canvas id="trend-chart" height="140"></canvas>
+  </div>
+  <div class="card" style="margin-bottom:0">
+    <h2>Incidents by Severity</h2>
+    <canvas id="severity-chart" height="140"></canvas>
+  </div>
+  <div class="card" style="margin-bottom:0">
+    <h2>Risk Heat Map</h2>
+    <canvas id="heatmap-chart" height="140"></canvas>
+  </div>
+</div>
+
+<!-- DEADLINES + EXPIRY ROW -->
+<div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+  <div class="card" style="margin-bottom:0">
+    <h2>Statutory Deadlines (next 30 days)</h2>
+    {% if stats.upcoming_deadlines %}
+    <table class="data-table">
+      <thead><tr><th>Ref</th><th>Title</th><th>Due</th></tr></thead>
+      <tbody>
+        {% for d in stats.upcoming_deadlines %}
+        <tr>
+          <td>{{ d.incident_ref }}</td>
+          <td>{{ d.title[:30] }}</td>
+          <td style="color:var(--warn);font-family:var(--mono);font-size:12px">{{ d.statutory_deadline[:10] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<p style="color:var(--muted);font-size:13px">No deadlines in the next 30 days.</p>{% endif %}
+  </div>
+  <div class="card" style="margin-bottom:0">
+    <h2>Certifications Expiring (30 days)</h2>
+    {% if stats.expiring_certs %}
+    <table class="data-table">
+      <thead><tr><th>Vendor</th><th>Certification</th><th>Expires</th></tr></thead>
+      <tbody>
+        {% for c in stats.expiring_certs %}
+        <tr>
+          <td>{{ c.vendor_name[:22] }}</td>
+          <td>{{ c.certification_name[:22] }}</td>
+          <td style="color:var(--red);font-family:var(--mono);font-size:12px">{{ c.expiry_date[:10] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<p style="color:var(--muted);font-size:13px">No certifications expiring soon.</p>{% endif %}
+  </div>
+  <div class="card" style="margin-bottom:0">
+    <h2>Aging Key Issues</h2>
+    {% if stats.key_issues %}
+    <table class="data-table">
+      <thead><tr><th>Issue</th><th>Age (days)</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for k in stats.key_issues %}
+        <tr>
+          <td>{{ k.title[:28] }}</td>
+          <td style="font-family:var(--mono);font-size:12px">{{ k.age_days }}</td>
+          <td>{{ k.status }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<p style="color:var(--muted);font-size:13px">No aging issues.</p>{% endif %}
+  </div>
+</div>
+
+<script src="/static/js/chart.umd.min.js"></script>
+<script src="/static/js/chartjs-chart-matrix.min.js"></script>
+<script>
+(function () {
+  var stats = {{ stats | tojson }};
+
+  // Incident trend line
+  new Chart(document.getElementById("trend-chart"), {
+    type: "line",
+    data: { labels: stats.incident_trend.labels,
+            datasets: [{ label: "Incidents", data: stats.incident_trend.values,
+                         borderColor: "#4a90e2", backgroundColor: "rgba(74,144,226,0.15)",
+                         fill: true, tension: 0.35, pointRadius: 3 }] },
+    options: { plugins: { legend: { display: false } },
+               scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+
+  // Severity donut
+  new Chart(document.getElementById("severity-chart"), {
+    type: "doughnut",
+    data: { labels: stats.severity_distribution.labels,
+            datasets: [{ data: stats.severity_distribution.values,
+                         backgroundColor: ["#e74c3c", "#f1c40f", "#4a90e2", "#2ecc71", "#95a5a6"] }] },
+    options: { plugins: { legend: { position: "bottom" } } }
+  });
+
+  // Risk heat map (5x5) - fixed cell sizes, no chartArea dependency
+  var heat = stats.risk_heatmap;
+  var hmData = [];
+  for (var l = 0; l < 5; l++) {
+    for (var i = 0; i < 5; i++) {
+      hmData.push({ x: String(i + 1), y: String(l + 1), v: heat[l][i], w: 40, h: 40 });
+    }
+  }
+  new Chart(document.getElementById("heatmap-chart"), {
+    type: "matrix",
+    data: { datasets: [{ data: hmData,
+      backgroundColor: function (ctx) {
+        var v = ctx.dataset.data[ctx.dataIndex].v;
+        if (v === 0) return "rgba(200,210,220,0.25)";
+        return "rgba(231,76,60,0.75)";
+      } }] },
+    options: { plugins: { legend: { display: false } },
+               scales: {
+                 x: { type: "category", labels: ["1","2","3","4","5"], title: { display: true, text: "Impact" } },
+                 y: { type: "category", labels: ["1","2","3","4","5"], title: { display: true, text: "Likelihood" } }
+               } }
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "base_shell.html" %}
+{% block title %}Permit to Work - EcoAegis{% endblock %}
+{% block content %}
+<h1>Permit to Work (PTW)</h1>
+
+<div class="card">
+  <h2>Issue permit (requires approved risk assessment - BRN-001)</h2>
+  <form id="permit-form">
+    <label>Title <input type="text" name="title" required></label>
+    <label>Description <textarea name="description" rows="2"></textarea></label>
+    <label>Type
+      <select name="permit_type">
+        <option value="hot_work">Hot work</option>
+        <option value="confined_space">Confined space</option>
+        <option value="electrical">Electrical</option>
+        <option value="height">Working at height</option>
+        <option value="excavation">Excavation</option>
+        <option value="general">General</option>
+      </select>
+    </label>
+    <label>Vendor ID <input type="number" name="vendor_id" required></label>
+    <label>Risk assessment ID (must be approved) <input type="number" name="risk_assessment_id" required></label>
+    <label>Site location <input type="text" name="site_location"></label>
+    <label>Valid from <input type="datetime-local" name="valid_from"></label>
+    <label>Valid until <input type="datetime-local" name="valid_until"></label>
+    <button class="btn btn-primary" type="submit">Submit for approval</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Permit list</h2>
+  <table class="data-table" id="permit-table">
+    <thead><tr><th>Ref</th><th>Title</th><th>Type</th><th>Vendor</th><th>Status</th><th>Valid until</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script src="/static/js/permits.js"></script>
+{% endblock %}

@@ -1,0 +1,671 @@
+SHE MANAGEMENT PLATFORM
+Business Requirements Specification
+Document Contributors
+Document Approvals
+Document History
+1. Introduction
+This Business Requirements Specification (BRS) defines the full set of functional, non-functional, security, and integration requirements for the SHE Management Platform an integrated, digital workflow system purpose-built to standardise, automate, and enforce compliance across all ten Safety, Health, and Environment (SHE) operational process modules.
+The platform introduces structured workflow logic, role-based access controls (RBAC), live risk register synchronisation, and statutory reporting capabilities, consolidating them into a single governed environment for managing the organisation’s SHE obligations. These obligations span vendor management, community relations, emergency preparedness, incident investigation, training, and environmental assessments.
+This BRS is technology independent. It defines what the system must do not how it should be technically implemented. The detailed system architecture and technical design are to be produced during the subsequent solution design phase.
+1.1 Background and Problem Statement
+The organisation’s SHE functions currently operates across ten discrete process areas, including vendor compliance management, community grievance resolution, emergency response, and environmental impact assessment. These processes are governed by manual workflows, dispersed documentation systems, and inconsistent escalation chains.
+This operational fragmentation creates three categories of measurable risk that the platform is designed to resolve:
+Risk Category 1 Compliance Gaps
+Incident data, vendor records, and regulatory submissions are maintained in separate, unconnected systems.
+There is no single auditable repository to confirm that all SHE obligations have been met.
+Regulatory submissions can be missed or incomplete due to lack of a central tracking mechanism.
+Risk Category 2 Escalation Failures
+Approvals and follow-up actions depend on email chains and verbal instructions rather than enforced workflow routing.
+There is no system-level mechanism to prevent approval skipping or unauthorised delegation.
+Cases can stall indefinitely without automated escalation to higher authority.
+Risk Category 3 Statutory Exposure
+Reporting timelines to external bodies such as NSSA, EMA, and ZRP are at risk when tracked manually.
+There is no automated notification system to alert responsible parties when statutory deadlines are approaching.
+Missed submissions create legal and reputational exposure for the organisation.
+The SHE Management Platform directly addresses these three risk categories by establishing a centralised, workflow-driven system that enforces process compliance, automates escalation, and maintains a live, cross-module Corporate Risk Register.
+1.2 Objectives
+1.2.1 Core System Objectives
+Digitise and enforce all ten SHE operational process workflows within a single governed platform.
+Maintain a live Central Risk Register that is synchronised across incident, grievance, emergency, and environmental modules in real time.
+Enforce role-based workflow routing and approval chains aligned to the RACI framework defined in each process standard.
+Automate statutory reporting submissions to NSSA, EMA, and Law Enforcement where regulatory timelines apply.
+Provide end-to-end audit trails for every SHE processes action, approval, and closure decision.
+1.2.2 Business Objectives
+Eliminate unauthorised vendor site deployments through mandatory, system-issued Permit to Work (PTW) issuance and validation.
+Reduce community grievance escalation into legal crises through structured intake, investigation, and resolution workflows.
+Ensure zero environmental regulatory violations on new project developments by enforcing Environmental Impact Assessment (EIA) completion prior to project clearance.
+Improve executive visibility into corporate SHE risks through structured, timely reporting at operational, management, and Board levels.
+1.2.3 Operational Objectives
+Integrate with Procurement, HR, Legal, and Finance systems to support vendor onboarding, training coordination, and emergency resource provisioning.
+Deliver a clean, intuitive user interface accessible to field-level SHE Champions, Officers, Managers, and executive approvers.
+Support configurable notification and escalation thresholds aligned to each process module’s compliance timelines.
+Maintain a corporate Learning Management System (LMS) integration to synchronise training records and competency matrices.
+1.3 Platform Concept and Architecture
+The SHE Management Platform is structured around four operational intelligence layers, each representing a cluster of related process modules:
+These layers are exposed through a unified platform interface featuring module-based navigation, role-enforced access, persistent workflow tracking, and cross-module risk data synchronisation.
+The platform is accessible to the following user categories:
+Internal Users: SHE Champions, SHE Officers, SHE Managers, Line Managers, Project Managers, Heads of Department, CRO, COO, and CEO.
+Executive Users: CRO, COO, CEO, and Board Committee Chairpersons, accessing approval workflows and strategic reporting dashboards.
+External Actors: Community complainants, EMA Consultants, and Regulators, accessing designated external-facing portals only.
+2. System Roles and Access Hierarchy
+The platform must enforce a unified role architecture aligned to the RACI assignments defined across all ten SHE process standards. Each role maps to a distinct access tier with specific platform permissions and workflow authorities. The following roles must be implemented:
+Each role tier is enforced through Role-Based Access Control (RBAC) logic within the platform. Administrators may assign and revoke roles without system redeployment. No role may assume the permissions of a higher-tier role, and approval skipping is technically prevented at the workflow engine level.
+3. Core Master Data Registries
+The platform database architecture must maintain the following global master registries. These registries are accessible across all ten process modules and are governed by enforced synchronisation logic meaning data written in one module automatically propagates to the relevant registry without manual intervention.
+3.1 Central Risk Register
+A live logistical matrix connecting environmental impacts, active workplace hazards, asset vulnerabilities, and ongoing remediation steps across all business divisions. The Risk Register is the single source of truth for corporate SHE risk status.
+The Risk Register must be updated automatically when any of the following events occur:
+An incident is closed in the Accident & Incident module (SHEIMI), including root cause classification and remediation status.
+A community grievance is resolved or classified as an unresolved residual risk in the Grievance module (SHECCM).
+An emergency response is closed out in the Emergency Response module (SHEER), with post-crisis findings recorded.
+An EIA is rejected or a project is flagged as high-risk in the Environmental Impact Assessment module (SHEIA).
+3.2 Key Issues SHE Tracker
+A live operational log tracking audit exceptions, open non-conformances, daily reporting metrics, and closed safety observations. The tracker must be updated whenever a SHE report is approved in the Reporting module (SHER) and must support visual data display for executive dashboards.
+Items in the Key Issues Tracker must be assigned an age threshold  unresolved items that exceed this threshold must automatically escalate to the SHE Manager and CRO.
+3.3 Vendor Compliance Roster
+A registry mapping third-party contractors against active insurance policies, certifications, risk profiles, and approved site-access permits. The roster must integrate with the Procurement ERP system and must automatically flag expired certifications or lapsed PTWs. A vendor with an expired certification or lapsed PTW must have their PTW eligibility suspended until the renewal is recorded.
+3.4 Community Grievance Register
+A formal case log recording all grievances received from external stakeholders. Each record must capture source channel, date received, grievance classification, assigned investigating officer, investigation status, resolution outcome, and complainant notification history. This register provides a full, auditable trail of every community interaction.
+3.5 Training Records and Competency Matrix
+A repository of all completed training sessions, trainee rosters, post-training competency scores, and upcoming scheduled refresher courses. This registry must synchronise bidirectionally with the corporate Learning Management System (LMS) pushing completion data when a session is closed and pulling LMS data when assessing training gaps.
+4. Business Rules
+The following business rules define the non-negotiable operational constraints and compliance logic that the platform must enforce across all modules. These rules govern platform behaviour, workflow routing, data integrity, and integration actions. They cannot be overridden by individual users at the field or managerial level.
+Note: Priority codes: M = Must Have (mandatory for go-live) | S = Should Have (high value, next cycle) | C = Could Have | W = Won’t Have this time.
+5. Functional Requirements
+Note: Priority codes: M = Must Have | S = Should Have | C = Could Have | W = Won’t Have this time.
+5.1  Module: Vendor SHE Compliance Management (SHECMV)
+Functional Objective: Standardise the structural assessment, contract governance, monitoring, and closure of contractor-executed on-site works. The module must ensure zero unauthorised vendor site deployments and 100% PTW coverage for all high-risk tasks.
+5.2 Module: Community Complaints Management (SHECCM)
+Functional Objective: Provide a structured, accountable process for receiving, investigating, and resolving community grievances. Ensure complainant notification and maintain a formal, auditable case record for every grievance received.
+5.3 Module: External Communication for Environmental & Social Concerns (SHE EC&SC)
+Functional Objective: Govern the identification, internal approval, and controlled distribution of public-facing communications regarding environmental and social impacts. Ensure 100% HOD vetting before any external release.
+5.4 Module: Emergency Preparedness & Response Planning (SHEEPRP)
+Functional Objective: Systematise the creation, resource mapping, testing, and continuous improvement of the corporate Disaster Management Response Plan. Enforce timely mock drill execution and ensure all emergency resources are formally provisioned through the system.
+5.5 Module: Accident & Incident Reporting and Investigation (SHEIMI)
+Functional Objective: Enforce automated tracking, thorough investigation routing, compliance escalation, and statutory closure for all workplace accidents and safety incidents. Ensure 100% root-cause tracing for all critical losses.
+5.6 Module: Annual Workplan Management (SHEAWPM)
+Functional Objective: Govern the full lifecycle of the annual corporate SHE operational plan from initial baseline assessment through committee review, executive approval, and real-time task tracking throughout the fiscal year.
+5.7 Module: Live Emergency Response (SHEER)
+Functional Objective: Execute real-time communications, executive strategic direction, staff relocation coordination, site clearance certification, and statutory notifications during an active crisis event. Ensure no time-critical step is missed through enforced workflow routing.
+5.8 Module: SHE Business Reporting (SHER)
+Functional Objective: Automate the creation, multi-tiered review, and action tracking for periodic Board, management, and operational safety performance reports. Ensure on-time submissions and live visibility in the Key Issues Tracker.
+5.9 Module: Environmental & Social Awareness Training (SHET&A)
+Functional Objective: Coordinate training needs assessments, external vendor onboarding, course delivery, and feedback capture for environmental and safety awareness programmes. Maintain continuous alignment between training content and recent incident trends.
+5.10 Module: Environmental Impact Assessment for New Projects (SHEIA)
+Functional Objective: Standardise compliance logic for screening, commissioning, evaluating, and submitting EIAs for all engineering and infrastructure initiatives. Enforce zero environmental regulatory violations and 100% onboarding of EMA-accredited consultants.
+6. Cross-Module Integration Dependencies
+The platform must function as a tightly integrated ecosystem not a set of isolated modules. The following cross-module integration logic must be implemented by the development team to ensure data synchronisation, automated escalation, and consistent risk governance across all ten process modules. All integration events must be logged in the audit trail.
+7. Technical Interface Specifications
+The following requirements define the technical connectivity layer for the platform. These are technology-direction requirements the detailed integration architecture is to be specified and agreed upon during the solution design phase. All interfaces must use industry-standard REST APIs with JSON payloads unless otherwise noted.
+8. Non-Functional Requirements
+Note: Priority codes: M = Must Have | S = Should Have | C = Could Have | W = Won’t Have this time.
+9. Security Requirements
+Note: Priority codes: M = Must Have | S = Should Have | C = Could Have | W = Won’t Have this time.
+10. Testing and Documentation Requirements
+10.1 User Acceptance Testing (UAT)
+Acceptance criteria will be based on the functional and non-functional requirements defined in this document. Detailed UAT test cases, test scripts, and sign-off criteria will be documented and approved in a separate UAT Plan prior to testing commencement.
+Priority areas for UAT include the following:
+Permit to Work (PTW) issuance and vendor compliance gating logic, including expired certification suspension.
+Incident escalation routing through the full hierarchical approval chain from intake to Board Chairperson.
+Automatic Risk Register synchronisation across SHEIMI, SHECCM, SHEER, and SHEIA upon case closure.
+EIA clearance gate enforcement confirming projects are technically blocked without recorded EMA approval.
+Statutory report generation, template rendering, and external submission workflows for NSSA, EMA, and ZRP.
+Mock drill scheduling, performance feedback capture, and automated EPRP update queue generation.
+Approval chain integrity confirming no step can be skipped or delegated to a lower-authority role.
+10.2 Quality Assurance
+The quality assurance team must validate the platform against all requirements defined in this document prior to production deployment. The following areas require particular attention:
+Workflow routing accuracy across all ten process modules, including all conditional branching logic.
+Cross-module integration logic and Risk Register synchronisation event triggers.
+RACI enforcement within the approval hierarchy confirming role permissions match the definitions in Section 2.
+Statutory deadline alert triggers and notification delivery reliability, including retry behaviour on failure.
+10.3 Regression Testing
+Regression testing must be performed following any workflow engine update, integration change, user interface release, or configuration change. All module-specific process logic must be re-validated against defined test cases after each release, and test results must be formally recorded.
+10.4 Documentation Requirements
+The following documentation artefacts must be produced, maintained, and version-controlled throughout the project lifecycle:
+High-level and low-level system design documents for each of the ten process modules.
+End-to-end process flow diagrams for all ten SHE modules, aligned to the RACI assignments and workflow definitions in this BRS.
+Integration documentation for all connected systems: Procurement ERP, LMS, Corporate Communications Gateway, EMA Portal, and Board Reporting Infrastructure.
+A maintained Data Dictionary defining all master data entities, their source module, data types, and cross-module linkage logic.
+This BRS, maintained as the living requirements baseline and version-controlled as the platform evolves through future releases.
+11. Risk Assessment Register Integration
+The organisation maintains a live Risk Assessment Register that captures process-level risks, hazard descriptions, inherent and residual risk scores, and existing mitigations across all business functions. The SHE Management Platform must directly support the ingestion, management, and reporting of entries from this register. This section defines the platform requirements derived from the existing register data and structures.
+11.1 Risk Register Data Model
+Each risk entry in the register captures the following structured fields. The SHE platform must store, display, and allow update of all fields for every active risk record:
+11.2  Risk Scoring and Classification Logic
+The platform must implement the following scoring and classification logic, consistent with the existing register methodology:
+Inherent Risk Score = Likelihood (1–5) × Impact (1–5). Maximum inherent score = 25.
+Residual Risk Score = Inherent Risk Score ÷ Control Effectiveness (1–5). A higher control effectiveness rating reduces the residual score.
+Risk Category must be selectable from the following values: Operational, Financial, Regulatory, Strategic.
+Risk Direction must be selectable from: Increasing (↑), Stable (→), Decreasing (↓). This field supports executive trend dashboards.
+Risks with an Aggregate Residual Score ≥ 12 must be automatically flagged as High Priority and escalated to the CRO dashboard.
+Risks with an Aggregate Residual Score of 8–11 are classified as Medium Priority and must appear on the SHE Manager review queue.
+Risks with an Aggregate Residual Score ≤ 7 are classified as Low Priority and are managed at the operational level.
+11.3 Key Risk Categories Observed in the Existing Register
+Based on analysis of the organisation’s current Risk Assessment Register, the following risk categories are prevalent and must be represented in the SHE platform’s risk taxonomy:
+11.4  Functional Requirements - Risk Register Module
+Note: Priority codes: M = Must Have | S = Should Have | C = Could Have | W = Won’t Have this time.
+12. ESG KPI Tracking and Reporting
+The organisation tracks a comprehensive set of Environmental, Social, and Governance (ESG) Key Performance Indicators (KPIs) across all business units monthly. Several of these KPIs fall directly within the SHE function’s mandate. The SHE Management Platform must serve as the system of record for capturing, tracking, and reporting on all SHE-relevant ESG KPIs.
+12.1  Environmental KPIs SHE Platform Scope
+The following environmental KPIs are tracked across the organisation and fall within the SHE platform scope. These KPIs cover energy consumption, emissions, waste management, and renewable energy adoption as defined in the ESG KPI registers (FY26 and FY27):
+The following environmental KPIs are currently tracked by the organisation and must be captured, monitored, and reported through the SHE platform. Targets are as defined in the ESG KPI register (FY26):
+12.2  Social KPIs - SHE Platform Scope
+The following social KPIs are directly relevant to the SHE function and must be tracked within the platform. These cover health and safety incidents, training, and community engagement:
+The following social KPIs are directly relevant to the SHE function and must be tracked within the platform:
+12.3  Governance KPIs - SHE Platform Scope
+The following governance KPIs are tracked by the organisation and must be supported within the SHE platform for integrated reporting and compliance monitoring:
+The following governance KPIs are tracked by the organisation and must be supported within the SHE platform:
+Number of corruption and bribery cases reported Target: 0.
+Regulatory fines and penalties paid Target: ZiG 0 (zero tolerance).
+KYC Compliance rate -Target: ≥99%.
+Regulatory penalties (ZIMRA fiscal devices) -Target: 0.
+Tip-off anonymous reports received and investigated Target: 100% investigated.
+Ethics policy acknowledgement sign-offs -Target: 100% of relevant staff.
+12.4  Functional Requirements - ESG KPI Module
+The following functional requirements define the ESG KPI Tracking and Reporting module capabilities:
+Note: Priority codes: M = Must Have | S = Should Have | C = Could Have | W = Won’t Have this time.
+13. Stakeholder Engagement Management
+The organisation maintains structured Stakeholder Engagement Plans (SEPs) across all business functions, tracking engagement issues, objectives, risks, mitigations, target dates, and quarterly feedback. Several stakeholder relationships are directly relevant to SHE obligations particularly EMA, NSSA, ZRP, POTRAZ, and community stakeholders. The SHE platform must support the management and tracking of SHE-specific stakeholder engagements.
+13.1 Key Regulatory Stakeholders Relevant to SHE
+The following external regulatory and community stakeholders have a direct bearing on the SHE function's statutory obligations and must be formally tracked within the platform. Engagement data is sourced from the organisation's Stakeholder Engagement Plans (FY26 and FY27):
+The following external regulatory and community stakeholders have a direct bearing on the SHE function’s statutory obligations and must be formally tracked within the platform:
+13.2  Stakeholder Engagement Data Model
+The following table summarises the structured data model for Stakeholder Engagement tracking, consistent with the organisation's existing Stakeholder Engagement Plan format used across all business units (Finance, EBS, CX, Tech Services, etc.):
+The SHE platform must maintain a structured Stakeholder Engagement Register for all SHE-relevant engagements. Each engagement record must capture the following fields, consistent with the organisation’s existing Stakeholder Engagement Plan format:
+Engagement Issue / Message - What is being discussed or managed with this stakeholder.
+Stakeholder / Audience - Name of the organisation or group.
+Contact Person - Named individual and contact details.
+Engagement Method - How the engagement is conducted (physical, online, letter, portal submission).
+SHE Engagement Objectives - Why the organisation is engaging this stakeholder from the SHE perspective.
+Stakeholder Engagement Objectives - What the stakeholder seeks from the engagement.
+Stakeholder Risk - Risk to the organisation if engagement is managed poorly.
+Risk Mitigation - Actions taken to mitigate the stakeholder risk.
+Target Date / Frequency - When the engagement is planned and how often.
+Responsible Person - Named SHE or business representative owning the engagement.
+Quarterly Feedback - Structured update for each quarter (Q1–Q4) capturing outcomes, feedback received, and next steps.
+13.3  Functional Requirements - Stakeholder Engagement Module
+The following functional requirements define the Stakeholder Engagement Management module capabilities:
+Note: Priority codes: M = Must Have | S = Should Have | C = Could Have | W = Won’t Have this time.
+– End of Document –
+14. Annual Sustainability Reporting Process
+The organisation maintains a structured Annual Sustainability Reporting Process that governs the collection, validation, review, and publication of sustainability and SHE performance data. The SHE Management Platform must support and automate key aspects of this reporting workflow to ensure data integrity, timeliness, and compliance with internal and external reporting obligations.
+14.1 End-to-End Sustainability Reporting Workflow
+The proposed end-to-end sustainability reporting workflow consists of the following stages, each with defined responsibilities and system support requirements:
+14.2 Data Collection, Validation and Review Controls
+The following controls must be enforced by the SHE platform to ensure data integrity throughout the reporting process:
+14.3 Proposed Reporting Calendar
+The following reporting calendar defines key milestones and deadlines for the annual sustainability reporting cycle:
+14.4 Automation Recommendations
+The following automation recommendations are proposed to streamline the reporting process and reduce manual effort:
+14.5 Functional Requirements - Annual Reporting Module
+The following functional requirements define the Annual Sustainability Reporting module capabilities:
+SHE Management Platform BRS | Version 1.1.0  |  June 2026  |  Internal – Confidential
+
+--- TABLE 1 ---
+Document Title | SHE Management Platform – Business Requirements Specification
+Document Owner | Safety, Health & Environment (SHE) Division
+Version | 1.0.0
+Status | Draft
+Date | June 2026
+Classification | Internal – Confidential
+
+--- TABLE 2 ---
+Name | Designation | Role | Date
+Brendon Buwerimwe |  | Author | June 2026
+[Name] |  | Reviewer | 
+[Name] |  | Technical SME | 
+
+--- TABLE 3 ---
+Name | Designation | Date | Signature
+[Name] |  |  | 
+[Name] |  |  | 
+[Name] |  |  | 
+
+--- TABLE 4 ---
+Revision | Date | Author | Summary of Changes
+v1.0.0 | June 2026 | Brendon Buwerimwe | Initial Draft
+v1.0.1 | June 2026 | Brendon Buwerimwe | 
+
+--- TABLE 5 ---
+Intelligence Layer | Modules Covered
+Compliance Governance | Vendor PTW management (SHECMV), EIA screening (SHEIA), Annual Workplan (SHEAWPM), and regulatory submission.
+Incident & Risk Management | Accident reporting (SHEIMI), root cause investigation, risk register updates, and statutory notifications.
+Community & Communications Management | Grievance intake and tracking (SHECCM), resolution workflows, and approved external communications (SHE EC&SC).
+Emergency & Training Readiness | Preparedness plan management (SHEEPRP), mock drill execution (SHEER), live emergency response coordination, and SHE training delivery (SHET&A).
+
+--- TABLE 6 ---
+Role | Tier | Platform Permissions & Responsibilities
+SHE Champion / Auditor | Field Execution | Initial incident intake, grievance logging, mock drill participation, raw data entry, and field-level tracking across active process cases. Read-only access to Risk Register summaries.
+SHE Officer | Field Execution | Process case creation, investigation support, report drafting, workplan tracking, vendor monitoring, training coordination, and EIA monitoring. Can submit cases for SHE Manager review.
+SHE Manager / Head of SHE | Process Owner | Review and approval of submissions, PTW issuance, site certifications, draft report validation, workplan authorship, and investigation team assignment. Authority to reject and return cases with embedded comments.
+SHE Head of Department (HOD) | Departmental Authority | Approval of external communications documents, escalation authority for community grievances, and field certification co-authority during emergency response events.
+Line Manager / Project Manager | Operational Owner | On-site vendor oversight, remediation action execution, training roster compilation, and implementation of approved incident investigation recommendations.
+Chief Risk Officer (CRO) | Executive Risk Authority | High-priority workplan approval, major incident report authorisation, statutory communication sign-off, executive escalation gateway, and Risk Register oversight.
+COO / CEO | Ultimate Authority | Material risk exceptions, operational shutdown decisions, emergency strategic direction, and Board-level report finalisation.
+Board Committee Chairperson | Governance | Annual workplan sign-off, major incident closure notification, and recipient of Board-level SHE reports. Read-only access to governance dashboards.
+External Actors (EMA Consultant, Regulators, Complainants) | External Portal | Community grievance submission, EIA report delivery, and statutory notification receipt. Access strictly limited to designated external-facing portals with no access to internal modules.
+
+--- TABLE 7 ---
+Req # | Use Case | Description | Priority
+BRN-SHE-001 | PTW Enforcement | No vendor or contractor may commence on-site work without a valid, system-issued Permit to Work (PTW). The PTW must only be generated by the SHE Manager after reviewing and approving the vendor’s submitted Risk Assessment Report. Manual or offline PTW issuance is strictly prohibited. Any PTW issued outside the platform is invalid. | M
+BRN-SHE-002 | Incident Notification Timeline | All workplace accidents or near-misses must be logged in the platform within 24 hours of occurrence. External statutory notifications to NSSA, EMA, or ZRP must be dispatched within 48 hours for incidents classified as critical. The system must auto-alert the SHE Officer and CRO if the notification deadline is approaching and has not yet been met. | M
+BRN-SHE-003 | Risk Register Synchronisation | Any case closed as an unresolved residual risk in the Community Grievance module (SHECCM) must: (1) automatically flag the corresponding asset ID in the Central Risk Register; (2) mandate a targeted mock drill in the Emergency Preparedness module (SHEEPRP); and (3) include the item in the next Board report generated by the Reporting module (SHER). These three actions must trigger simultaneously upon case closure classification. | M
+BRN-SHE-004 | EIA Clearance Gate | No new infrastructure or engineering project may proceed to departmental implementation without a confirmed EMA approval status recorded in the platform. Projects submitted without a completed EIA where one is legally required must be blocked at the project initiation stage. A mandatory notification must be issued to the SHE Manager and CRO at the point of blocking. | M
+BRN-SHE-005 | Approval Chain Enforcement | Each module’s approval workflow must follow the hierarchy defined in the RACI specification. Approvals may not be skipped, bypassed, or delegated to a lower-authority role. If an approver is unavailable, the system must escalate to the next defined authority and log the delegation event with timestamp, original assignee, and reason code. | M
+BRN-SHE-006 | Annual Workplan Balance | All tasks in the Annual SHE Workplan must be tagged as either Preventive (P) or Detective (D) controls. The system must flag any draft workplan where preventive controls constitute less than 40% of total tasks and must prevent submission of the draft until the balance is corrected or an override is approved by the CRO. | M
+BRN-SHE-007 | Emergency Re-Occupation Gate | No staff member or contractor may re-occupy a facility declared unsafe during an emergency event until a formal Site Safe for Occupation Certificate has been issued and recorded within the platform by both the SHE Manager and the HOD of Security & Investigations. The system must enforce this gate at the individual access-request level. | M
+BRN-SHE-008 | External Communications Vetting | All public-facing SHE communications including press releases, regulatory notices, community advisories, and digital content must be reviewed and formally approved by the SHE Head of Department before dispatch to Corporate Communications for release. The system must prevent direct dispatch without a recorded HOD sign-off event. | M
+BRN-SHE-009 | Training Alignment to Incidents | The training plan must be reviewed and updated following every major incident closure. The system must prompt the SHE Officer to verify that the root cause of the incident is reflected in the next scheduled training module. Any unaddressed training gaps identified at this stage must remain flagged and visible in the Key Issues Tracker until resolved. | S
+BRN-SHE-010 | Grievance Resolution Notification | All complainants who submitted a community grievance must receive a formal written notification of the resolution outcome whether fully resolved or managed as a residual risk before the case is marked as closed in the system. The system must record the notification event with timestamp and method of delivery. | M
+BRN-SHE-011 | Mock Drill Mandatory Frequency | At least one organisation-wide emergency mock drill must be completed per calendar year. The system must block closure of the Annual Workplan cycle if no mock drill completion record exists for that period. A warning notification must be issued to the SHE Manager 60 days before year-end if no drill has been completed. | M
+BRN-SHE-012 | Report Submission Compliance | SHE reports must be submitted on time per the frequency schedule defined in the Reporting module. The system must auto-flag overdue submissions to the SHE Manager and CRO. Persistent non-submission (beyond a configurable grace period) must trigger an escalation notification directly to the COO. | M
+BRN-SHE-013 | Vendor Certification Validity | Vendor certifications, insurance policies, and risk profiles registered in the Vendor Compliance Roster must not be expired at any point when an active PTW is in force. The system must notify the SHE Officer and Procurement Manager 30 days before expiry. Upon expiry without a recorded renewal, the vendor’s PTW eligibility must be automatically suspended until the record is updated. | M
+BRN-SHE-014 | Procurement Gateway for Consultants | All EIA consultants onboarded through the SHEIA module and all external training agencies onboarded through the SHET&A module must be sourced through the formal Procurement process. Direct engagement without Procurement validation is prohibited. The system must generate a Procurement engagement request automatically when a consultant or agency onboarding is initiated. | M
+
+--- TABLE 8 ---
+Req # | Use Case | Description | Priority
+FNR-SHE-001 | Vendor Risk Screening | The system must enable the SHE team to conduct a structured risk assessment of the vendor’s scope of work, workforce, equipment, and site conditions prior to PTW issuance. The risk screening must produce a documented Risk Assessment Report that forms the basis for PTW approval or rejection. | M
+FNR-SHE-002 | PTW Issuance and Validation | Upon approval of the vendor’s Risk Assessment Report, the system must generate a unique, system-issued Permit to Work record linked to the vendor’s compliance record. The PTW must specify approved scope, site boundaries, valid period, and responsible SHE Officer. No PTW may be issued without a completed and approved Risk Assessment. | M
+FNR-SHE-003 | Vendor Monitoring and Site Oversight | During active vendor works, the system must support logging of periodic field audits, non-conformance observations, and corrective action assignments. Observations must be linked to the vendor’s PTW record and tracked to resolution. | M
+FNR-SHE-004 | PTW Closure and Vendor Offboarding | Upon completion of vendor works, the system must guide the SHE Officer through a formal PTW closure checklist, including site restoration confirmation, incident clearance, and final certification. The vendor record must be updated in the Vendor Compliance Roster upon closure. | M
+FNR-SHE-005 | Vendor Certification Monitoring | The system must continuously monitor the expiry dates of all active vendor certifications, insurance policies, and risk profiles within the Vendor Compliance Roster. Automated alerts must be sent 30 days before expiry to the SHE Officer and Procurement Manager, with escalation to SHE Manager upon expiry. | M
+FNR-SHE-006 | Procurement Gateway Integration | When vendor contract terms are created or modified within the SHECMV module, the system must send structured API payloads to the Procurement ERP module to hold, release, or flag vendor onboarding tasks accordingly. | M
+
+--- TABLE 9 ---
+Req # | Use Case | Description | Priority
+FNR-SHE-007 | Multi-Channel Grievance Intake | The system must ingest community grievances from multiple channels, including customer touchpoints, regulatory bodies, media reports, and direct submissions via an external portal. Each grievance must be assigned a unique case reference and logged into the Community Grievance Register using a standardised template that captures: complainant details, issue description, date received, source channel, and initial severity classification. | M
+FNR-SHE-008 | Classification and Investigation | The system must enable the SHE team to classify the grievance by type and severity, assign a dedicated investigating officer, and record all stakeholder engagement activities during the investigation. The investigation record must capture both business impact and community impact assessments. | M
+FNR-SHE-009 | Resolution Plan and Assignment | The system must support drafting of a formal Resolution Plan and route recommended corrective actions to designated Line Managers for field implementation. The assignment status of each action must be tracked using configurable status states (Open, In Progress, Resolved) and visible on the SHE Officer’s dashboard. | M
+FNR-SHE-010 | Escalation Workflow | If full resolution is not achievable within the initial investigation, the system must trigger a mandatory negotiation workflow to engage the community on residual risks and secondary mitigation options. The escalation event, its rationale, and all negotiation records must be logged and notified to the HOD and CRO. | M
+FNR-SHE-011 | Risk Register Synchronisation and Complainant Notification | Upon case closure (resolved or residual risk classification), the system must automatically update the Central Risk Register with the grievance parameters. Simultaneously, the system must generate and dispatch a formal written notification to the complainant confirming the resolution outcome before the case status is set to closed. | M
+
+--- TABLE 10 ---
+Req # | Use Case | Description | Priority
+FNR-SHE-012 | Issue Tracking | The system must allow the SHE Officer to log and actively track external environmental or social concerns raised by public bodies, NGOs, or customers. Each concern must remain tracked as an open case until its operational impact has fully subsided and the case is formally closed. | M
+FNR-SHE-013 | Awareness Plan Composition | The system must support drafting of a public awareness action plan within the platform, including identification of target customer or community segments and generation of a formal communications brief linked to the concern case. | M
+FNR-SHE-014 | HOD Review and Approval | All drafted communications must be routed to the SHE Head of Department for formal review and approval before any handoff to Corporate Communications. The system must technically prevent direct dispatch of any communication without a recorded HOD sign-off. Rejected drafts must be returned with embedded revision comments. | M
+FNR-SHE-015 | Multi-Channel Distribution | Upon HOD approval, the system must support configuration of the distribution frequency, communication medium (digital, email, workshop, face-to-face), and formal handoff of the approved package to Corporate Communications for execution. | M
+FNR-SHE-016 | Effectiveness Assessment | The system must record distribution confirmations returned from Corporate Communications and prompt the SHE Officer to complete a mandatory effectiveness assessment evaluating message reach and community response. The case must remain open until the effectiveness review record is formally captured. | S
+
+--- TABLE 11 ---
+Req # | Use Case | Description | Priority
+FNR-SHE-017 | IMT/ECMT Appointment | The system must support the formal identification and documented appointment of the Incident Management Team (IMT) and Emergency Crisis Management Team (ECMT), recording each member’s name, assigned role, emergency contact details, and appointment date. | M
+FNR-SHE-018 | Disaster Management Plan Drafting | The system must enable the SHE Champion / Integrated Team Manager to compile a complete Disaster Management Response Plan within the platform, capturing human resource allocations, approved budgets, physical tool inventories, and designated emergency facilities. | M
+FNR-SHE-019 | Executive Approval Workflow | The plan must be submitted to Senior Management through a structured approval workflow, triggering an automated resource adequacy review at each approval stage. If rejected, the system must route the plan back to the author with embedded reviewer comments and a mandatory revision deadline. | M
+FNR-SHE-020 | Mock Drill Scheduling and Execution | The system must enable scheduling of mock drills across business segments, send automated notifications to all required participants, and provide a structured logging interface for drill performance observations and feedback. HR, Finance, and Procurement must be able to request and provision emergency materials through the system. | M
+FNR-SHE-021 | Plan Optimisation from Drill Feedback | Post-drill feedback captured within the system must automatically generate an improvement item queue for the Emergency Preparedness Plan. Each improvement item must be tracked individually to closure. The plan version may not be incremented until all outstanding improvement items have been resolved. | M
+
+--- TABLE 12 ---
+Req # | Use Case | Description | Priority
+FNR-SHE-022 | Incident Intake and Initial Notification | Any employee must be able to log an incident via the platform using a predefined intake form accessible from all device types. Upon submission, an Initial Notification Document must be automatically compiled and routed simultaneously to the SHE Unit and the relevant Line Manager. The incident must be assigned a unique case reference at the point of intake. | M
+FNR-SHE-023 | Investigation Team Assignment | The system must route incident data through the CRO to the CEO for the formal commissioning of an Investigation Team. The composition of the team, including member names and assigned roles, must be recorded within the incident case file and version controlled. | M
+FNR-SHE-024 | Root Cause Report and Hierarchical Approval | The appointed investigation team must compile a full root-cause report within the system, capturing contributing factors, immediate causes, and systemic issues. The report must route sequentially through the CRO, COO, CEO, and Board Chairperson for approval. No approval step may be bypassed, skipped, or re-sequenced. | M
+FNR-SHE-025 | Remediation Delegation and Follow-Up Audit | Approved remediation recommendations must be assigned to designated Line Managers for field implementation. The SHE Officer must log follow-up audit visits and record the verification status of each recommendation. Verified items trigger standard close-out; unresolved items automatically escalate to the SHE Manager. | M
+FNR-SHE-026 | Statutory Submission | Upon final case closure, the system must generate completed regulatory report files for NSSA, EMA, and ZRP (where applicable) and submit them through the Statutory Reporting Engine. Submission status and acknowledgement receipts must be tracked within the incident case file. The Central Risk Register must be updated with incident metadata upon final closure. | M
+
+--- TABLE 13 ---
+Req # | Use Case | Description | Priority
+FNR-SHE-027 | Baseline Assessment Ingestion | The system must support structured ingestion of planning inputs from international safety standards, applicable regulatory mandates, and outstanding historical audit deviations. These inputs must be systematically reviewed by the SHE Manager as the foundation for workplan drafting. | M
+FNR-SHE-028 | Workplan Draft and Committee Review | The system must enable the SHE Manager to compile a draft Annual Workplan with itemised tasks tagged as Preventive (P) or Detective (D) controls, cost projections, and milestone dates. The draft must route to the SHE Management Review Committee for structured review before executive escalation. | M
+FNR-SHE-029 | Executive Approval and Distribution | The finalised plan must route to the CRO and COO for executive sign-off. Upon approval, the system must distribute the plan to the regional SHE Committee network. If declined at any stage, the plan must be returned to the author with embedded revision comments and required response timelines. | M
+FNR-SHE-030 | In-Year Tracking and Mid-Year Adjustments | The system must support real-time tracking of workplan task completion status throughout the fiscal year, visible on the SHE Manager’s dashboard. The SHE Officer may submit mid-year adjustment requests for active tasks; all adjustments must receive SHE Manager approval before taking effect and must be version-logged in the workplan record. | M
+
+--- TABLE 14 ---
+Req # | Use Case | Description | Priority
+FNR-SHE-031 | Incident Alert and Strategic Direction | The system must ingest an active crisis alert and immediately route notifications to the SHE Unit, CRO, COO, and CEO. Executive strategic direction decisions must be logged within the case file with timestamp and identity of the directing authority. | M
+FNR-SHE-032 | Site Safety Certification | The SHE Manager and HOD of Security & Investigations must complete a structured physical field evaluation checklist within the system and formally issue a Site Safe for Occupation Certificate. Personnel re-entry must be blocked by the system until this certificate is recorded in the active emergency case. | M
+FNR-SHE-033 | Staff Relocation Workflow | If the site is deemed unsafe, the system must trigger a staff relocation workflow, coordinated by the Facilities Manager, CPO, and CHRO. Relocation task status must be tracked per individual or group until all staff are formally accounted for and recorded as safely relocated. | M
+FNR-SHE-034 | Post-Crisis Audit and Statutory Reporting | The SHE Unit must log root-cause findings and structural improvement recommendations within the case file. The system must file mandatory post-crisis reports with ZRP, NSSA, EMA, and relevant insurance providers, and must track acknowledgement of receipt from each recipient. | M
+FNR-SHE-035 | EPRP Update and Case Closure | Structural engineering repair tasks must be created and tracked to completion within the system. Post-crisis learnings must generate an automated update queue for the Emergency Preparedness & Response Plan. Case closure requires all outstanding repair tasks and EPRP improvement items to be formally resolved and recorded. | M
+
+--- TABLE 15 ---
+Req # | Use Case | Description | Priority
+FNR-SHE-036 | Report Type Selection | The system must support the creation of reports categorised by type and frequency: Weekly Operational, Monthly Management, Project-Specific, and Board-Level. Each report type must have a predefined distribution list, required approval chain, and submission deadline. Overdue reports must be flagged automatically. | M
+FNR-SHE-037 | Draft Compilation and SHE Manager Review | Raw SHE metrics and case data must be consolidated into a structured draft report within the system. The draft must route to the SHE Manager for initial review and data verification. If modifications are required, the draft is returned to the author with embedded review comments. | M
+FNR-SHE-038 | CRO Approval and Chart of Authority | Validated reports must route to the CRO for formal approval. Upon CRO approval, the report escalates per the corporate Chart of Authority to the relevant next recipient. If rejected, the system returns the report to the previous stage with CRO-embedded comments for revision. | M
+FNR-SHE-039 | Action Plan Tracking | Manco or Board-directed recommendations arising from approved reports must generate discrete action items within the system, assigned to named Line Managers with defined completion dates. Completion status must be tracked and reported as part of each subsequent reporting cycle. | M
+FNR-SHE-040 | Key Issues Tracker Update | Upon report approval, the SHE Manager must be able to close out resolved Key Issues items within the Tracker. Unresolved items must remain visible on executive dashboards and must auto-escalate beyond configured age thresholds, with notifications to the SHE Manager and CRO. | M
+
+--- TABLE 16 ---
+Req # | Use Case | Description | Priority
+FNR-SHE-041 | Training Needs Assessment | The system must ingest data from internal audits, closed incident logs, change management activities, and the overarching corporate training plan to identify and flag specific SHE awareness gaps requiring a training intervention. Each identified gap must be traceable to its source trigger. | M
+FNR-SHE-042 | Internal vs. Outsourced Delivery Decision | The system must support the SHE team’s structured determination of whether a training module should be delivered internally or outsourced to an external agency. If the decision is to outsource, a Procurement engagement request must be automatically generated within the system. | M
+FNR-SHE-043 | External Agency Onboarding | The system must support the Procurement-led vetting, selection, and onboarding of an external training agency. The agency’s credentials and accreditation records must be captured and validated within the platform before any training engagement is confirmed. | M
+FNR-SHE-044 | Logistics and Roster Management | The system must support scheduling of training sessions with automated notifications to relevant Line Managers. A trainee roster must be compiled and attendance captured for each session. Attendance records must be linked to individual employee competency records in the Training Records registry. | M
+FNR-SHE-045 | Feedback Capture and Training Plan Update | Trainee evaluations and post-session assessments must be captured within the system and compiled into a Training Performance Report. The report must route to the relevant Line Manager and Talent & Development team. The corporate Training Plan must be updated with scheduled refresher dates based on evaluation outcomes. | M
+
+--- TABLE 17 ---
+Req # | Use Case | Description | Priority
+FNR-SHE-046 | EIA Requirement Screening | The system must enable the SHE Unit to audit new project parameters against a structured EIA screening checklist and formally determine whether a full EIA is legally mandated under applicable environmental legislation. Projects that require an EIA must be flagged and technically blocked from proceeding without EIA completion. | M
+FNR-SHE-047 | Project Prospectus Request | Where an EIA is required, the system must notify the initiating department to prepare and submit an introductory Project Prospectus. The submitted prospectus must be formally linked to the project record before any consultant sourcing activity begins. | M
+FNR-SHE-048 | EIA Consultant Acquisition | The system must automatically generate a Procurement engagement request to source and onboard an EMA-accredited Environmental Impact Assessment Consultant (EIAC). The consultant’s credentials and EMA accreditation status must be formally verified within the system before the engagement is confirmed. | M
+FNR-SHE-049 | EIA Report Compilation and EMA Submission | The appointed consultant must deliver the draft EIA Report through the platform. The SHE Manager must review and formally approve the report before submission. Upon approval, the finalised EIA Report must be submitted to the Environmental Management Agency (EMA) through the platform, and submission status must be tracked to confirmed receipt. | M
+FNR-SHE-050 | EMA Decision Handling | Upon receipt of an EMA decision: if approved, the system must trigger project deployment tasks and assign environmental monitoring obligations to the project team. If rejected or flagged high-risk, the system must notify the project team, issue a formal risk alert to the SHE Manager and CRO, and log a mandatory recommendation to modify or discontinue the project. | M
+FNR-SHE-051 | Lifecycle Environmental Monitoring | Throughout the active construction and operational phase, the SHE Officer / Manager must log, evaluate, and formally record ongoing environmental observations against the project record. Open observations must remain tracked until formally closed. | M
+
+--- TABLE 18 ---
+Source Module | Target Module(s) | Integration Logic
+SHEIA – EIA Screening | SHECMV – Vendor PTW | When environmental hazards are flagged during EIA screening, the system must trigger mandatory vendor risk assessment requirements and block PTW issuance until the flagged hazards are formally addressed.
+SHECMV – Vendor PTW | SHEIMI – Incident Investigation | If a field breach or physical accident occurs during active vendor works, the incident must be automatically linked to the relevant PTW case and vendor compliance record in SHECMV.
+SHEIMI – Incident Investigation | Central Risk Register | Upon incident closure, metadata including root cause classification, affected asset ID, and remediation status must automatically update the Central Risk Register.
+SHECCM – Community Grievance | Central Risk Register | Grievances closed as unresolved residual risks must automatically flag the corresponding asset ID in the Central Risk Register.
+SHECCM – Community Grievance | SHEEPRP – Mock Drills | Any grievance classified as a residual risk must mandate and create a targeted mock drill record in the Emergency Preparedness module.
+SHEER – Live Emergency Response | SHEEPRP – EPRP Update | Post-emergency root-cause findings and structural learnings must automatically generate an improvement item queue within the Emergency Preparedness Plan.
+SHER – SHE Reporting | SHET&A – Training | Approved SHE reports containing open training-gap action items must automatically trigger training needs entries in the Training module.
+SHEIMI – Incident Investigation | SHET&A – Training | Upon incident closure, the system must prompt the SHE Officer to confirm that the identified root cause is addressed in the upcoming training schedule. Unconfirmed gaps must remain flagged.
+SHER – SHE Reporting | SHEAWPM – Annual Workplan | Board or Manco-directed recommendations arising from approved SHE reports must generate action items visible within the Annual Workplan tracking view.
+SHECMV / SHEIA | Procurement ERP Gateway | When a new project is initiated (SHEIA) or when vendor contract terms are modified (SHECMV), the system must trigger structured API payloads to the ERP Procurement module to hold, release, or flag associated vendor onboarding tasks.
+
+--- TABLE 19 ---
+Interface | Connected Modules | Description | Priority
+Procurement ERP Gateway | SHECMV, SHEIA, SHET&A | API integration to hold, release, or flag vendor onboarding tasks in the ERP Procurement module when triggered by vendor compliance, EIA, or training events. Consultant and agency onboarding must also route through this gateway. | M
+Statutory Reporting Engine | SHEIMI, SHEER | Secure external document generation interface capable of rendering incident and emergency data into official regulatory templates for submission to NSSA, EMA, and ZRP (Law Enforcement). Submission status must be tracked within the platform. | M
+Corporate Risk Register API | SHEIMI, SHECCM, SHEER, SHEIA | Bidirectional API synchronising incident, grievance, emergency, and EIA closure metadata with the Central Risk Register. Any flagged residual risk must trigger downstream workflow events in relevant modules. | M
+Learning Management System (LMS) | SHET&A | API integration pushing training completion records, competency scores, and refresher schedules to the corporate LMS. The platform must pull LMS data when assessing training gaps. | M
+Corporate Communications Gateway | SHE EC&SC | Approved communication documents must be pushed to the Corporate Communications workflow system with metadata including target segment, medium, frequency, and HOD approval timestamp. Dispatch confirmations must be returned to the SHE platform. | S
+Board Reporting System | SHER | Board-level SHE reports approved through the Chart of Authority workflow must be formatted and delivered to the Board reporting infrastructure in a compatible format (PDF, Word, or Power BI feed). | S
+EMA Regulatory Portal | SHEIA | Finalised EIA reports must be submitted directly to the EMA portal (where an electronic submission pathway exists) and submission acknowledgement status must be tracked within the platform. | M
+
+--- TABLE 20 ---
+Req # | Use Case | Description | Priority
+NFR-SHE-001 | System Availability | The platform must maintain a minimum of 99.5% availability during core business hours. All planned maintenance windows must be scheduled outside core business hours and communicated to users at least 48 hours in advance via the in-platform notification system. | M
+NFR-SHE-002 | Workflow Response Performance | All workflow routing events including approvals, escalations, and automated notifications must be processed within 60 seconds of the triggering action. All module dashboards and list views must load within 3 seconds on a standard broadband connection. | M
+NFR-SHE-003 | Data Retention | All SHE records including incident reports, PTW logs, EIA reports, grievance cases, training records, and statutory submissions must be retained within the system for a minimum of 7 years in compliance with applicable statutory requirements. Retention policy must be configurable per record type. | M
+NFR-SHE-004 | Audit Trail Integrity | The system must maintain a complete, tamper-evident audit log of all actions, approvals, modifications, and escalations. Each log entry must record: user identity, timestamp, action type, and the previous and new state of the affected record. The audit log must not be editable or deletable by any user role. | M
+NFR-SHE-005 | Scalability | The platform must support concurrent usage across all business divisions and geographic locations without performance degradation. The system architecture must accommodate growth in module volume, user count, data volume, and integration payload frequency without requiring re-architecture. | M
+NFR-SHE-006 | Notification Reliability | All system-generated notifications including statutory deadline alerts, approval requests, escalation triggers, and drill reminders must be delivered via both email and in-platform notification. Delivery failure must be automatically logged and the notification retried at defined intervals. | M
+NFR-SHE-007 | Integration Standards | All system integrations (Procurement ERP, LMS, Corporate Communications, EMA Portal, Board Reporting) must use industry-standard REST APIs with JSON payloads. Webhook support must be available for event-driven integration updates. | M
+NFR-SHE-008 | Offline Resilience | Field-level incident intake forms must support offline data capture with automatic synchronisation to the platform upon reconnection. This ensures incident reporting from remote or low-connectivity sites is not blocked by network unavailability. | S
+NFR-SHE-009 | Accessibility | The platform UI must meet WCAG 2.1 AA accessibility standards. All data views must support visual disambiguation through labels, patterns, and text labels in addition to colour, to ensure usability for users with colour vision impairments. | S
+
+--- TABLE 21 ---
+Req # | Use Case | Description | Priority
+SEC-SHE-001 | Authentication | All users accessing the platform must be authenticated via the organisation’s central identity management system. Multi-factor authentication (MFA) must be enforced for all roles with access to incident data, Risk Register records, and statutory reporting functions. Single sign-on (SSO) integration is required. | M
+SEC-SHE-002 | Role-Based Access Control | The system must enforce role-based access control (RBAC) aligned strictly to the role hierarchy defined in Section 2. Field-level roles must not be able to access executive reporting views, the Risk Register write interface, or fraud-related queues. Administrators must be able to assign and revoke roles without a system redeployment cycle. | M
+SEC-SHE-003 | Encryption in Transit | All data transmitted between the platform, integrated systems (ERP, LMS, EMA Portal), and end-users must be encrypted using TLS 1.2 or higher. Unencrypted HTTP connections must be rejected at the API gateway with a 4xx error response. | M
+SEC-SHE-004 | Encryption at Rest | All SHE records, Risk Register data, and vendor compliance data stored within the platform database must be encrypted at rest using AES-256 or an equivalent industry-standard algorithm. | M
+SEC-SHE-005 | Audit Logging | The system must maintain a tamper-evident audit log of all data access events, user logins, role changes, report exports, and approval actions. Logs must be retained for a minimum of 7 years and must be accessible to the system administrator without requiring platform downtime or a support ticket. | M
+SEC-SHE-006 | API Protection | All platform API endpoints and integration APIs must be protected against abuse through: rate limiting per consumer, IP allowlisting for approved integrated systems, and automatic rejection of malformed or unauthorised requests with appropriate error codes. | M
+SEC-SHE-007 | Credential Storage | All service credentials, API keys, and database connection strings used by the platform must be stored in a secrets management vault (e.g. HashiCorp Vault or an equivalent). Hardcoded credentials in configuration files, environment variables committed to source control, or application code are strictly prohibited. | M
+SEC-SHE-008 | Penetration Testing | The system must undergo independent penetration testing prior to production deployment and at least annually thereafter. All critical and high-severity findings must be formally tracked and resolved within 30 days of identification. Test results and remediation evidence must be retained. | S
+
+--- TABLE 22 ---
+Field | Description
+Process Function | Business function owning the risk (e.g. Commercial, Technology Services, Risk, HR).
+PCN Owner Function | The organisational function responsible for the PCN (Process Change Note) associated with the risk.
+REF | Unique reference identifier for the risk record.
+Major Process / PCN Name | The named process or initiative to which the risk is linked.
+Process Owner / PCN Owner | Named individual responsible for the process or change being assessed.
+Process Objective | The stated objective of the process or initiative being assessed.
+Key Risk / Hazard | Full description of the identified risk or hazard scenario.
+Risk Impact | Narrative description of the consequence if the risk materialises.
+Risk Category | Classification of the risk: Operational, Financial, Regulatory, or Strategic.
+Existing Mitigations / Controls | Current controls in place to reduce the likelihood or impact of the risk.
+Likelihood (1–5) | Numeric score representing the probability of the risk occurring.
+Impact (1–5) | Numeric score representing the severity of impact if the risk occurs.
+Aggregate Inherent Risk | Calculated as Likelihood × Impact before controls are applied.
+Control Effectiveness (1–5) | Rating of how effective existing controls are in mitigating the risk.
+Aggregate Residual Risk | Calculated residual risk score after accounting for control effectiveness.
+Managerial Response | The management decision on how to treat the risk (Accept, Mitigate, Transfer, Avoid).
+Risk Direction | Trend indicator showing whether the risk is Increasing, Stable, or Decreasing.
+Responsible Person – Business | Named business owner responsible for the risk.
+Review Date | Scheduled date for the next risk review.
+Status Update | Latest narrative update on the risk status.
+Responsible Person – Risk | Named Risk function representative overseeing the risk.
+Source and Reference Date | Document source and date when the risk was originally identified.
+Statutory Instrument | Applicable statutory instrument or regulation relevant to the risk.
+Compliant Y/N | Indicator of whether the organisation is currently compliant with the relevant statutory requirement.
+
+--- TABLE 23 ---
+Risk Category | Description | Key Examples from Register
+Regulatory | Risks arising from non-compliance with statutory instruments, POTRAZ, EMA, RBZ, ZIMRA, or other regulatory bodies. | Promotions launched without POTRAZ approval; EIA submissions not made to EMA; tariff changes implemented without regulatory sign-off; improper disposal of recharge cards contrary to EMA Act Chapter 20:27.
+Operational | Risks arising from process failures, system misconfigurations, fraud, poor controls, or human error in executing business processes. | Tariff misconfigurations causing revenue leakage; fraudulent SIM deployments; unauthorised physical recharge cards; manual credit adjustment fraud; CCTV footage tampering; vendor site access without PTW.
+Financial | Risks of direct revenue loss, exposure to credit default, currency risk, or unauthorised financial transactions. | Dealers failing to pay credit airtime obligations; security deposit shortfalls; revenue leakage on misconfigured billing; foreign exchange losses; fraudulent bundle purchases.
+Strategic | Risks to the organisation’s competitive position, market share, or long-term business model. | Cannibalisation of revenue by competing product channels; low market uptake of new products; dependence on third-party delivery partners; failure to recoup marketing costs on revenue-sharing deals.
+
+--- TABLE 24 ---
+Req # | Use Case | Description | Priority
+FNR-SHE-052 | Risk Entry Creation | Any authorised SHE Officer or Risk function representative must be able to create a new risk entry using the full data model defined in Section 11.1. All mandatory fields (Risk/Hazard description, Category, Likelihood, Impact, Existing Controls) must be completed before the entry can be saved. Incomplete submissions must be rejected with field-level validation messages. | M
+FNR-SHE-053 | Risk Scoring Calculation | The platform must automatically calculate the Aggregate Inherent Risk Score (Likelihood × Impact) and the Aggregate Residual Risk Score upon entry creation or update. Both calculated fields must be read-only and may not be manually overridden. The platform must display the applicable risk priority classification (High / Medium / Low) alongside the residual score. | M
+FNR-SHE-054 | Risk Categorisation and Tagging | Each risk entry must be categorised by Risk Category (Operational, Financial, Regulatory, Strategic) and tagged with the relevant Process Module from the SHE platform (SHECMV, SHECCM, SHEIMI, SHEEPRP, SHEER, SHEAWPM, SHER, SHET&A, SHEIA, SHE EC&SC). This enables cross-module risk traceability and filtered reporting. | M
+FNR-SHE-055 | Risk Review and Status Updates | Each risk record must support a structured review cycle. The system must display the scheduled Review Date and prompt the responsible Risk Owner when the date approaches. Status updates must be logged with a timestamp and the identity of the author. A full version history of all status changes must be retained. | M
+FNR-SHE-056 | High-Priority Risk Escalation | Any risk record with an Aggregate Residual Risk Score ≥ 12 must automatically trigger a notification to the CRO and SHE Manager. The risk must remain flagged on the CRO’s executive dashboard until the score is reduced through a recorded control improvement, or explicitly acknowledged by the CRO with a written risk acceptance rationale. | M
+FNR-SHE-057 | Statutory Compliance Tracking | Risk records with an associated Statutory Instrument reference must include a Compliant (Y/N) field. Non-compliant records must be visually highlighted on the Risk Register dashboard. The system must notify the SHE Manager and CRO of any record that moves from Compliant to Non-Compliant status. | M
+FNR-SHE-058 | Risk Register Reporting | The system must generate Risk Register summary reports filterable by: Risk Category, Process Module, Residual Risk Score range, Risk Direction, and Responsible Person. Reports must be exportable in PDF and Excel format and must feed into the Board-level and Management SHE reporting cycle defined in Section 5.8 (SHER). | M
+FNR-SHE-059 | Cross-Module Risk Linkage | Risk entries originating from incident investigations (SHEIMI), community grievances (SHECCM), emergency responses (SHEER), or EIA assessments (SHEIA) must be automatically linked to their source case. The system must allow drill-down from a risk entry to its originating case record. | M
+
+--- TABLE 25 ---
+KPI Category | KPI Name | Unit | FY26 Target | FY27 Target | Data Source | Frequency
+Energy | BTS Diesel Usage | Litres | 3,966,538 | 3,966,538 | DPA Operations | Monthly
+Energy | Electricity Usage for BTS | kWh | 61,437,631 | 61,437,631 | DPA Operations | Monthly
+Energy | Motor Vehicle Fuel Usage | Litres | TBA | TBA | Fleet Management | Monthly
+Energy | Cost of Diesel Usage for Generators | ZiG | 334,736,216 | 334,736,216 | Finance | Monthly
+Energy | Cost of Electricity Usage for BTS | ZiG | 354,495,132 | 354,495,132 | Finance | Monthly
+Renewable Energy | Solar BTS Installation | Number | 80 | 80 | DPA Engineering | Monthly
+Renewable Energy | % Base Stations with Solar Power | % | 30% (499 sites) | 30% (499 sites) | DPA Engineering | Monthly
+Renewable Energy | Office Sites Powered by Solar | Number | 9 | 9 | DPA Engineering | Monthly
+Renewable Energy | % Solar Export Back to Grid | % | TBA | TBA | DPA Engineering | Monthly
+Emissions | Quality of Generation Emissions | Band | Blue Band | Blue Band | Environmental Monitoring | Monthly
+Waste Management | Diesel Spillages | Litres | 0 | 0 | SHE Operations | Monthly
+Waste Management | Fuel Thefts at BTS | Litres | 0 | 0 | Security / SHE | Monthly
+Waste Management | Oil Spillages | Litres | 0 | 0 | SHE Operations | Monthly
+Waste Management | Used Oil Recycled | Litres | 3,400 | 3,400 | SHE Operations | Monthly
+Waste Management | Batteries Recycled | Number | 250 | 250 | SHE Operations | Monthly
+Waste Management | Scrap Metal Recycled | kg | TBA | TBA | SHE Operations | Monthly
+Environmental Incidents | Environmental Incidences | Count | 0 | 0 | SHE Incident Module | Monthly
+Environmental Incidents | e-Waste Produced | kg | TBA | TBA | SHE Operations | Monthly
+Environmental Incidents | General Waste Produced | kg | TBA | TBA | SHE Operations | Monthly
+
+--- TABLE 26 ---
+KPI | Unit | FY26 Target | Reporting Frequency | Responsible Unit
+BTS Diesel Usage | Litres | 3,966,538 | Monthly | DPA / SHE
+Electricity Usage for BTS | kWh | 61,437,631 | Monthly | DPA / SHE
+Motor Vehicle Fuel Usage | Litres | TBD | Monthly | DPA / SHE
+Quality of Generation & Fleet Emissions | Band | Blue Band | Monthly | DPA / SHE
+Solar BTS Installations | # | 80 new sites | Monthly | DPA / SHE
+% Base Stations with Solar Power | % | 30% (499 sites) | Monthly | DPA / SHE
+Office Sites Powered by Solar | # | 9 | Monthly | DPA / SHE
+Diesel Spillages | Litres | 0 | Monthly | DPA / SHE
+Fuel Thefts at BTS | Litres | 0 | Monthly | DPA / SHE
+Used Oil Recycled | Litres | 3,400 | Monthly | SHE
+Batteries Recycled | # | 250 | Monthly | SHE
+Vehicle Fuel Usage – Tech Services | Litres | 5,100 | Monthly | Tech / SHE
+Scrap / E-Waste Properly Disposed or Recycled | kg | 0 net (all recycled) | Monthly | Tech / SHE
+Toner Cartridges Returned for Recycling | # | 0 net | Monthly | Tech / SHE
+Number of Work-Related Injuries | # | 0 | Monthly | SHE
+Total Non-Compliance Incidents (Health & Safety) | # | 0 | Monthly | SHE
+Business Disruptions due to Climate Events | Days/Region | 0 | Monthly | SHE
+Property Loss / Damage due to Climate Events | ZiG | 0 | Monthly | SHE
+
+--- TABLE 27 ---
+KPI Category | KPI Name | Unit | FY26 Target | FY27 Target | Data Source | Frequency
+Health & Safety | Total Incidences Recorded (per month) | Count | 0 | 0 | SHE Incident Module | Monthly
+Health & Safety | Cumulative Incidences Recorded | Count | 0 | 0 | SHE Incident Module | Monthly
+Health & Safety | Incident Rate | Rate | 0 | 0 | SHE Analytics | Monthly
+Health & Safety | Injury Frequency Rate | Rate | 0 | 0 | SHE Analytics | Monthly
+Health & Safety | Number of Fatalities | Count | 0 | 0 | SHE Incident Module | Monthly
+Health & Safety | Number of Injuries | Count | 0 | 0 | SHE Incident Module | Monthly
+Health & Safety | Number of Medical Treatment Incidents | Count | 0 | 0 | SHE Incident Module | Monthly
+Health & Safety | Lost Time Injuries | Count | 0 | 0 | SHE Incident Module | Monthly
+Health & Safety | Vehicle Accidents | Count | 0 | 0 | SHE Incident Module | Monthly
+Health & Safety | Number of Contractor Fatalities | Count | 0 | 0 | SHE Incident Module | Monthly
+Health & Safety | Number of Work Related Injuries | Count | 0 | 0 | SHE Incident Module | Monthly
+Health & Safety | COVID-19 Cases | Count | 0 | 0 | HR / Occupational Health | Monthly
+Training | Number of Training Hours | Hours | TBA | TBA | LMS / SHE Training | Monthly
+Training | Training Completion Rate | % | 100% | 100% | LMS | Monthly
+Community | Number of Planned Engagements with Key Stakeholders | Count | TBA | TBA | Stakeholder Management | Quarterly
+Community | Engagement Score | Score | TBA | TBA | Stakeholder Management | Quarterly
+Community | Stakeholder Issues Resolved | Count | TBA | TBA | Stakeholder Management | Quarterly
+Community | Content/Articles Developed for Publication | Count | TBA | TBA | Communications | Quarterly
+
+--- TABLE 28 ---
+KPI | Unit | FY26 Target | Reporting Frequency
+Number of Customer Grievances (Human Rights Violations) | # | 0 | Monthly
+Number of Resolved Customer Grievances (Human Rights) | # | 100% of received | Monthly
+Number of Stakeholder Engagement Initiatives | # | As per plan | Monthly
+Number of Data Security Breaches | # | ≤5 | Monthly
+Number of Customer Privacy Breaches | # | ≤5 | Monthly
+KYC Physical Document Disposal Compliance | Y/N | Compliant | Quarterly
+EMA Act Chapter 20:27 Disposal Compliance | Y/N | Compliant | Per disposal event
+
+--- TABLE 29 ---
+KPI Category | KPI Name | Unit | FY26 Target | FY27 Target | Data Source | Frequency
+Compliance | Number of Corruption and Bribery Cases Reported | Count | 0 | 0 | Legal / Ethics | Monthly
+Compliance | Regulatory Fines and Penalties Paid | ZiG | 0 | 0 | Finance / Legal | Monthly
+Compliance | KYC Compliance Rate | % | ≥99% | ≥99% | Compliance | Monthly
+Compliance | Regulatory Penalties (ZIMRA Fiscal Devices) | Count | 0 | 0 | Finance | Monthly
+Compliance | Tip-off Anonymous Reports Received and Investigated | % | 100% | 100% | Ethics / Legal | Monthly
+Compliance | Ethics Policy Acknowledgement Sign-offs | % | 100% | 100% | HR / Compliance | Monthly
+Risk Management | Risk Assessments & Reviews Completed | Count | TBA | TBA | Risk Management | Quarterly
+Risk Management | SHE Incidents Closed Within SLA | % | 100% | 100% | SHE Operations | Monthly
+System Utilisation | CURA Utilisation - Incident Module | % | 100% | 100% | SHE Platform | Monthly
+System Utilisation | CURA Utilisation - Hazards Module | % | 100% | 100% | SHE Platform | Monthly
+System Utilisation | CURA Utilisation - Sustainability Module | % | 100% | 100% | SHE Platform | Monthly
+System Utilisation | CURA Utilisation - Stakeholder Management Module | % | 100% | 100% | SHE Platform | Monthly
+System Utilisation | CURA Utilisation - SHE Module | % | 100% | 100% | SHE Platform | Monthly
+System Utilisation | CURA Utilisation - Licences/Permits Module | % | 100% | 100% | SHE Platform | Monthly
+System Utilisation | Cassava AI Incident Module Utilisation | % | 100% | 100% | SHE Platform | Monthly
+
+--- TABLE 30 ---
+Req ID | Requirement | Priority | Acceptance Criteria
+ESG-FR-001 | The platform must provide a configurable KPI dashboard displaying all SHE-relevant ESG KPIs with real-time data feeds from operational systems. | M | Dashboard displays all 40+ KPIs with current month, YTD, and trend data.
+ESG-FR-002 | The platform must support automated data collection from DPA Operations, Fleet Management, Finance, and HR systems for environmental and social KPIs. | M | Data auto-populates from source systems without manual entry for standard metrics.
+ESG-FR-003 | The platform must generate monthly ESG KPI reports with variance analysis against FY26 and FY27 targets. | M | Reports generated by 5th of each month showing target vs actual with colour-coded variance.
+ESG-FR-004 | The platform must trigger alerts when KPIs exceed thresholds (e.g., environmental incidents > 0, fatalities > 0). | M | Immediate email/SMS alerts to SHE Manager and CRO for critical threshold breaches.
+ESG-FR-005 | The platform must maintain historical KPI data for trend analysis and year-on-year comparison. | S | Minimum 3 years of historical data available for trend charts.
+ESG-FR-006 | The platform must support export of KPI data to Excel and PDF formats for external reporting. | M | One-click export functionality for all KPI views.
+ESG-FR-007 | The platform must integrate with CURA modules (Incident, Hazards, Sustainability, Stakeholder, SHE, Licences) to pull utilisation metrics. | M | Utilisation percentages auto-calculated from system usage logs.
+ESG-FR-008 | The platform must track renewable energy metrics including solar BTS installations, grid connectivity, and diesel reduction trends. | S | Solar metrics updated monthly from DPA engineering data.
+ESG-FR-009 | The platform must support B Lab Impact Assessment tracking and SDG Baseline scoring for Fintech operations. | C | Assessment scores recorded and tracked quarterly.
+ESG-FR-010 | The platform must provide executive summary views for Board and management reporting with drill-down capability. | M | Executive view shows top 10 KPIs with red/amber/green status indicators.
+
+--- TABLE 31 ---
+Req # | Use Case | Description | Priority
+FNR-SHE-060 | ESG KPI Data Capture | The system must provide structured monthly data entry forms for each SHE-relevant ESG KPI defined in Sections 12.1 and 12.2. Each form must validate that entries are within acceptable ranges and flag anomalies (e.g. a non-zero diesel spillage entry) for immediate SHE Manager review. | M
+FNR-SHE-061 | KPI Target Configuration | The SHE Manager must be able to configure annual KPI targets within the system for each ESG metric. The system must display actual versus target variance on the ESG dashboard and highlight KPIs that are off-track in red, on-track in green, and at risk in amber. | M
+FNR-SHE-062 | ESG Trend Reporting | The system must generate monthly ESG performance trend reports showing actuals versus targets for all SHE KPIs, with month-over-month variance analysis. These reports must feed into the Board-level SHE reporting cycle (SHER) and must be exportable in PDF, Excel, and Power BI feed format. | M
+FNR-SHE-063 | Environmental Incident Linkage | Any KPI entry reflecting a non-zero value for diesel spillages, oil spillages, fuel theft, workplace injuries, or climate-related business disruption must automatically generate a linked incident record in the SHEIMI module and trigger notification to the SHE Manager and CRO. | M
+FNR-SHE-064 | Regulatory Compliance KPI Flags | Any KPI entry reflecting a regulatory penalty, non-compliance event, or EMA Act violation must automatically update the Central Risk Register, notify the CRO, and log a mandatory statutory reporting action in the SHER module. | M
+
+--- TABLE 32 ---
+Stakeholder | Category | Contact Person | Phone | Engagement Method | SHE Engagement Objectives | Risk if Not Managed | Mitigation | Status
+POTRAZ | Regulator | Spencer Jambawo | 774222051 | Online and face-to-face | Regulatory compliance, strategic alignment on telecom infrastructure | Conflict between participating stakeholders | Keep Regulator Informed, Adhere to Compliance | Ongoing
+RBZ / Bankers Association | Regulator | Karen Chiwetu | 777087650 | Online and face-to-face | Regulatory compliance, licensing, capital adequacy | Regulatory & Compliance Risks | Transparent customer communication | Ongoing
+EMA | Regulator | TBA | TBA | Formal submissions, inspections | Environmental compliance, EIA approvals, waste management | Statutory non-compliance, project delays | Proactive engagement, timely submissions | Ongoing
+NSSA | Regulator | TBA | TBA | Formal reports, inspections | Workplace safety compliance, injury reporting | Legal penalties, operational shutdown | Automated reporting, compliance tracking | Ongoing
+ZRP | Law Enforcement | TBA | TBA | Formal reports, incident notifications | Incident reporting, emergency response coordination | Legal exposure, delayed response | Direct reporting channel, 24/7 contact | Ongoing
+POTRAZ - Rural Councils | Government | Livinson Mtekede | 773405778 | Online and face-to-face | Infrastructure deployment, community alignment | Disempowered stakeholders | Seek Financing Partner, avoid tenders | Ongoing - 53 RDCs engaged
+Urban Councils / RDCs | Government | Various | Various | Meetings, correspondence | Site approvals, infrastructure coordination | Project delays, community conflict | Regular engagement, formal agreements | Ongoing
+Community Representatives | Community | Various | Various | Public meetings, grievance channels | Grievance resolution, project acceptance | Escalation to legal crises | Structured intake, timely resolution | Ongoing
+EMA Consultants | External Consultant | Various | Various | Formal contracts, deliverables | EIA completion, environmental assessments | Project clearance delays | 100% EMA-accredited consultant onboarding | Ongoing
+SMEAZ | Business Association | Farai Mtambanengwe | 778055076 | Online and face-to-face | Digital transformation alignment, digital divide closure | Creating expectations of change | Solid Contracts, Competitive Pricing | Ongoing
+Universities | Academic | Various | Various | Online and face-to-face | Academic collaboration, research partnerships | Creating expectations of change | Seek Financing Partners, Have Solid Contracts | Planning 2025 Academic projects
+eGovernment (OPC) | Government | Preston Umena | 772958816 | Online and face-to-face | Digital transformation, e-government alignment | Other risk not mentioned | Strong Value Proposition, Competitive Pricing | Scheduled engagement
+PRAZ | Procurement | Willard Karangura | 712899410 | Online and face-to-face | Procurement process understanding, preferred partner status | Conflict between participating stakeholders | Strong Value Proposition | Ongoing - Preferred Partner Status
+
+--- TABLE 33 ---
+Stakeholder | Engagement Focus | SHE Module Relevance | Frequency
+Environmental Management Agency (EMA) | EIA submissions, environmental compliance, disposal approvals, EMA Act Chapter 20:27 adherence. | SHEIA, SHECMV, Waste Disposal events | Per project / event
+NSSA (National Social Security Authority) | Statutory incident reporting for workplace accidents, injury claims, and safety compliance. | SHEIMI, SHEER | Per incident / monthly
+ZRP (Zimbabwe Republic Police) | Statutory reporting of major incidents, emergency response coordination, security at SHE events. | SHEER, SHEIMI | Per incident
+POTRAZ | Regulatory compliance on network infrastructure safety, base station siting, and operational standards. | SHEIA, SHEAWPM | Monthly / Ongoing
+Provincial Administrators & City Officials | Community engagement on environmental and social concerns, base station rentals, and community development. | SHECCM, SHE EC&SC | Ongoing
+Chiefs’ Council | Community relations, land use agreements, community grievance resolution, and social impact management. | SHECCM, SHE EC&SC | Ongoing
+NGO Regional Heads | Community development partnerships, social investment, and grievance channel management. | SHECCM, SHE EC&SC | Ongoing
+EMA-Accredited Consultants | EIA scoping, report compilation, and submission on behalf of the organisation. | SHEIA | Per project
+ZRP / ZNA / ZPCS (Provincial Officers Commanding) | Security risk management, emergency preparedness coordination, and incident response. | SHEER, SHEEPRP | Ongoing
+
+--- TABLE 34 ---
+Field Name | Description | Data Type | Required | Source
+Engagement Issue / Message | What is being discussed or managed with this stakeholder | Text (500 chars) | Yes | User input
+Stakeholder / Audience | Name of the organisation or group | Text (200 chars) | Yes | Master Data Registry
+Contact Person | Named individual and contact details | Text (200 chars) | Yes | User input
+Phone Number | Primary contact number | Text (20 chars) | Yes | User input
+Engagement Method | How the engagement is conducted | Dropdown | Yes | User input
+SHE Engagement Objectives | Why the organisation is engaging from SHE perspective | Text (500 chars) | Yes | User input
+Stakeholder Engagement Objectives | What the stakeholder seeks from the engagement | Text (500 chars) | Yes | User input
+Stakeholder Risk | Risk to the organisation if engagement is managed poorly | Text (500 chars) | Yes | Risk Register
+Risk Mitigation | Actions taken to mitigate the stakeholder risk | Text (500 chars) | Yes | User input
+Target Date / Frequency | When the engagement is planned and how often | Date + Dropdown | Yes | User input
+Responsible Person | Named SHE or business representative owning the engagement | Text (100 chars) | Yes | User Directory
+Current Position | Current status of the engagement | Text (500 chars) | Yes | User input
+Quarterly Feedback Q1 | Structured update for Q1 (31 May) | Text (1000 chars) | No | User input
+Quarterly Feedback Q2 | Structured update for Q2 (31 August) | Text (1000 chars) | No | User input
+Quarterly Feedback Q3 | Structured update for Q3 (30 November) | Text (1000 chars) | No | User input
+Quarterly Feedback Q4 | Structured update for Q4 (28 February) | Text (1000 chars) | No | User input
+
+--- TABLE 35 ---
+Req ID | Requirement | Priority | Acceptance Criteria
+SE-FR-001 | The platform must maintain a centralised Stakeholder Engagement Register accessible across all business units (Finance, EBS, CX, Tech Services, DPA, etc.). | M | All 17 business units can create, view, and update engagement records.
+SE-FR-002 | The platform must support quarterly feedback capture (Q1-Q4) with structured fields for outcomes, feedback received, and next steps. | M | Quarterly feedback fields available for all active engagements with date validation.
+SE-FR-003 | The platform must trigger automated reminders for upcoming engagement deadlines and quarterly feedback submissions. | M | Email notifications sent 7 days before target dates to responsible persons.
+SE-FR-004 | The platform must link stakeholder risks to the Central Risk Register for integrated risk management. | M | Stakeholder risk entries auto-sync to Risk Register with appropriate classification.
+SE-FR-005 | The platform must support attachment of engagement evidence (meeting minutes, correspondence, photos). | S | File upload capability for each engagement record up to 10MB per file.
+SE-FR-006 | The platform must generate stakeholder engagement summary reports by business unit, stakeholder category, and quarter. | M | Reports exportable to PDF and Excel with filtering by unit, category, and date range.
+SE-FR-007 | The platform must maintain a master stakeholder directory with contact details, historical engagements, and relationship history. | S | Directory searchable by name, organisation, category, and engagement date.
+SE-FR-008 | The platform must support escalation of unresolved stakeholder issues to SHE Manager and CRO based on age thresholds. | M | Issues unresolved beyond 30 days auto-escalate to SHE Manager; 60 days to CRO.
+SE-FR-009 | The platform must integrate with the SHE Incident module to link community grievances to stakeholder engagement records. | M | Grievance records reference related stakeholder engagement entries.
+SE-FR-010 | The platform must provide executive dashboards showing stakeholder engagement coverage, risk status, and quarterly performance. | S | Dashboard displays engagement metrics by unit, risk heat map, and trend analysis.
+
+--- TABLE 36 ---
+Req # | Use Case | Description | Priority
+FNR-SHE-065 | Stakeholder Register Management | The system must maintain a structured Stakeholder Engagement Register for all SHE-relevant stakeholders. Each record must be linked to the relevant SHE process module(s) and the applicable regulatory or community obligation. Engagements must be categorised by stakeholder type: Regulator, Community, Emergency Authority, Consultant, or Other. | M
+FNR-SHE-066 | Engagement Scheduling and Reminders | The system must support scheduling of planned stakeholder engagements with automated reminder notifications to the responsible SHE team member. For regulatory stakeholders (EMA, NSSA, ZRP, POTRAZ), the system must enforce minimum engagement frequencies and alert the SHE Manager if a scheduled engagement has not been recorded within the defined period. | M
+FNR-SHE-067 | Quarterly Feedback Capture | The system must provide a structured quarterly feedback form (Q1-Q4) for each stakeholder engagement record. Feedback must include: outcome summary, stakeholder response, open items raised, and agreed next steps. Quarterly feedback records must be version-controlled and retained for audit. | M
+FNR-SHE-068 | Regulatory Submission Tracking | For statutory stakeholders (EMA, NSSA, ZRP), each engagement record involving a regulatory submission must track: submission date, submission reference, expected response date, regulatory decision received, and compliance status. Overdue regulatory responses must trigger escalation notifications to the SHE Manager and CRO. | M
+FNR-SHE-069 | Community Grievance Linkage | Any community stakeholder engagement arising from a formal grievance (SHECCM) must be automatically linked to the grievance case record. The stakeholder engagement outcome must be captured as the formal complainant notification required under BRN-SHE-010. | M
+FNR-SHE-070 | Stakeholder Engagement Reporting | The system must generate Stakeholder Engagement summary reports by stakeholder type, SHE module, quarter, and responsible person. These reports must be included in the quarterly Board and Management SHE reports generated by the SHER module. | S
+
+--- TABLE 37 ---
+Req ID | Requirement | Priority | Acceptance Criteria
+AR-FR-001 | The platform must support configurable reporting calendars with milestone tracking and deadline alerts. | M | Calendar configurable per reporting cycle; alerts sent 7 days, 3 days, and 1 day before deadlines.
+AR-FR-002 | The platform must provide automated data collection from integrated operational systems. | M | Data auto-populates from DPA, Fleet, HR, Finance, and LMS with manual override capability.
+AR-FR-003 | The platform must enforce data validation rules with real-time exception reporting. | M | Validation rules configurable by admin; exceptions flagged immediately with reason codes.
+AR-FR-004 | The platform must support multi-tiered approval workflows with mandatory sign-offs. | M | Approval chain configurable; no data accepted without all required approvals.
+AR-FR-005 | The platform must generate draft sustainability reports with automated KPI insertion. | M | Report templates support automated KPI tables, charts, and narrative sections.
+AR-FR-006 | The platform must maintain a complete audit trail of all data changes, approvals, and submissions. | M | Audit log captures user, timestamp, action, and before/after values for all changes.
+AR-FR-007 | The platform must support version control for reports with comparison and rollback capability. | S | Version history maintained; users can compare versions and revert to previous versions.
+AR-FR-008 | The platform must provide executive dashboards for real-time reporting status and KPI performance. | S | Dashboard shows reporting progress, KPI status, and bottleneck identification.
+AR-FR-009 | The platform must support export of reports to PDF, Word, and Excel formats. | M | One-click export for all report formats with consistent formatting.
+AR-FR-010 | The platform must integrate with the ESG KPI module for seamless data flow into annual reports. | M | ESG KPI data automatically available in reporting module without manual re-entry.
+
+--- TABLE 38 ---
+Priority | Automation Area | Description | Expected Benefit | Implementation Phase
+1 | Automated Data Collection | Direct API integration with DPA, Fleet, HR, Finance, and LMS systems to pull KPI data automatically | Reduce manual data entry by 80%; improve accuracy and timeliness | Phase 1 (Go-live)
+2 | Validation Engine | Configurable validation rules with real-time exception reporting and automated flagging of anomalous values | Reduce data quality issues by 90%; faster exception resolution | Phase 1 (Go-live)
+3 | Workflow Automation | Automated approval routing with reminder notifications, escalation triggers, and audit trail capture | Reduce approval cycle time by 50%; ensure compliance with approval policies | Phase 1 (Go-live)
+4 | Report Template Generation | Pre-configured report templates with automated KPI insertion, narrative sections, and formatting | Reduce report compilation time by 60%; ensure consistency across reports | Phase 2 (Post go-live)
+5 | Executive Dashboard | Real-time executive summary dashboard with red/amber/green indicators and drill-down capability | Enable proactive decision-making; reduce executive briefing preparation time | Phase 2 (Post go-live)
+6 | Regulatory Report Automation | Automated generation of statutory report templates for EMA, NSSA, and other regulators | Reduce regulatory submission preparation time by 70%; ensure compliance | Phase 2 (Post go-live)
+
+--- TABLE 39 ---
+Milestone | Activity | Deadline | Responsible | Deliverable
+M1 | Data collection kick-off and system readiness check | Week 1, Month 1 | SHE Manager | Data collection plan
+M2 | Completion of data collection from all business units | End of Month 1 | SHE Officers | Raw data submissions
+M3 | Data validation and exception resolution | End of Week 2, Month 2 | SHE Manager | Validated dataset
+M4 | Management review and approval of data | End of Month 2 | HODs, SHE Manager | Approved data package
+M5 | Draft report compilation and internal review | End of Month 3 | SHE Manager, Communications | Draft sustainability report
+M6 | Executive Committee review | Week 2, Month 4 | CRO, COO, CEO | Executive feedback
+M7 | Board approval | Week 4, Month 4 | Board of Directors | Approved final report
+M8 | External publication and regulatory submission | Month 5 | Communications, Legal | Published report, regulatory filings
+
+--- TABLE 40 ---
+Control Category | Control Description | System Enforcement | Frequency
+Data Collection | All data must be sourced from approved operational systems with automated feeds where possible | System integration with DPA, Fleet, HR, Finance, LMS; manual entry only for non-integrated sources | Monthly
+Data Collection | Data collectors must be trained and authorised; data entry restricted to assigned personnel | RBAC enforcement; data entry permissions tied to role assignments | Per cycle
+Data Validation | Automated validation rules must check for completeness, range validity, and consistency | Validation engine with configurable rules; exception reports auto-generated | Real-time
+Data Validation | Out-of-range or anomalous values must be flagged for review before acceptance | Alert generation for values outside defined thresholds; manual override requires approval | Real-time
+Review & Approval | All data submissions require review and approval by designated approvers | Workflow routing with mandatory approval steps; no bypass permitted | Per cycle
+Review & Approval | Approval history must be maintained for audit purposes | Audit trail capturing approver, timestamp, and comments for all approvals | Continuous
+Review & Approval | Escalation must occur if approvals are not completed within defined timeframes | Auto-escalation after 5 business days; reminder notifications at 3 days | Per cycle
+
+--- TABLE 41 ---
+Stage | Activity | Responsible Role | System Support Required | Timeline
+1. Data Collection | Collect SHE and sustainability data from all business units and operational systems | SHE Officers, Business Unit Representatives | Automated data feeds from DPA, Fleet, HR, Finance, and LMS systems | Month 1-2
+2. Data Validation | Validate data accuracy, completeness, and consistency against source systems | SHE Manager, Data Quality Team | Data validation rules, exception reporting, automated checks | Month 2
+3. Review & Approval | Review validated data, resolve exceptions, and obtain management sign-off | SHE Manager, Heads of Department | Workflow routing, approval tracking, escalation alerts | Month 2-3
+4. Report Compilation | Compile sustainability report with KPIs, narratives, and supporting evidence | SHE Manager, Communications Team | Report templates, automated KPI insertion, narrative sections | Month 3
+5. Executive Review | Present draft report to Executive Committee for review and feedback | CRO, COO, CEO | Executive dashboard, summary views, drill-down capability | Month 3-4
+6. Board Approval | Submit final report to Board for formal approval | CEO, Board Secretary | Board portal integration, secure document distribution | Month 4
+7. External Publication | Publish approved report on corporate website and distribute to stakeholders | Communications, Investor Relations | Document management, version control, publication workflow | Month 4-5
+8. Regulatory Submission | Submit required reports to EMA, NSSA, and other regulatory bodies | SHE Manager, Legal | Statutory report templates, automated submission where available | Month 4-5

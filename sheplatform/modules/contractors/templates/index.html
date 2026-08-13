@@ -1,0 +1,51 @@
+{% extends "base_shell.html" %}
+{% block title %}Contractors - EcoAegis{% endblock %}
+{% block content %}
+<h1>Contractor Management</h1>
+<div class="login-sub" style="color:var(--muted);font-size:13px;margin-bottom:16px">
+  Site readiness: insurance + certifications + site induction. Ready contractors can get PTWs.
+</div>
+
+<div class="card">
+  <h2>Record site induction</h2>
+  <form id="ind-form">
+    <div class="filters">
+      <label>Contractor
+        <select name="vendor_id" id="vendor-select" required></select>
+      </label>
+      <label>Site
+        <select name="site_id" id="site-select" required></select>
+      </label>
+      <label>Type
+        <select name="induction_type">
+          <option value="general">General</option>
+          <option value="site_specific" selected>Site specific</option>
+          <option value="high_risk">High risk</option>
+          <option value="refresher">Refresher</option>
+        </select>
+      </label>
+      <label>Valid until <input type="date" name="valid_until"></label>
+    </div>
+    <label>Notes <input type="text" name="notes"></label>
+    <button class="btn btn-primary" type="submit">Record induction</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Contractor readiness</h2>
+  <table class="data-table" id="readiness-table">
+    <thead><tr><th>Vendor</th><th>Status</th><th>Insurance</th><th>Certs</th><th>PTW eligible</th><th>Readiness</th><th>Actions</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>Induction log</h2>
+  <table class="data-table" id="ind-table">
+    <thead><tr><th>Vendor</th><th>Site</th><th>Type</th><th>Date</th><th>Valid until</th><th>Trainer</th><th>Status</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script src="/static/js/contractors.js"></script>
+{% endblock %}

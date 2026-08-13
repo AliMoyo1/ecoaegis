@@ -1,0 +1,59 @@
+{% extends "base_shell.html" %}
+{% block title %}Inspections - EcoAegis{% endblock %}
+{% block content %}
+<h1>Inspections</h1>
+<div class="login-sub" style="color:var(--muted);font-size:13px;margin-bottom:16px">
+  Checklist-driven inspections. Failed items auto-create corrective actions.
+</div>
+
+<div class="card">
+  <h2>Schedule inspection</h2>
+  <form id="insp-form">
+    <label>Title <input type="text" name="title" required></label>
+    <div class="filters">
+      <label>Type
+        <select name="inspection_type" id="insp-type">
+          <option value="safety">Safety</option>
+          <option value="health">Health</option>
+          <option value="environmental">Environmental</option>
+          <option value="fire">Fire</option>
+          <option value="electrical">Electrical</option>
+          <option value="housekeeping">Housekeeping</option>
+        </select>
+      </label>
+      <label>Location <input type="text" name="site_location"></label>
+      <label>Scheduled date <input type="date" name="scheduled_date"></label>
+      <label>Inspector
+        <select name="inspector_id" id="inspector-select"></select>
+      </label>
+    </div>
+    <button class="btn btn-primary" type="submit">Schedule</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Inspection list</h2>
+  <div class="filters">
+    <select id="f-status">
+      <option value="">All statuses</option>
+      <option value="scheduled">Scheduled</option>
+      <option value="in_progress">In progress</option>
+      <option value="completed">Completed</option>
+      <option value="overdue">Overdue</option>
+    </select>
+  </div>
+  <table class="data-table" id="insp-table">
+    <thead><tr><th>Ref</th><th>Title</th><th>Type</th><th>Location</th><th>Scheduled</th><th>Inspector</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<div class="card" id="run-card" style="display:none">
+  <h2 id="run-title">Run inspection</h2>
+  <div id="checklist-items"></div>
+  <label style="margin-top:12px">Findings <textarea id="findings" rows="3" placeholder="Overall findings and recommendations"></textarea></label>
+  <button class="btn btn-primary" id="complete-btn" onclick="completeInspection()">Complete inspection</button>
+</div>
+
+<script src="/static/js/inspections.js"></script>
+{% endblock %}

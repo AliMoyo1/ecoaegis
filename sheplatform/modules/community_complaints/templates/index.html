@@ -1,0 +1,44 @@
+{% extends "base_shell.html" %}
+{% block title %}Community Complaints - EcoAegis{% endblock %}
+{% block content %}
+<h1>Community Complaints (SHECCM)</h1>
+
+<div class="card">
+  <h2>Log complaint</h2>
+  <form id="grievance-form">
+    <label>Description <textarea name="description" rows="3" required></textarea></label>
+    <label>Channel
+      <select name="source_channel">
+        <option value="portal">Portal</option>
+        <option value="phone">Phone</option>
+        <option value="email">Email</option>
+        <option value="walk_in">Walk-in</option>
+        <option value="media">Media</option>
+        <option value="regulator">Regulator</option>
+        <option value="ngo">NGO</option>
+      </select>
+    </label>
+    <label>Severity
+      <select name="severity">
+        <option value="low">Low</option>
+        <option value="medium" selected>Medium</option>
+        <option value="high">High</option>
+        <option value="critical">Critical</option>
+      </select>
+    </label>
+    <label>Complainant name <input type="text" name="complainant_name"></label>
+    <label>Complainant contact <input type="text" name="complainant_contact"></label>
+    <button class="btn btn-primary" type="submit">Log complaint</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Grievance list</h2>
+  <table class="data-table" id="grievance-table">
+    <thead><tr><th>Case</th><th>Description</th><th>Channel</th><th>Severity</th><th>Status</th><th>Notified</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script src="/static/js/grievances.js"></script>
+{% endblock %}

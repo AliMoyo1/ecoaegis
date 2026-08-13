@@ -1,0 +1,66 @@
+{% extends "base_shell.html" %}
+{% block title %}Chemicals - EcoAegis{% endblock %}
+{% block content %}
+<h1>Chemical &amp; SDS Register</h1>
+<div class="login-sub" style="color:var(--muted);font-size:13px;margin-bottom:16px">
+  Hazardous substance inventory with safety data sheets. Feeds emergency readiness.
+</div>
+
+<div class="card">
+  <h2>Register chemical</h2>
+  <form id="chem-form">
+    <label>Name <input type="text" name="name" required></label>
+    <div class="filters">
+      <label>CAS number <input type="text" name="cas_number" style="width:140px"></label>
+      <label>Supplier <input type="text" name="supplier"></label>
+      <label>Hazard class
+        <select name="hazard_class">
+          <option value="">None</option>
+          <option value="flammable">Flammable</option>
+          <option value="corrosive">Corrosive</option>
+          <option value="toxic">Toxic</option>
+          <option value="oxidising">Oxidising</option>
+          <option value="explosive">Explosive</option>
+          <option value="environmental_hazard">Environmental hazard</option>
+          <option value="irritant">Irritant</option>
+          <option value="compressed_gas">Compressed gas</option>
+        </select>
+      </label>
+      <label>Site
+        <select name="site_id" id="chem-site">
+          <option value="0">-</option>
+        </select>
+      </label>
+    </div>
+    <div class="filters">
+      <label>Quantity/units <input type="text" name="quantity_units" style="width:140px"></label>
+      <label>Storage location <input type="text" name="storage_location"></label>
+      <label>SDS path <input type="text" name="sds_path" placeholder="docs/SDS/..."></label>
+    </div>
+    <button class="btn btn-primary" type="submit">Register</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Inventory</h2>
+  <div class="filters">
+    <select id="f-hazard">
+      <option value="">All hazard classes</option>
+      <option value="flammable">Flammable</option>
+      <option value="corrosive">Corrosive</option>
+      <option value="toxic">Toxic</option>
+      <option value="oxidising">Oxidising</option>
+      <option value="explosive">Explosive</option>
+      <option value="environmental_hazard">Environmental hazard</option>
+      <option value="irritant">Irritant</option>
+      <option value="compressed_gas">Compressed gas</option>
+    </select>
+  </div>
+  <table class="data-table" id="chem-table">
+    <thead><tr><th>Ref</th><th>Name</th><th>CAS</th><th>Hazard class</th><th>Supplier</th><th>Site</th><th>Storage</th><th>SDS</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script src="/static/js/chemicals.js"></script>
+{% endblock %}

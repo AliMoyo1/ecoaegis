@@ -1,0 +1,23 @@
+{% extends "base_shell.html" %}
+{% block title %}Annual Workplan - EcoAegis{% endblock %}
+{% block content %}
+<h1>Annual Workplan (SHEAWPM)</h1>
+
+<div class="card">
+  <h2>Create workplan</h2>
+  <form id="workplan-form">
+    <label>Fiscal year <input type="text" name="fiscal_year" placeholder="2027" required></label>
+    <button class="btn btn-primary" type="submit">Create workplan</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Workplans</h2>
+  <table class="data-table" id="workplan-table">
+    <thead><tr><th>Ref</th><th>Fiscal year</th><th>Status</th><th>Preventive %</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script src="/static/js/workplan.js"></script>
+{% endblock %}

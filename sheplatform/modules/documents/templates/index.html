@@ -1,0 +1,59 @@
+{% extends "base_shell.html" %}
+{% block title %}Document Control - EcoAegis{% endblock %}
+{% block content %}
+<h1>Document Control</h1>
+<div class="login-sub" style="color:var(--muted);font-size:13px;margin-bottom:16px">
+  SOP and policy library with versioning and staff acknowledgement.
+</div>
+
+{% if user.can_documents_manage %}
+<div class="card">
+  <h2>Register document</h2>
+  <form id="doc-form">
+    <label>Title <input type="text" name="title" required></label>
+    <div class="filters">
+      <label>Type
+        <select name="doc_type">
+          <option value="sop">SOP</option>
+          <option value="policy">Policy</option>
+          <option value="guideline">Guideline</option>
+          <option value="form">Form</option>
+          <option value="template">Template</option>
+          <option value="regulation">Regulation</option>
+        </select>
+      </label>
+      <label>Version <input type="text" name="version" value="1.0" style="width:70px"></label>
+      <label>Review due <input type="date" name="review_due_date"></label>
+    </div>
+    <label>Description <textarea name="description" rows="2"></textarea></label>
+    <button class="btn btn-primary" type="submit">Register</button>
+  </form>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Document library</h2>
+  <div class="filters">
+    <select id="f-type">
+      <option value="">All types</option>
+      <option value="sop">SOP</option>
+      <option value="policy">Policy</option>
+      <option value="guideline">Guideline</option>
+      <option value="regulation">Regulation</option>
+    </select>
+    <select id="f-status">
+      <option value="">All statuses</option>
+      <option value="draft">Draft</option>
+      <option value="in_review">In review</option>
+      <option value="approved">Approved</option>
+      <option value="superseded">Superseded</option>
+    </select>
+  </div>
+  <table class="data-table" id="doc-table">
+    <thead><tr><th>Ref</th><th>Title</th><th>Type</th><th>Version</th><th>Status</th><th>Approver</th><th>Review due</th><th>Acks</th><th>Actions</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script src="/static/js/documents.js"></script>
+{% endblock %}
