@@ -64,4 +64,45 @@ document.getElementById("obs-form").addEventListener("submit", async (e) => {
 ["f-status", "f-severity"].forEach((id) => {
   document.getElementById(id).addEventListener("change", loadObservations);
 });
+
+// Photo capture + vision classification
+const photoForm = document.getElementById("photo-form");
+const photoStatus = document.getElementById("photo-status");
+const photoPreviewCard = document.getElementById("photo-preview-card");
+const photoPreviewImg = document.getElementById("photo-preview-img");
+const photoSuggestionBody = document.getElementById("photo-suggestion-body");
+
+document.querySelector("[name='file']").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  photoPreviewImg.src = URL.createObjectURL(file);
+  photoPreviewCard.style.display = "block";
+  photoStatus.textContent = "Ready to classify";
+});
+
+photoForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const body = new FormData(photoForm);
+  const btn = document.getElementById("photo-submit");
+  btn.disabled = true;
+  photoStatus.textContent = "Analysing photo...";
+  const resp = await fetch(`${API}/from-photo`, { method: "POST", body });
+  const data = await resp.json();
+  btn.disabled = false;
+  if (!data.ok) {
+    photoStatus.textContent = "Classification failed";
+    alert(data.message || "Failed");
+    return;
+  }
+  const s = data.vision;
+  photoSuggestionBody.innerHTML = `
+    <strong>${data.observation.obs_ref} - ${s.title}</strong><br>
+    Type: ${s.obs_type} | Severity: ${s.severity}<br>
+    ${s.description}<br>
+    <em>Suggested controls:</em> ${(s.controls || []).join("; ") || "-"}`;
+  photoStatus.textContent = "Observation created";
+  photoForm.reset();
+  loadObservations();
+});
+
 loadObservations();

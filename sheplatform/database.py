@@ -962,6 +962,7 @@ SCHEMA = [
         description     TEXT,
         location        TEXT,
         photo_path      TEXT,
+        ai_metadata     JSONB DEFAULT '{}',
         severity        TEXT DEFAULT 'low' CHECK (severity IN ('low','medium','high','critical')),
         status          TEXT DEFAULT 'open' CHECK (status IN ('open','acknowledged','corrective_action','closed')),
         site_id         INTEGER REFERENCES sites(id),

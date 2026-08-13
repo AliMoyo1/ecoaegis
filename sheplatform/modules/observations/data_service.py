@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+import json
+
 from sheplatform.core.audit import log_audit
 
 
@@ -22,7 +24,8 @@ def _next_ref(db, year: int | None = None) -> str:
 
 def create_observation(db, *, obs_type: str, title: str, description: str,
                        location: str, severity: str, reported_by: int,
-                       org_id: int | None = None) -> dict:
+                       org_id: int | None = None, photo_path: str = "",
+                       ai_metadata: dict | None = None) -> dict:
     if obs_type not in ("hazard", "near_miss", "unsafe_act", "unsafe_condition", "good_practice"):
         raise ValueError("invalid obs_type")
     if severity not in ("low", "medium", "high", "critical"):
@@ -30,9 +33,10 @@ def create_observation(db, *, obs_type: str, title: str, description: str,
     ref = _next_ref(db)
     db.execute(
         "INSERT INTO observations (obs_ref, obs_type, title, description, location, "
-        "severity, status, reported_by, org_id) "
-        "VALUES (%s, %s, %s, %s, %s, %s, 'open', %s, %s)",
-        (ref, obs_type, title, description, location, severity, reported_by, org_id))
+                "photo_path, severity, status, reported_by, org_id, ai_metadata) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, 'open', %s, %s, %s)",
+                (ref, obs_type, title, description, location, photo_path or "",
+                 severity, reported_by, org_id, json.dumps(ai_metadata or {})))
     db.commit()
     log_audit(db, reported_by, org_id, "observation.created", "observations", ref,
               new_value={"obs_type": obs_type, "severity": severity})
