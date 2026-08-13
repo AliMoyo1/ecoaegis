@@ -690,7 +690,7 @@ SCHEMA = [
         title           TEXT NOT NULL,
         period_start    TIMESTAMPTZ,
         period_end      TIMESTAMPTZ,
-        status          TEXT DEFAULT 'draft' CHECK (status IN ('draft','review','approved','submitted','overdue')),
+        status          TEXT DEFAULT 'draft' CHECK (status IN ('draft','review','approved','rejected','submitted','overdue')),
         content         JSONB DEFAULT '{}',
         document_path   TEXT,
         submission_deadline TIMESTAMPTZ,

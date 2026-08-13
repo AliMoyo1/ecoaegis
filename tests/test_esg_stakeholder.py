@@ -118,3 +118,25 @@ class TestStakeholder:
         overdue = data_service.check_overdue_engagements(db)
         assert len(overdue) == 1
         assert overdue[0]["status"] == "overdue"
+
+    def test_list_engagements_status_filter_is_parameterized(self, db):
+        """Re-audit fix: list_engagements built its WHERE clause with an
+        f-string. A status value containing a quote must not break the
+        query, and filtering must still work correctly.
+        """
+        officer = _mk_user(db, "she_officer", "sh3@test.com")
+        from sheplatform.modules.stakeholder import data_service
+        stakeholder = data_service.create_stakeholder(
+            db, name="POTRAZ", category="regulator", org_id=None)
+        data_service.create_engagement(
+            db, stakeholder_id=stakeholder["id"], engagement_issue="Spectrum licensing",
+            created_by=officer["id"])
+
+        # a value shaped like an injection attempt must not error or leak rows
+        result = data_service.list_engagements(db, status="active' OR '1'='1")
+        assert result == []
+
+        # normal filtering still works
+        result = data_service.list_engagements(db, status="active")
+        assert len(result) == 1
+        assert result[0]["engagement_issue"] == "Spectrum licensing"
