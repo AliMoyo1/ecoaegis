@@ -10,6 +10,51 @@ import json
 from sheplatform.core.ai_client import ask_ai
 from sheplatform.database import get_db
 
+
+def _safe_json(text: str) -> dict:
+    """Tolerant JSON object parser: returns {} on any failure."""
+    if not text:
+        return {}
+    s = text.strip()
+    if s.startswith("```"):
+        lines = s.splitlines()
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].startswith("```"):
+            lines = lines[:-1]
+        s = "\n".join(lines).strip()
+    # Find the first JSON object
+    start = s.find("{")
+    end = s.rfind("}")
+    if start == -1 or end == -1 or end < start:
+        return {}
+    try:
+        return json.loads(s[start:end + 1])
+    except Exception:
+        return {}
+
+
+def _safe_json_array(text: str) -> list:
+    """Tolerant JSON array parser: returns [] on any failure."""
+    if not text:
+        return []
+    s = text.strip()
+    if s.startswith("```"):
+        lines = s.splitlines()
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].startswith("```"):
+            lines = lines[:-1]
+        s = "\n".join(lines).strip()
+    start = s.find("[")
+    end = s.rfind("]")
+    if start == -1 or end == -1 or end < start:
+        return []
+    try:
+        return json.loads(s[start:end + 1])
+    except Exception:
+        return []
+
 # ---------- data gathering (grounding) ----------
 
 
@@ -134,6 +179,29 @@ async def root_cause_assistant(incident_id: int, org_id: int | None = None) -> d
         )
         reply = await ask_ai(prompt, max_tokens=1500)
         return {"ok": True, "incident_ref": incident.get("incident_ref"), "result": reply}
+    finally:
+        db.close()
+
+
+async def draft_corrective_actions(incident_id: int, org_id: int | None = None) -> dict:
+    """AI drafts corrective/preventive actions as structured records."""
+    db = get_db()
+    try:
+        incident = _incident_detail(db, incident_id)
+        if not incident:
+            return {"ok": False, "message": "incident not found"}
+        if org_id and incident.get("org_id") and incident["org_id"] != org_id:
+            return {"ok": False, "message": "incident not found"}
+        prompt = (
+            f"Incident: {incident.get('title')}\n"
+            f"Root cause: {incident.get('root_cause') or 'not recorded'}\n\n"
+            "Propose 2-4 corrective/preventive actions. Return ONLY a JSON array of objects "
+            'with keys: title, description, type ("corrective"|"preventive"), '
+            "suggested_role, due_in_days. No prose."
+        )
+        raw = await ask_ai(prompt, max_tokens=1200)
+        actions = _safe_json_array(raw)
+        return {"ok": True, "incident_ref": incident.get("incident_ref"), "draft_actions": actions}
     finally:
         db.close()
 

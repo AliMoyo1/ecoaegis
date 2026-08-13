@@ -49,6 +49,13 @@ async def api_root_cause(request: Request, incident_id: int):
     return JSONResponse(await service.root_cause_assistant(incident_id, request.state.user.get("org_id")))
 
 
+@router.post("/api/draft-actions/{incident_id}")
+@require_auth
+async def api_draft_actions(request: Request, incident_id: int):
+    return JSONResponse(await service.draft_corrective_actions(
+        incident_id, request.state.user.get("org_id")))
+
+
 @router.post("/api/predictive-risk")
 @require_auth
 async def api_predictive(request: Request):
