@@ -60,6 +60,7 @@ from sheplatform.modules.stakeholder.routes import router as stakeholder_router
 from sheplatform.modules.evidence.routes import router as evidence_router
 from sheplatform.modules.integration.routes import router as integration_router
 from sheplatform.modules.ai.routes import router as ai_router
+from sheplatform.modules.attachments.routes import router as attachments_router
 from sheplatform.modules.capa.routes import router as capa_router
 from sheplatform.modules.inspections.routes import router as inspections_router
 from sheplatform.modules.observations.routes import router as observations_router
@@ -89,6 +90,7 @@ app.include_router(stakeholder_router)
 app.include_router(evidence_router)
 app.include_router(integration_router)
 app.include_router(ai_router)
+app.include_router(attachments_router)
 app.include_router(capa_router)
 app.include_router(inspections_router)
 app.include_router(observations_router)

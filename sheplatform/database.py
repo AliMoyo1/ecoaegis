@@ -1014,6 +1014,25 @@ SCHEMA = [
         updated_at      TIMESTAMPTZ DEFAULT NOW()
     )""",
     """
+    CREATE TABLE IF NOT EXISTS attachments (
+        id            SERIAL PRIMARY KEY,
+        entity_type   TEXT NOT NULL,
+        entity_id     INTEGER NOT NULL,
+        file_name     TEXT NOT NULL,
+        original_name TEXT NOT NULL,
+        mime_type     TEXT,
+        size_bytes    INTEGER,
+        sha256        TEXT,
+        kind          TEXT DEFAULT 'file',
+        ai_labels     JSONB,
+        org_id        INTEGER NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+        uploaded_by   INTEGER REFERENCES users(id),
+        created_at    TIMESTAMPTZ DEFAULT NOW()
+    )""",
+    """
+    CREATE INDEX IF NOT EXISTS idx_attachments_entity ON attachments(entity_type, entity_id)
+    """,
+    """
     CREATE TABLE IF NOT EXISTS chemicals (
         id              SERIAL PRIMARY KEY,
         chem_ref        TEXT UNIQUE NOT NULL,
