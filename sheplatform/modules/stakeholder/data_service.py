@@ -32,11 +32,11 @@ def create_stakeholder(db, *, name: str, category: str = "community",
 
 
 def list_stakeholders(db, org_id: int | None = None) -> list[dict]:
-    if org_id:
-        return [dict(r) for r in db.execute(
-            "SELECT * FROM stakeholders WHERE org_id = %s ORDER BY id DESC",
-            (org_id,)).fetchall()]
-    return [dict(r) for r in db.execute("SELECT * FROM stakeholders ORDER BY id DESC").fetchall()]
+    if not org_id:
+        return []  # fail closed: no tenant scope -> no data (audit S5)
+    return [dict(r) for r in db.execute(
+        "SELECT * FROM stakeholders WHERE org_id = %s ORDER BY id DESC",
+        (org_id,)).fetchall()]
 
 
 def create_engagement(db, *, stakeholder_id: int, engagement_issue: str,

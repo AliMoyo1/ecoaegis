@@ -7,9 +7,9 @@ import pytest
 def _mk_user(db, role, email):
     from sheplatform.core.auth import hash_password
     db.execute(
-        "INSERT INTO users (email, password_hash, first_name, last_name, role_key) "
-        "VALUES (%s, %s, %s, %s, %s)",
-        (email, hash_password("Test1234!"), "F", "L", role),
+        "INSERT INTO users (email, password_hash, first_name, last_name, role_key, org_id) "
+        "VALUES (%s, %s, %s, %s, %s, %s)",
+        (email, hash_password("Test1234!"), "F", "L", role, 1),
     )
     db.commit()
     return dict(db.execute("SELECT * FROM users WHERE email = %s", (email,)).fetchone())
@@ -21,7 +21,7 @@ class TestObservations:
         from sheplatform.modules.observations.data_service import create_observation
         obs = create_observation(
             db, obs_type="hazard", title="Wet floor", description="Spill near exit",
-            location="Warehouse", severity="medium", reported_by=emp["id"])
+            location="Warehouse", severity="medium", reported_by=emp["id"], org_id=1)
         assert obs["status"] == "open"
         assert obs["obs_ref"].startswith("OBS-")
         assert obs["reported_by"] == emp["id"]
@@ -33,7 +33,7 @@ class TestObservations:
             create_observation, raise_corrective_action)
         obs = create_observation(
             db, obs_type="near_miss", title="Forklift near miss", description="",
-            location="Yard", severity="high", reported_by=emp["id"])
+            location="Yard", severity="high", reported_by=emp["id"], org_id=1)
 
         out = raise_corrective_action(db, obs["id"], officer["id"])
         assert out["capa_ref"].startswith("CA-")
@@ -41,7 +41,7 @@ class TestObservations:
 
         # CAPA linked back exists
         from sheplatform.modules.capa.data_service import list_actions
-        actions = list_actions(db)
+        actions = list_actions(db, org_id=1)
         assert any("Forklift near miss" in a["title"] for a in actions)
 
     def test_cannot_escalate_twice(self, db):

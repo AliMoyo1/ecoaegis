@@ -23,7 +23,17 @@ def db(tmp_path, monkeypatch):
 
     from sheplatform.database import init_db, get_db
     init_db()
-    return get_db()
+    # Seed a default organisation so users.org_id (now NOT NULL) has a target.
+    db = get_db()
+    db.execute("INSERT INTO organisations (name, slug) VALUES ('Test Org', 'test-org')")
+    db.commit()
+    return db
+
+
+@pytest.fixture
+def org_id(db) -> int:
+    """The seeded organisation's id, for test helpers that create users."""
+    return db.execute("SELECT id FROM organisations LIMIT 1").fetchone()["id"]
 
 
 @pytest.fixture
@@ -31,9 +41,9 @@ def she_manager(db):
     """SHE Manager user."""
     from sheplatform.core.auth import hash_password
     db.execute(
-        "INSERT INTO users (email, password_hash, first_name, last_name, role_key) "
-        "VALUES (%s, %s, %s, %s, %s)",
-        ("manager@test.com", hash_password("Test1234!"), "Test", "Manager", "she_manager"),
+        "INSERT INTO users (email, password_hash, first_name, last_name, role_key, org_id) "
+        "VALUES (%s, %s, %s, %s, %s, %s)",
+        ("manager@test.com", hash_password("Test1234!"), "Test", "Manager", "she_manager", 1),
     )
     db.commit()
     row = db.execute("SELECT * FROM users WHERE email = 'manager@test.com'").fetchone()
@@ -45,9 +55,9 @@ def she_officer(db):
     """SHE Officer user."""
     from sheplatform.core.auth import hash_password
     db.execute(
-        "INSERT INTO users (email, password_hash, first_name, last_name, role_key) "
-        "VALUES (%s, %s, %s, %s, %s)",
-        ("officer@test.com", hash_password("Test1234!"), "Test", "Officer", "she_officer"),
+        "INSERT INTO users (email, password_hash, first_name, last_name, role_key, org_id) "
+        "VALUES (%s, %s, %s, %s, %s, %s)",
+        ("officer@test.com", hash_password("Test1234!"), "Test", "Officer", "she_officer", 1),
     )
     db.commit()
     row = db.execute("SELECT * FROM users WHERE email = 'officer@test.com'").fetchone()
@@ -59,9 +69,9 @@ def board_chair(db):
     """Board Chair user."""
     from sheplatform.core.auth import hash_password
     db.execute(
-        "INSERT INTO users (email, password_hash, first_name, last_name, role_key) "
-        "VALUES (%s, %s, %s, %s, %s)",
-        ("chair@test.com", hash_password("Test1234!"), "Test", "Chair", "board_chair"),
+        "INSERT INTO users (email, password_hash, first_name, last_name, role_key, org_id) "
+        "VALUES (%s, %s, %s, %s, %s, %s)",
+        ("chair@test.com", hash_password("Test1234!"), "Test", "Chair", "board_chair", 1),
     )
     db.commit()
     row = db.execute("SELECT * FROM users WHERE email = 'chair@test.com'").fetchone()

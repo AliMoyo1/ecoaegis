@@ -66,9 +66,10 @@ def list_inspections(db, status: str | None = None, org_id: int | None = None) -
     if status:
         conds.append("i.status = %s")
         params.append(status)
-    if org_id:
-        conds.append("i.org_id = %s")
-        params.append(org_id)
+    if not org_id:
+        return []  # fail closed: no tenant scope -> no data (audit S5)
+    conds.append("i.org_id = %s")
+    params.append(org_id)
     if conds:
         sql += " WHERE " + " AND ".join(conds)
     sql += " ORDER BY i.id DESC"
@@ -98,6 +99,8 @@ def complete_inspection(db, inspection_id: int, user_id: int, findings: str,
         raise ValueError("inspection not found")
     if row["status"] not in ("scheduled", "in_progress"):
         raise ValueError("only scheduled/in-progress inspections can be completed")
+    row = dict(row)
+    org_id = org_id or row.get("org_id")  # inherit tenant from the inspection
 
     now = datetime.now(timezone.utc).isoformat()
     db.execute("UPDATE inspections SET status = 'completed', completed_date = %s, "

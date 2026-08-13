@@ -98,6 +98,22 @@ async def api_consultant_create(request: Request,
         db.close()
 
 
+@router.post("/api/consultants/{consultant_id}/verify")
+@require_auth
+@require_capability("module.eia.access")
+async def api_consultant_verify(request: Request, consultant_id: int,
+                                verified: bool = Form(True)):
+    db = get_db()
+    try:
+        result = data_service.verify_consultant_accreditation(
+            db, consultant_id, request.state.user["id"], verified=verified)
+        if not result["ok"]:
+            return JSONResponse(result, status_code=400)
+        return JSONResponse(result)
+    finally:
+        db.close()
+
+
 @router.post("/api/projects/{project_id}/consultant")
 @require_auth
 @require_capability("module.eia.access")

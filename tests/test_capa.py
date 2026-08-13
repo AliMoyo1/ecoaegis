@@ -7,9 +7,9 @@ import pytest
 def _mk_user(db, role, email):
     from sheplatform.core.auth import hash_password
     db.execute(
-        "INSERT INTO users (email, password_hash, first_name, last_name, role_key) "
-        "VALUES (%s, %s, %s, %s, %s)",
-        (email, hash_password("Test1234!"), "F", "L", role),
+        "INSERT INTO users (email, password_hash, first_name, last_name, role_key, org_id) "
+        "VALUES (%s, %s, %s, %s, %s, %s)",
+        (email, hash_password("Test1234!"), "F", "L", role, 1),
     )
     db.commit()
     return dict(db.execute("SELECT * FROM users WHERE email = %s", (email,)).fetchone())
@@ -21,7 +21,7 @@ def _mk_action(db, officer, manager, priority="high"):
         db, title="Fix spill kit", description="Restock spill kit",
         source_type="incident", source_id=1, priority=priority,
         assigned_to=officer["id"], due_date="2099-01-01T00:00:00+00:00",
-        created_by=manager["id"])
+        created_by=manager["id"], org_id=1)
 
 
 class TestCAPAWorkflow:
@@ -83,14 +83,14 @@ class TestCAPAAgeing:
         create_action(
             db, title="Old action", description="", source_type="audit", source_id=1,
             priority="low", assigned_to=officer["id"],
-            due_date="2000-01-01T00:00:00+00:00", created_by=manager["id"])
+            due_date="2000-01-01T00:00:00+00:00", created_by=manager["id"], org_id=1)
 
         from sheplatform.modules.capa.data_service import age_actions
         aged = age_actions(db)
         assert aged >= 1
 
         from sheplatform.modules.capa.data_service import list_actions
-        items = list_actions(db, status="overdue")
+        items = list_actions(db, status="overdue", org_id=1)
         assert any(a["title"] == "Old action" for a in items)
 
 

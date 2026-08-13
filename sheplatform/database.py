@@ -40,7 +40,7 @@ SCHEMA = [
         last_name       TEXT NOT NULL,
         phone           TEXT,
         role_key        TEXT NOT NULL DEFAULT 'employee',
-        org_id          INTEGER REFERENCES organisations(id) ON DELETE CASCADE,
+        org_id          INTEGER NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
         is_active       BOOLEAN DEFAULT TRUE,
         must_change_password BOOLEAN DEFAULT FALSE,
         mfa_secret      TEXT,
@@ -148,7 +148,9 @@ SCHEMA = [
         nssa_notified   BOOLEAN DEFAULT FALSE,
         nssa_notified_at TIMESTAMPTZ,
         ema_notified    BOOLEAN DEFAULT FALSE,
+        ema_notified_at TIMESTAMPTZ,
         zrp_notified    BOOLEAN DEFAULT FALSE,
+        zrp_notified_at TIMESTAMPTZ,
         statutory_deadline TIMESTAMPTZ,
         closed_at       TIMESTAMPTZ,
         closed_by       INTEGER REFERENCES users(id),
@@ -456,6 +458,7 @@ SCHEMA = [
         resolution_outcome TEXT,
         complainant_notified BOOLEAN DEFAULT FALSE,
         complainant_notified_at TIMESTAMPTZ,
+        notified_by      INTEGER REFERENCES users(id),
         notification_method TEXT,
         is_residual_risk BOOLEAN DEFAULT FALSE,
         asset_id        TEXT,
@@ -522,8 +525,10 @@ SCHEMA = [
         company         TEXT,
         ema_accreditation_number TEXT,
         ema_accreditation_verified BOOLEAN DEFAULT FALSE,
+        accreditation_verified_by INTEGER REFERENCES users(id),
+        accreditation_verified_at TIMESTAMPTZ,
         procurement_ref TEXT,
-        status          TEXT DEFAULT 'pending' CHECK (status IN ('pending','verified','active','inactive')),
+        status          TEXT DEFAULT 'pending' CHECK (status IN ('pending','verified','rejected','active','inactive')),
         org_id          INTEGER REFERENCES organisations(id),
         created_at      TIMESTAMPTZ DEFAULT NOW()
     )""",
@@ -1144,6 +1149,21 @@ class _PgConn:
             self.commit()
         self.close()
         return False
+
+
+def resolve_org(db, org_id: int | None, user_id: int | None) -> int | None:
+    """Tenant resolution helper: explicit org wins, else inherit from the creator.
+
+    Audit S5: keeps data tied to a tenant even when callers (event handlers,
+    tests) omit org_id - fails closed downstream instead of leaking.
+    """
+    if org_id:
+        return org_id
+    if user_id:
+        row = db.execute("SELECT org_id FROM users WHERE id = %s", (user_id,)).fetchone()
+        if row and row["org_id"]:
+            return row["org_id"]
+    return None
 
 
 def get_db() -> object:

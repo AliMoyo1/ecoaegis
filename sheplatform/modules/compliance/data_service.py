@@ -8,6 +8,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from sheplatform.core.audit import log_audit
+from sheplatform.database import resolve_org
 
 FREQUENCIES = ("annual", "semi_annual", "quarterly", "monthly", "event_based", "continuous")
 
@@ -22,6 +23,7 @@ def _next_ref(db) -> str:
 def create_obligation(db, *, regulation: str, obligation: str, regulator: str,
                       owner_id: int, frequency: str, next_due_date: str = "",
                       created_by: int, org_id: int | None = None) -> dict:
+    org_id = resolve_org(db, org_id, created_by)
     if frequency not in FREQUENCIES:
         raise ValueError("invalid frequency")
     ref = _next_ref(db)
@@ -49,9 +51,10 @@ def list_obligations(db, status: str | None = None, regulator: str | None = None
     if regulator:
         conds.append("o.regulator = %s")
         params.append(regulator)
-    if org_id:
-        conds.append("o.org_id = %s")
-        params.append(org_id)
+    if not org_id:
+        return []  # fail closed: no tenant scope -> no data (audit S5)
+    conds.append("o.org_id = %s")
+    params.append(org_id)
     if conds:
         sql += " WHERE " + " AND ".join(conds)
     sql += " ORDER BY o.next_due_date ASC NULLS LAST, o.id DESC"

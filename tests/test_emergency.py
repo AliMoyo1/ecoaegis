@@ -9,9 +9,9 @@ from __future__ import annotations
 def _mk_user(db, role, email):
     from sheplatform.core.auth import hash_password
     db.execute(
-        "INSERT INTO users (email, password_hash, first_name, last_name, role_key) "
-        "VALUES (%s, %s, %s, %s, %s)",
-        (email, hash_password("Test1234!"), "T", "U", role),
+        "INSERT INTO users (email, password_hash, first_name, last_name, role_key, org_id) "
+        "VALUES (%s, %s, %s, %s, %s, %s)",
+        (email, hash_password("Test1234!"), "T", "U", role, 1),
     )
     db.commit()
     row = db.execute("SELECT * FROM users WHERE email = %s", (email,)).fetchone()
@@ -58,13 +58,33 @@ class TestDrills:
 
 
 class TestPostCrisis:
-    def test_post_crisis_creates_eprp_improvement(self, db):
-        # BRS row 6: emergency.post_crisis -> EPRP improvement queue
+    def test_post_crisis_blocked_without_site_certificate(self, db):
+        """Audit P0-2: the re-entry gate must block post_crisis until BRN-007 cert."""
         officer = _mk_user(db, "she_officer", "em4@test.com")
         from sheplatform.modules.emergency import data_service
         event = data_service.create_emergency(
             db, title="Chemical leak", description="", severity="high",
             created_by=officer["id"])
+
+        result = data_service.transition_post_crisis(
+            db, event["id"], root_cause="Valve failure")
+        assert result["ok"] is False
+        assert "site safe certificate required" in result["message"]
+
+    def test_post_crisis_creates_eprp_improvement(self, db):
+        # BRS row 6: emergency.post_crisis -> EPRP improvement queue
+        officer = _mk_user(db, "she_officer", "em5@test.com")
+        manager = _mk_user(db, "she_manager", "em6@test.com")
+        hod = _mk_user(db, "she_hod", "em7@test.com")
+        from sheplatform.modules.emergency import data_service
+        event = data_service.create_emergency(
+            db, title="Chemical leak", description="", severity="high",
+            created_by=officer["id"])
+
+        # dual sign-off first (BRN-007)
+        cert = data_service.issue_site_safe_certificate(
+            db, event["id"], she_manager_id=manager["id"], hod_security_id=hod["id"])
+        assert cert["ok"] is True
 
         result = data_service.transition_post_crisis(
             db, event["id"], root_cause="Valve failure")

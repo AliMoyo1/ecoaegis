@@ -10,6 +10,7 @@ import re
 from datetime import datetime, timezone
 
 from sheplatform.core import events
+from sheplatform.database import resolve_org
 
 
 def next_risk_ref(db) -> str:
@@ -55,6 +56,7 @@ def create_risk(db, *, hazard_description: str, risk_category: str,
                 created_by: int | None = None, org_id: int | None = None,
                 statutory_instrument: str = "") -> dict:
     """Create a risk. Computed columns handle inherent/residual/priority in DB."""
+    org_id = resolve_org(db, org_id, created_by)
     ref = next_risk_ref(db)
     db.execute(
         "INSERT INTO risks (risk_ref, process_function, hazard_description, risk_category, "
@@ -86,9 +88,10 @@ def list_risks(db, category: str | None = None, status: str | None = None,
     if status:
         conds.append("status = %s")
         params.append(status)
-    if org_id:
-        conds.append("org_id = %s")
-        params.append(org_id)
+    if not org_id:
+        return []  # fail closed: no tenant scope -> no data (audit S5)
+    conds.append("org_id = %s")
+    params.append(org_id)
     if conds:
         sql += " WHERE " + " AND ".join(conds)
     sql += " ORDER BY residual_score DESC, id DESC LIMIT %s"

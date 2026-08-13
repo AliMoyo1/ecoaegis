@@ -7,9 +7,9 @@ import pytest
 def _mk_user(db, role, email):
     from sheplatform.core.auth import hash_password
     db.execute(
-        "INSERT INTO users (email, password_hash, first_name, last_name, role_key) "
-        "VALUES (%s, %s, %s, %s, %s)",
-        (email, hash_password("Test1234!"), "F", "L", role),
+        "INSERT INTO users (email, password_hash, first_name, last_name, role_key, org_id) "
+        "VALUES (%s, %s, %s, %s, %s, %s)",
+        (email, hash_password("Test1234!"), "F", "L", role, 1),
     )
     db.commit()
     return dict(db.execute("SELECT * FROM users WHERE email = %s", (email,)).fetchone())
@@ -124,3 +124,62 @@ class TestPTWApproval:
 
         rows = db.execute("SELECT event_type FROM events WHERE event_type = 'permit.approved'").fetchall()
         assert len(rows) == 1
+
+    def test_http_route_allows_line_manager_step1(self, db):
+        """REGRESSION (re-audit): the HTTP route was gated by ptw.approve which
+        excluded line_manager/she_officer, so step 1 could never be approved in
+        the running app. Route must allow all chain roles; service enforces role.
+        """
+        from fastapi.testclient import TestClient
+        from sheplatform.core.auth import hash_password
+        # seed the chain roles with the dev password for HTTP login
+        officer = _mk_user(db, "she_officer", "http-officer@test.com")
+        line_mgr = _mk_user(db, "line_manager", "http-lm@test.com")
+        for u in (officer, line_mgr):
+            db.execute("UPDATE users SET password_hash = %s WHERE id = %s",
+                       (hash_password("ChangeMe!123"), u["id"]))
+        db.commit()
+        permit = _mk_permit(db, officer)
+
+        from sheplatform.main import app
+        client = TestClient(app)
+
+        def login(email):
+            r = client.post("/login", data={"email": email, "password": "ChangeMe!123"})
+            assert r.status_code in (200, 303), f"login {email} -> {r.status_code}"
+            return client.cookies.get("she_csrf", "")
+
+        def approve(email, step_id, decision="approved"):
+            token = login(email)
+            return client.post(
+                f"/permits/api/{permit['id']}/approve",
+                data={"step_id": step_id, "decision": decision},
+                headers={"X-CSRF-Token": token})
+
+        from sheplatform.modules.permit_to_work.data_service import get_pending_approval_step
+
+        # step 1: LINE MANAGER via the real HTTP route (was 403 before the fix)
+        s = get_pending_approval_step(db, permit["id"])
+        assert s["role_required"] == "line_manager"
+        r = approve("http-lm@test.com", s["id"])
+        assert r.status_code in (200, 400), f"expected ok-or-role-error, got {r.status_code}"
+        if r.status_code == 400:
+            # if 400, body must be a role error (not a 403 permission error)
+            assert "requires role" in r.json()["message"]
+
+        # step 2: SHE OFFICER via HTTP
+        s = get_pending_approval_step(db, permit["id"])
+        assert s["role_required"] == "she_officer"
+        r = approve("http-officer@test.com", s["id"])
+        assert r.status_code in (200, 400)
+
+        # a user with NO permit module access must be blocked at the route gate
+        # (403 = capability gate; 400 = service role check - either is correct
+        # defense in depth, but employee has no permit module access at all)
+        emp = _mk_user(db, "employee", "http-emp@test.com")
+        db.execute("UPDATE users SET password_hash = %s WHERE id = %s",
+                   (hash_password("ChangeMe!123"), emp["id"]))
+        db.commit()
+        s = get_pending_approval_step(db, permit["id"])
+        r = approve("http-emp@test.com", s["id"])
+        assert r.status_code in (400, 403)

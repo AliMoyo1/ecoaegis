@@ -38,11 +38,11 @@ def get_workplan(db, plan_id: int) -> dict | None:
 
 
 def list_workplans(db, org_id: int | None = None) -> list[dict]:
-    if org_id:
-        return [dict(r) for r in db.execute(
-            "SELECT * FROM annual_workplan WHERE org_id = %s ORDER BY id DESC",
-            (org_id,)).fetchall()]
-    return [dict(r) for r in db.execute("SELECT * FROM annual_workplan ORDER BY id DESC").fetchall()]
+    if not org_id:
+        return []  # fail closed: no tenant scope -> no data (audit S5)
+    return [dict(r) for r in db.execute(
+        "SELECT * FROM annual_workplan WHERE org_id = %s ORDER BY id DESC",
+        (org_id,)).fetchall()]
 
 
 def add_task(db, *, workplan_id: int, title: str, control_type: str,

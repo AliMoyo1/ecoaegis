@@ -73,7 +73,7 @@ async def api_create(request: Request,
 
 @router.post("/api/{permit_id}/approve")
 @require_auth
-@require_capability("ptw.approve")
+@require_capability("module.permits.access")
 async def api_approve(request: Request, permit_id: int, step_id: int = Form(...),
                       decision: str = Form("approved"), comments: str = Form("")):
     db = get_db()

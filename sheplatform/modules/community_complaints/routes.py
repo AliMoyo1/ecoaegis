@@ -66,7 +66,8 @@ async def api_create(request: Request,
 async def api_notify(request: Request, grievance_id: int, method: str = Form("phone")):
     db = get_db()
     try:
-        return JSONResponse(data_service.record_notification(db, grievance_id, method))
+        return JSONResponse(data_service.record_notification(
+            db, grievance_id, method, notified_by=request.state.user["id"]))
     finally:
         db.close()
 

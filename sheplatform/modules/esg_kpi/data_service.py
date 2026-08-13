@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from sheplatform.core import events
+from sheplatform.database import resolve_org
 
 
 # Representative ESG KPI seed set (BRS Sections 12.1-12.3; 40+ in production)
@@ -84,6 +85,7 @@ def _rag(actual: float, target: float, threshold_type: str, alert_threshold) -> 
 def record_kpi_entry(db, *, kpi_id: int, period: str, actual_value: float,
                      target_value: float | None = None, notes: str = "",
                      created_by: int | None = None, org_id: int | None = None) -> dict:
+    org_id = resolve_org(db, org_id, created_by)
     kpi = get_kpi(db, kpi_id)
     if kpi is None:
         return {"ok": False, "message": "KPI not found"}

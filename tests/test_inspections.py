@@ -7,9 +7,9 @@ import pytest
 def _mk_user(db, role, email):
     from sheplatform.core.auth import hash_password
     db.execute(
-        "INSERT INTO users (email, password_hash, first_name, last_name, role_key) "
-        "VALUES (%s, %s, %s, %s, %s)",
-        (email, hash_password("Test1234!"), "F", "L", role),
+        "INSERT INTO users (email, password_hash, first_name, last_name, role_key, org_id) "
+        "VALUES (%s, %s, %s, %s, %s, %s)",
+        (email, hash_password("Test1234!"), "F", "L", role, 1),
     )
     db.commit()
     return dict(db.execute("SELECT * FROM users WHERE email = %s", (email,)).fetchone())
@@ -20,7 +20,7 @@ def _mk_inspection(db, officer, inspection_type="safety"):
     return schedule_inspection(
         db, title="Monthly safety walk", inspection_type=inspection_type,
         site_location="Harare HQ", scheduled_date="2099-01-01T00:00:00+00:00",
-        inspector_id=officer["id"], created_by=officer["id"])
+        inspector_id=officer["id"], created_by=officer["id"], org_id=1)
 
 
 class TestInspectionWorkflow:
@@ -55,7 +55,7 @@ class TestInspectionWorkflow:
 
         # the CAPA exists with source inspection
         from sheplatform.modules.capa.data_service import list_actions
-        actions = list_actions(db)
+        actions = list_actions(db, org_id=1)
         assert any(a["source_type"] == "inspection" and a["source_id"] == insp["id"]
                    for a in actions)
         assert "PPE worn by all personnel" in actions[0]["title"]
@@ -89,11 +89,11 @@ class TestInspectionAgeing:
         schedule_inspection(
             db, title="Old inspection", inspection_type="fire",
             site_location="X", scheduled_date="2000-01-01T00:00:00+00:00",
-            inspector_id=officer["id"], created_by=officer["id"])
+            inspector_id=officer["id"], created_by=officer["id"], org_id=1)
 
         from sheplatform.modules.inspections.data_service import age_inspections
         aged = age_inspections(db)
         assert aged >= 1
 
         from sheplatform.modules.inspections.data_service import list_inspections
-        assert any(i["status"] == "overdue" for i in list_inspections(db, status="overdue"))
+        assert any(i["status"] == "overdue" for i in list_inspections(db, status="overdue", org_id=1))

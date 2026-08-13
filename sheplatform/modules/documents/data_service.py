@@ -8,6 +8,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from sheplatform.core.audit import log_audit
+from sheplatform.database import resolve_org
 
 DOC_TYPES = ("sop", "policy", "guideline", "form", "template", "regulation")
 STATUSES = ("draft", "in_review", "approved", "superseded", "archived")
@@ -23,6 +24,7 @@ def create_document(db, *, title: str, doc_type: str, description: str = "",
                     version: str = "1.0", file_path: str = "", review_due_date: str = "",
                     supersedes: int | None = None, created_by: int,
                     org_id: int | None = None) -> dict:
+    org_id = resolve_org(db, org_id, created_by)
     if doc_type not in DOC_TYPES:
         raise ValueError("invalid doc_type")
     ref = _next_ref(db)
@@ -53,9 +55,10 @@ def list_documents(db, doc_type: str | None = None, status: str | None = None,
     if status:
         conds.append("d.status = %s")
         params.append(status)
-    if org_id:
-        conds.append("d.org_id = %s")
-        params.append(org_id)
+    if not org_id:
+        return []  # fail closed: no tenant scope -> no data (audit S5)
+    conds.append("d.org_id = %s")
+    params.append(org_id)
     if conds:
         sql += " WHERE " + " AND ".join(conds)
     sql += " ORDER BY d.id DESC"

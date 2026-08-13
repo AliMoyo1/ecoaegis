@@ -11,9 +11,9 @@ from datetime import datetime, timedelta, timezone
 def _mk_user(db, role, email):
     from sheplatform.core.auth import hash_password
     db.execute(
-        "INSERT INTO users (email, password_hash, first_name, last_name, role_key) "
-        "VALUES (%s, %s, %s, %s, %s)",
-        (email, hash_password("Test1234!"), "T", "U", role),
+        "INSERT INTO users (email, password_hash, first_name, last_name, role_key, org_id) "
+        "VALUES (%s, %s, %s, %s, %s, %s)",
+        (email, hash_password("Test1234!"), "T", "U", role, 1),
     )
     db.commit()
     row = db.execute("SELECT * FROM users WHERE email = %s", (email,)).fetchone()
@@ -43,6 +43,13 @@ def _approve_full_chain(db, incident_id):
             _mk_user(db, role, email)
             row = db.execute("SELECT * FROM users WHERE email = %s", (email,)).fetchone()
         data_service.approve_report_step(db, incident_id, step["id"], dict(row), "approved")
+
+
+def _notify_all_statutory(db, incident_id):
+    """Mark NSSA/EMA/ZRP notified (audit P0-6: required before closing critical/high)."""
+    from sheplatform.modules.incidents import data_service
+    for body in ("nssa", "ema", "zrp"):
+        data_service.set_statutory_notified(db, incident_id, body, notified=True)
 
 
 class TestIncidentCreate:
@@ -119,6 +126,7 @@ class TestIncidentLifecycle:
         assert "not yet approved" in res["message"]
 
         _approve_full_chain(db, inc["id"])
+        _notify_all_statutory(db, inc["id"])
 
         res = data_service.close_incident(db, inc["id"], mgr["id"])
         assert res["ok"] is True
@@ -149,6 +157,7 @@ class TestIncidentApprovalChain:
             assert r["ok"] is True
 
         assert data_service.approval_complete(db, inc["id"]) is True
+        _notify_all_statutory(db, inc["id"])
         # now close succeeds
         r = data_service.close_incident(db, inc["id"], mgr["id"])
         assert r["ok"] is True
@@ -184,6 +193,43 @@ class TestIncidentApprovalChain:
         assert r["ok"] is False
         assert "requires role" in r["message"]
 
+    def test_close_blocked_without_statutory_notification(self, db):
+        """Audit P0-6: critical/high incidents cannot close until NSSA/EMA/ZRP notified."""
+        emp = _mk_user(db, "employee", "emp12@test.com")
+        mgr = _mk_user(db, "she_manager", "mgr12@test.com")
+        inc = _mk_incident(db, emp["id"], severity="high")
+
+        from sheplatform.modules.incidents import data_service
+        data_service.submit_root_cause_report(db, inc["id"], "root", "", "", mgr["id"])
+        _approve_full_chain(db, inc["id"])
+
+        # no notifications -> blocked
+        r = data_service.close_incident(db, inc["id"], mgr["id"])
+        assert r["ok"] is False
+        assert "statutory notification required" in r["message"]
+
+        # partial (NSSA only) -> still blocked
+        data_service.set_statutory_notified(db, inc["id"], "nssa", notified=True)
+        r = data_service.close_incident(db, inc["id"], mgr["id"])
+        assert r["ok"] is False
+        assert "EMA" in r["message"]
+
+        # all three -> closes
+        _notify_all_statutory(db, inc["id"])
+        r = data_service.close_incident(db, inc["id"], mgr["id"])
+        assert r["ok"] is True
+
+    def test_low_severity_closes_without_notification(self, db):
+        """The statutory gate applies to critical/high only."""
+        emp = _mk_user(db, "employee", "emp13@test.com")
+        mgr = _mk_user(db, "she_manager", "mgr13@test.com")
+        inc = _mk_incident(db, emp["id"], severity="low")
+        from sheplatform.modules.incidents import data_service
+        data_service.submit_root_cause_report(db, inc["id"], "root", "", "", mgr["id"])
+        _approve_full_chain(db, inc["id"])
+        r = data_service.close_incident(db, inc["id"], mgr["id"])
+        assert r["ok"] is True
+
 
 class TestIncidentToRiskIntegration:
     def test_close_creates_risk(self, db):
@@ -195,10 +241,11 @@ class TestIncidentToRiskIntegration:
         from sheplatform.modules.incidents import data_service
         data_service.submit_root_cause_report(db, inc["id"], "root", "", "", mgr["id"])
         _approve_full_chain(db, inc["id"])
+        _notify_all_statutory(db, inc["id"])
         data_service.close_incident(db, inc["id"], mgr["id"])
 
         from sheplatform.modules.risk_register import data_service as risk_svc
-        risks = risk_svc.list_risks(db)
+        risks = risk_svc.list_risks(db, org_id=1)
         assert len(risks) == 1
         assert risks[0]["source_type"] == "incident"
         assert risks[0]["source_id"] == inc["id"]
@@ -216,7 +263,7 @@ class TestIncidentToRiskIntegration:
         data_service.close_incident(db, inc["id"], mgr["id"])
 
         from sheplatform.modules.risk_register import data_service as risk_svc
-        risks = risk_svc.list_risks(db)
+        risks = risk_svc.list_risks(db, org_id=1)
         assert len(risks) == 1  # still one risk, no duplicate
 
 

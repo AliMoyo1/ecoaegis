@@ -58,9 +58,10 @@ def list_evidence(db, entity_type: str | None = None, entity_id: int | None = No
     if entity_id is not None:
         conds.append("entity_id = %s")
         params.append(entity_id)
-    if org_id:
-        conds.append("org_id = %s")
-        params.append(org_id)
+    if not org_id:
+        return []  # fail closed: no tenant scope -> no data (audit S5)
+    conds.append("org_id = %s")
+    params.append(org_id)
     if conds:
         sql += " WHERE " + " AND ".join(conds)
     sql += " ORDER BY id DESC"

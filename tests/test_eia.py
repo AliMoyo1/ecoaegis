@@ -9,9 +9,9 @@ from __future__ import annotations
 def _mk_user(db, role, email):
     from sheplatform.core.auth import hash_password
     db.execute(
-        "INSERT INTO users (email, password_hash, first_name, last_name, role_key) "
-        "VALUES (%s, %s, %s, %s, %s)",
-        (email, hash_password("Test1234!"), "T", "U", role),
+        "INSERT INTO users (email, password_hash, first_name, last_name, role_key, org_id) "
+        "VALUES (%s, %s, %s, %s, %s, %s)",
+        (email, hash_password("Test1234!"), "T", "U", role, 1),
     )
     db.commit()
     row = db.execute("SELECT * FROM users WHERE email = %s", (email,)).fetchone()
@@ -62,14 +62,48 @@ class TestConsultantGate:
         assert result["ok"] is False
         assert result.get("code") == "FNR-048"
 
+    def test_accreditation_requires_manager_verification(self, db):
+        """Audit P0-5: accreditation is NOT self-attested by the number alone."""
+        officer = _mk_user(db, "she_officer", "e8@test.com")
+        manager = _mk_user(db, "she_manager", "e9@test.com")
+        project = _mk_project(db, officer["id"])
+
+        from sheplatform.modules.eia import data_service
+        # number supplied, but consultant still UNVERIFIED (no auto-verify)
+        consultant = data_service.register_consultant(
+            db, name="Green Consulting", company="GreenCo",
+            ema_accreditation_number="EMA-2026-0042")
+        assert consultant["ema_accreditation_verified"] == 0
+        assert consultant["status"] == "pending"
+
+        # assign blocked even with a number (the fix)
+        result = data_service.assign_consultant(db, project["id"], consultant["id"])
+        assert result["ok"] is False
+        assert result.get("code") == "FNR-048"
+
+        # officer cannot verify (role check)
+        r = data_service.verify_consultant_accreditation(db, consultant["id"], officer["id"])
+        assert r["ok"] is False
+        assert "SHE Manager" in r["message"]
+
+        # manager verifies -> now assignable
+        r = data_service.verify_consultant_accreditation(db, consultant["id"], manager["id"])
+        assert r["ok"] is True
+        assert r["consultant"]["ema_accreditation_verified"] == 1
+        assert r["consultant"]["status"] == "verified"
+        result = data_service.assign_consultant(db, project["id"], consultant["id"])
+        assert result["ok"] is True
+
     def test_accredited_consultant_assigns(self, db):
         officer = _mk_user(db, "she_officer", "e4@test.com")
+        manager = _mk_user(db, "she_manager", "e10@test.com")
         project = _mk_project(db, officer["id"])
 
         from sheplatform.modules.eia import data_service
         consultant = data_service.register_consultant(
             db, name="EMA Certified Ltd", company="ECL",
             ema_accreditation_number="EMA-2024-011")
+        data_service.verify_consultant_accreditation(db, consultant["id"], manager["id"])
         result = data_service.assign_consultant(db, project["id"], consultant["id"])
         assert result["ok"] is True
         assert result["project"]["status"] == "assessment"
@@ -99,7 +133,7 @@ class TestEmaDecision:
 
         # eia.rejected handler created a risk
         from sheplatform.modules.risk_register import data_service as risk_svc
-        risks = risk_svc.list_risks(db)
+        risks = risk_svc.list_risks(db, org_id=1)
         assert len(risks) == 1
         assert risks[0]["source_type"] == "eia"
         assert risks[0]["origin_module"] == "SHEIA"

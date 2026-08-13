@@ -25,9 +25,9 @@ class TestSessions:
     def test_create_and_get(self, db):
         from sheplatform.core.auth import hash_password
         db.execute(
-            "INSERT INTO users (email, password_hash, first_name, last_name, role_key) "
-            "VALUES (%s, %s, %s, %s, %s)",
-            ("sess@test.com", hash_password("Test1234!"), "S", "User", "employee"),
+            "INSERT INTO users (email, password_hash, first_name, last_name, role_key, org_id) "
+            "VALUES (%s, %s, %s, %s, %s, %s)",
+            ("sess@test.com", hash_password("Test1234!"), "S", "User", "employee", 1),
         )
         db.commit()
         user_id = db.execute("SELECT id FROM users WHERE email = 'sess@test.com'").fetchone()["id"]
@@ -44,9 +44,9 @@ class TestSessions:
         from datetime import datetime, timedelta, timezone
         from sheplatform.core.auth import hash_password
         db.execute(
-            "INSERT INTO users (email, password_hash, first_name, last_name, role_key) "
-            "VALUES (%s, %s, %s, %s, %s)",
-            ("exp@test.com", hash_password("Test1234!"), "E", "User", "employee"),
+            "INSERT INTO users (email, password_hash, first_name, last_name, role_key, org_id) "
+            "VALUES (%s, %s, %s, %s, %s, %s)",
+            ("exp@test.com", hash_password("Test1234!"), "E", "User", "employee", 1),
         )
         db.commit()
         user_id = db.execute("SELECT id FROM users WHERE email = 'exp@test.com'").fetchone()["id"]
@@ -66,9 +66,9 @@ class TestSessions:
     def test_destroy_session(self, db):
         from sheplatform.core.auth import hash_password
         db.execute(
-            "INSERT INTO users (email, password_hash, first_name, last_name, role_key) "
-            "VALUES (%s, %s, %s, %s, %s)",
-            ("kill@test.com", hash_password("Test1234!"), "K", "User", "employee"),
+            "INSERT INTO users (email, password_hash, first_name, last_name, role_key, org_id) "
+            "VALUES (%s, %s, %s, %s, %s, %s)",
+            ("kill@test.com", hash_password("Test1234!"), "K", "User", "employee", 1),
         )
         db.commit()
         user_id = db.execute("SELECT id FROM users WHERE email = 'kill@test.com'").fetchone()["id"]

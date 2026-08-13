@@ -11,6 +11,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from sheplatform.core import events
+from sheplatform.database import resolve_org
 
 
 def next_incident_ref(db) -> str:
@@ -38,6 +39,7 @@ def create_incident(db, *, title: str, description: str, severity: str,
                     reported_by: int, org_id: int | None = None,
                     latitude: float | None = None, longitude: float | None = None) -> dict:
     """Create an incident. Sets statutory_deadline = reported_at + 48h for critical (BRN-002)."""
+    org_id = resolve_org(db, org_id, reported_by)
     ref = next_incident_ref(db)
     reported_at = datetime.now(timezone.utc)
     statutory_deadline = None
@@ -88,9 +90,10 @@ def list_incidents(db, status: str | None = None, severity: str | None = None,
     if incident_type:
         conds.append("incident_type = %s")
         params.append(incident_type)
-    if org_id:
-        conds.append("org_id = %s")
-        params.append(org_id)
+    if not org_id:
+        return []  # fail closed: no tenant scope -> no data (audit S5)
+    conds.append("org_id = %s")
+    params.append(org_id)
     if conds:
         sql += " WHERE " + " AND ".join(conds)
     sql += " ORDER BY id DESC LIMIT %s"
@@ -238,6 +241,14 @@ def close_incident(db, incident_id: int, by_user: int) -> dict:
         return {"ok": False, "message": "incident not found"}
     if incident["status"] == "under_review" and not approval_complete(db, incident_id):
         return {"ok": False, "message": "root cause report not yet approved by the review chain"}
+    # BRN-SHE-002 / FNR-SHE-026 (audit P0-6): critical and high incidents must
+    # have their statutory notifications (NSSA/EMA/ZRP) recorded before closure.
+    if incident["severity"] in ("critical", "high"):
+        missing = [b for b in ("nssa", "ema", "zrp")
+                   if not incident.get(f"{b}_notified")]
+        if missing:
+            return {"ok": False,
+                    "message": f"statutory notification required before close: {', '.join(missing).upper()}"}
     db.execute(
         "UPDATE incidents SET status = 'closed', closed_at = %s, closed_by = %s WHERE id = %s",
         (datetime.now(timezone.utc).isoformat(), by_user, incident_id),
