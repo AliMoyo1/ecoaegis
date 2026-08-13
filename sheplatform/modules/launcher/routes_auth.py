@@ -27,8 +27,17 @@ async def login_page(request: Request):
 async def login_submit(request: Request, email: str = Form(...), password: str = Form(...)):
     db = get_db()
     try:
+        ip = request.client.host if request.client else ""
+        # Audit S4 fix: 5 failed attempts / 5 min per IP. Checked before touching
+        # bcrypt so a locked-out caller can't use timing to probe credentials.
+        if auth.is_login_rate_limited(db, ip):
+            return templates.TemplateResponse(
+                request, "login.html",
+                {"roles": ROLES, "error": "Too many login attempts. Try again in a few minutes."},
+                status_code=429)
         user = auth.get_user_by_email(db, email)
         if user is None or not auth.verify_password(password, user["password_hash"]):
+            auth.record_failed_login(db, ip)
             return templates.TemplateResponse(request, "login.html",
                                               {"roles": ROLES, "error": "Invalid email or password"})
         if not user["is_active"]:

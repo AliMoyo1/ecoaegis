@@ -75,3 +75,78 @@ class TestSessions:
         raw = auth.create_session(db, user_id)
         auth.destroy_session(db, raw)
         assert auth.get_session_user(db, raw) is None
+
+
+class TestLoginRateLimit:
+    """Audit S4 fix: login had zero rate limiting or lockout."""
+
+    def test_under_threshold_not_limited(self, db):
+        for _ in range(4):
+            auth.record_failed_login(db, "1.1.1.1")
+        assert auth.is_login_rate_limited(db, "1.1.1.1") is False
+
+    def test_at_threshold_limited(self, db):
+        for _ in range(5):
+            auth.record_failed_login(db, "2.2.2.2")
+        assert auth.is_login_rate_limited(db, "2.2.2.2") is True
+
+    def test_identifiers_are_independent(self, db):
+        for _ in range(5):
+            auth.record_failed_login(db, "3.3.3.3")
+        assert auth.is_login_rate_limited(db, "3.3.3.3") is True
+        assert auth.is_login_rate_limited(db, "4.4.4.4") is False
+
+    def test_window_expiry_clears_the_limit(self, db):
+        from datetime import datetime, timedelta, timezone
+        old = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
+        for _ in range(5):
+            db.execute("INSERT INTO login_attempts (identifier, created_at) VALUES (%s, %s)",
+                      ("5.5.5.5", old))
+        db.commit()
+        # all 5 attempts are outside the 5-minute window -> not limited
+        assert auth.is_login_rate_limited(db, "5.5.5.5") is False
+
+    def test_no_identifier_never_limited(self, db):
+        assert auth.is_login_rate_limited(db, "") is False
+
+
+class TestLoginRateLimitHTTP:
+    """HTTP-level: the actual /login route, not just the auth.py functions."""
+
+    def _mk_user(self, db, email="rl@test.com", password="Test1234!"):
+        from sheplatform.core.auth import hash_password
+        db.execute(
+            "INSERT INTO users (email, password_hash, first_name, last_name, role_key, org_id) "
+            "VALUES (%s, %s, %s, %s, %s, %s)",
+            (email, hash_password(password), "R", "L", "employee", 1),
+        )
+        db.commit()
+
+    def test_sixth_attempt_blocked_even_with_correct_password(self, db):
+        from fastapi.testclient import TestClient
+        from sheplatform.main import app
+        self._mk_user(db)
+        client = TestClient(app)
+
+        for _ in range(5):
+            resp = client.post("/login", data={"email": "rl@test.com", "password": "wrong"})
+            assert resp.status_code == 200  # re-rendered login page with an error
+
+        # 6th attempt, even with the CORRECT password, must be blocked
+        resp = client.post("/login", data={"email": "rl@test.com", "password": "Test1234!"})
+        assert resp.status_code == 429
+        assert "Too many" in resp.text
+
+    def test_login_succeeds_before_threshold(self, db):
+        from fastapi.testclient import TestClient
+        from sheplatform.main import app
+        self._mk_user(db, email="rl2@test.com")
+        client = TestClient(app)
+
+        for _ in range(3):
+            client.post("/login", data={"email": "rl2@test.com", "password": "wrong"})
+
+        resp = client.post("/login", data={"email": "rl2@test.com", "password": "Test1234!"},
+                           follow_redirects=False)
+        assert resp.status_code == 303
+        assert "she_session" in resp.cookies

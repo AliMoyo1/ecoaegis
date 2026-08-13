@@ -69,6 +69,15 @@ SCHEMA = [
         created_at      TIMESTAMPTZ DEFAULT NOW()
     )""",
     """
+    CREATE TABLE IF NOT EXISTS login_attempts (
+        id              SERIAL PRIMARY KEY,
+        identifier      TEXT NOT NULL,
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+    )""",
+    """
+    CREATE INDEX IF NOT EXISTS idx_login_attempts_identifier ON login_attempts(identifier, created_at)
+    """,
+    """
     CREATE TABLE IF NOT EXISTS audit_log (
         id              SERIAL PRIMARY KEY,
         user_id         INTEGER,
