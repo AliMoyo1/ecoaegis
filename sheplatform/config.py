@@ -43,6 +43,12 @@ class Settings:
     AI_API_KEY: str = os.getenv("AI_API_KEY", "")
     AI_MODEL: str = os.getenv("AI_MODEL", "Kimi-K2.7-Code")
 
+    # Vision AI provider override (defaults to AI_PROVIDER; Gemini/Anthropic recommended)
+    VISION_AI_PROVIDER: str = os.getenv("VISION_AI_PROVIDER", os.getenv("AI_PROVIDER", "kimi"))
+    VISION_AI_MODEL: str = os.getenv("VISION_AI_MODEL", "")
+    VISION_AI_BASE_URL: str = os.getenv("VISION_AI_BASE_URL", "")
+    VISION_AI_API_KEY: str = os.getenv("VISION_AI_API_KEY", "")
+
     # Email
     EMAIL_PROVIDER: str = os.getenv("EMAIL_PROVIDER", "console")
     SMTP_HOST: str = os.getenv("SMTP_HOST", "")

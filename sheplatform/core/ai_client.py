@@ -127,3 +127,69 @@ async def _ask_anthropic(prompt: str, system: str, max_tokens: int) -> str:
         messages=[{"role": "user", "content": prompt}],
     )
     return "".join(block.text for block in msg.content if block.type == "text").strip()
+
+
+async def ask_ai_vision(prompt, image_bytes, mime_type="image/jpeg",
+                        system=None, max_tokens=1500) -> str:
+    """Send an image + prompt to a vision-capable provider. Never raises."""
+    import base64
+
+    info = provider_info()
+    if not info["configured"]:
+        return "AI vision not configured."
+    b64 = base64.b64encode(image_bytes).decode()
+    system_prompt = system or SYSTEM_GROUNDING
+    try:
+        if settings.AI_PROVIDER == "anthropic":
+            return await _ask_anthropic_vision(prompt, b64, mime_type, system_prompt, max_tokens)
+        return await _ask_openai_vision(prompt, b64, mime_type, system_prompt, max_tokens)
+    except Exception as e:
+        logger.exception("AI vision failed")
+        return f"AI vision failed: {e}"
+
+
+async def _ask_openai_vision(prompt: str, b64: str, mime_type: str,
+                             system: str, max_tokens: int) -> str:
+    import httpx
+
+    base_url, api_key, model = _endpoint_and_key()
+    data_uri = f"data:{mime_type};base64,{b64}"
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        resp = await client.post(
+            f"{base_url.rstrip('/')}/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}",
+                     "Content-Type": "application/json"},
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": data_uri}},
+                    ]},
+                ],
+                "max_tokens": max_tokens,
+                "temperature": 0.2,
+            },
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data["choices"][0]["message"]["content"].strip()
+
+
+async def _ask_anthropic_vision(prompt: str, b64: str, mime_type: str,
+                                system: str, max_tokens: int) -> str:
+    import anthropic
+
+    client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+    msg = await client.messages.create(
+        model=settings.AI_MODEL or "claude-sonnet-4-20250514",
+        max_tokens=max_tokens,
+        system=system,
+        messages=[{"role": "user", "content": [
+            {"type": "text", "text": prompt},
+            {"type": "image", "source": {
+                "type": "base64", "media_type": mime_type, "data": b64}},
+        ]}],
+    )
+    return "".join(block.text for block in msg.content if block.type == "text").strip()
