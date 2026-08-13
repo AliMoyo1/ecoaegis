@@ -28,6 +28,13 @@ async function loadIncidents() {
   for (const inc of data.incidents) {
     const tr = document.createElement("tr");
     const deadline = inc.statutory_deadline ? `<span class="${inc.statutory_deadline < new Date().toISOString() ? 'red' : ''}">${inc.statutory_deadline}</span>` : "-";
+    let actions = "-";
+    if (inc.status === "under_review" && inc.pending_step) {
+      const role = inc.pending_step.role_required.replace(/_/g, " ");
+      actions = `<span style="font-size:11px;color:var(--muted)">review: ${role}</span> ` +
+                `<button class="btn btn-sm btn-primary" onclick="approveReport(${inc.id}, ${inc.pending_step.id}, 'approved')">Approve</button> ` +
+                `<button class="btn btn-sm" onclick="approveReport(${inc.id}, ${inc.pending_step.id}, 'rejected')">Reject</button>`;
+    }
     tr.innerHTML = `
       <td>${inc.incident_ref}</td>
       <td>${inc.title}</td>
@@ -35,9 +42,24 @@ async function loadIncidents() {
       <td>${inc.incident_type}</td>
       <td>${inc.status}</td>
       <td>${deadline}</td>
-      <td>${inc.reported_at || ""}</td>`;
+      <td>${inc.reported_at || ""}</td>
+      <td>${actions}</td>`;
     tbody.appendChild(tr);
   }
+}
+
+async function approveReport(incidentId, stepId, decision) {
+  const comments = decision === "rejected" ? (prompt("Rejection reason:") || "rejected") : "";
+  if (comments === null) return;
+  const fd = new FormData();
+  fd.append("step_id", stepId);
+  fd.append("decision", decision);
+  fd.append("comments", comments);
+  const resp = await fetch(`${API}/${incidentId}/approve-report`, { method: "POST", body: fd });
+  const data = await resp.json();
+  if (!data.ok) alert(data.message || "Approval failed");
+  else if (data.result.complete) alert("Report approval complete - incident can be closed");
+  loadIncidents();
 }
 
 document.getElementById("incident-form").addEventListener("submit", async (e) => {

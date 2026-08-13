@@ -148,14 +148,96 @@ def submit_root_cause_report(db, incident_id: int, root_cause: str, immediate_ca
     )
     db.commit()
     _add_timeline(db, incident_id, "Root cause report submitted for approval", "report", by_user)
+
+    # Severity-graded approval chain (audit fix: report was never routed to
+    # CRO/COO/CEO/Board - the RBAC capability existed as dead code).
+    from sheplatform.core.workflow import create_approval_chain
+    severity = incident["severity"]
+    if severity == "critical":
+        steps = [
+            {"step_order": 1, "role_required": "cro", "sla_hours": 24},
+            {"step_order": 2, "role_required": "coo", "sla_hours": 24},
+            {"step_order": 3, "role_required": "ceo", "sla_hours": 48},
+            {"step_order": 4, "role_required": "board_chair", "sla_hours": 48},
+        ]
+    elif severity == "high":
+        steps = [
+            {"step_order": 1, "role_required": "cro", "sla_hours": 24},
+            {"step_order": 2, "role_required": "coo", "sla_hours": 48},
+            {"step_order": 3, "role_required": "ceo", "sla_hours": 48},
+        ]
+    elif severity == "medium":
+        steps = [
+            {"step_order": 1, "role_required": "cro", "sla_hours": 48},
+            {"step_order": 2, "role_required": "coo", "sla_hours": 48},
+        ]
+    else:  # low
+        steps = [
+            {"step_order": 1, "role_required": "cro", "sla_hours": 72},
+        ]
+    create_approval_chain(db, "incident", incident_id, steps)
     return {"ok": True, "incident": get_incident(db, incident_id)}
 
 
+def get_pending_approval_step(db, incident_id: int) -> dict | None:
+    """Pending step in the incident's active approval chain (for UI)."""
+    row = db.execute(
+        "SELECT s.id, s.step_order, s.role_required, s.sla_hours, s.status "
+        "FROM approval_chain_steps s "
+        "JOIN approval_chains c ON c.id = s.chain_id "
+        "WHERE c.entity_type = 'incident' AND c.entity_id = %s AND c.status = 'active' "
+        "AND s.status = 'pending' ORDER BY s.step_order LIMIT 1",
+        (incident_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def approval_complete(db, incident_id: int) -> bool:
+    """True when the incident's approval chain has been completed (all steps approved)."""
+    row = db.execute(
+        "SELECT status FROM approval_chains "
+        "WHERE entity_type = 'incident' AND entity_id = %s "
+        "ORDER BY id DESC LIMIT 1", (incident_id,)).fetchone()
+    return bool(row and row["status"] == "completed")
+
+
+def approve_report_step(db, incident_id: int, step_id: int, approver: dict,
+                        decision: str, comments: str = "") -> dict:
+    """Approve/reject one step of the incident report approval chain."""
+    from sheplatform.core.workflow import advance_approval
+
+    result = advance_approval(db, "incident", incident_id, step_id, approver, decision, comments)
+    if not result["ok"]:
+        return result
+
+    if result.get("complete"):
+        if decision == "rejected":
+            db.execute("UPDATE incidents SET status = 'open' WHERE id = %s", (incident_id,))
+            _add_timeline(db, incident_id, "Root cause report REJECTED - returned for revision",
+                          "report", approver.get("id"))
+        else:
+            _add_timeline(db, incident_id, "Root cause report approved - clearance to close",
+                          "report", approver.get("id"))
+            events.emit("incident.report_approved", {
+                "incident_id": incident_id,
+                "ref": get_incident(db, incident_id)["incident_ref"],
+                "org_id": get_incident(db, incident_id).get("org_id"),
+                "entity_type": "incident", "entity_id": incident_id,
+            }, db, user_id=approver.get("id"), source_module="incidents")
+        db.commit()
+    return result
+
+
 def close_incident(db, incident_id: int, by_user: int) -> dict:
-    """Close an incident. Emits incident.closed -> Risk Register handler (BRS row 3)."""
+    """Close an incident. Emits incident.closed -> Risk Register handler (BRS row 3).
+
+    Gate: the root-cause report approval chain must be COMPLETE before close
+    (audit fix - the gate was set but never checked downstream).
+    """
     incident = get_incident(db, incident_id)
     if incident is None:
         return {"ok": False, "message": "incident not found"}
+    if incident["status"] == "under_review" and not approval_complete(db, incident_id):
+        return {"ok": False, "message": "root cause report not yet approved by the review chain"}
     db.execute(
         "UPDATE incidents SET status = 'closed', closed_at = %s, closed_by = %s WHERE id = %s",
         (datetime.now(timezone.utc).isoformat(), by_user, incident_id),
@@ -182,8 +264,18 @@ def set_statutory_notified(db, incident_id: int, body: str, notified: bool = Tru
     if col is None:
         return {"ok": False, "message": "unknown body"}
     db.execute(
-        f"UPDATE incidents SET {col} = %s, {col.replace('_notified', '_notified_at')} = %s WHERE id = %s",
-        (1 if notified else 0, datetime.now(timezone.utc).isoformat() if notified else None, incident_id),
-    )
+        "UPDATE incidents SET "
+        "nssa_notified = CASE WHEN %s = 'nssa' THEN %s ELSE nssa_notified END, "
+        "ema_notified = CASE WHEN %s = 'ema' THEN %s ELSE ema_notified END, "
+        "zrp_notified = CASE WHEN %s = 'zrp' THEN %s ELSE zrp_notified END, "
+        "nssa_notified_at = CASE WHEN %s = 'nssa' THEN %s ELSE nssa_notified_at END, "
+        "ema_notified_at = CASE WHEN %s = 'ema' THEN %s ELSE ema_notified_at END, "
+        "zrp_notified_at = CASE WHEN %s = 'zrp' THEN %s ELSE zrp_notified_at END "
+        "WHERE id = %s",
+        (body, 1 if notified else 0, body, 1 if notified else 0, body, 1 if notified else 0,
+         body, datetime.now(timezone.utc).isoformat() if notified else None,
+         body, datetime.now(timezone.utc).isoformat() if notified else None,
+         body, datetime.now(timezone.utc).isoformat() if notified else None,
+         incident_id))
     db.commit()
     return {"ok": True, "incident": get_incident(db, incident_id)}

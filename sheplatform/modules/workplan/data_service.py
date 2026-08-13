@@ -37,7 +37,11 @@ def get_workplan(db, plan_id: int) -> dict | None:
     return dict(row) if row else None
 
 
-def list_workplans(db) -> list[dict]:
+def list_workplans(db, org_id: int | None = None) -> list[dict]:
+    if org_id:
+        return [dict(r) for r in db.execute(
+            "SELECT * FROM annual_workplan WHERE org_id = %s ORDER BY id DESC",
+            (org_id,)).fetchall()]
     return [dict(r) for r in db.execute("SELECT * FROM annual_workplan ORDER BY id DESC").fetchall()]
 
 

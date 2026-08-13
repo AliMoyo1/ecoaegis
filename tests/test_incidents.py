@@ -28,6 +28,23 @@ def _mk_incident(db, user_id, severity="high", title="Test incident"):
         incident_type="accident", occurred_at=now, reported_by=user_id)
 
 
+def _approve_full_chain(db, incident_id):
+    """Approve every pending step in the incident's approval chain (test helper)."""
+    from sheplatform.modules.incidents import data_service
+    # create one user per required role on demand
+    while True:
+        step = data_service.get_pending_approval_step(db, incident_id)
+        if step is None:
+            break
+        role = step["role_required"]
+        email = f"approver-{role}-{incident_id}@test.com"
+        row = db.execute("SELECT * FROM users WHERE email = %s", (email,)).fetchone()
+        if not row:
+            _mk_user(db, role, email)
+            row = db.execute("SELECT * FROM users WHERE email = %s", (email,)).fetchone()
+        data_service.approve_report_step(db, incident_id, step["id"], dict(row), "approved")
+
+
 class TestIncidentCreate:
     def test_ref_format(self, db):
         emp = _mk_user(db, "employee", "emp1@test.com")
@@ -96,9 +113,76 @@ class TestIncidentLifecycle:
         assert res["ok"] is True
         assert res["incident"]["status"] == "under_review"
 
+        # close must be BLOCKED until the review chain approves (audit fix)
+        res = data_service.close_incident(db, inc["id"], mgr["id"])
+        assert res["ok"] is False
+        assert "not yet approved" in res["message"]
+
+        _approve_full_chain(db, inc["id"])
+
         res = data_service.close_incident(db, inc["id"], mgr["id"])
         assert res["ok"] is True
         assert res["incident"]["status"] == "closed"
+
+
+class TestIncidentApprovalChain:
+    def test_critical_routes_through_board(self, db):
+        """Audit fix: critical incident reports must route CRO -> COO -> CEO -> Board."""
+        emp = _mk_user(db, "employee", "emp9@test.com")
+        mgr = _mk_user(db, "she_manager", "mgr9@test.com")
+        cro = _mk_user(db, "cro", "cro1@test.com")
+        coo = _mk_user(db, "coo", "coo1@test.com")
+        ceo = _mk_user(db, "ceo", "ceo1@test.com")
+        board = _mk_user(db, "board_chair", "board1@test.com")
+
+        inc = _mk_incident(db, emp["id"], severity="critical")
+
+        from sheplatform.modules.incidents import data_service
+        data_service.submit_root_cause_report(db, inc["id"], "root", "", "", mgr["id"])
+
+        expected = ["cro", "coo", "ceo", "board_chair"]
+        for role in expected:
+            step = data_service.get_pending_approval_step(db, inc["id"])
+            assert step["role_required"] == role, f"expected {role}, got {step['role_required']}"
+            approver = {"cro": cro, "coo": coo, "ceo": ceo, "board_chair": board}[role]
+            r = data_service.approve_report_step(db, inc["id"], step["id"], approver, "approved")
+            assert r["ok"] is True
+
+        assert data_service.approval_complete(db, inc["id"]) is True
+        # now close succeeds
+        r = data_service.close_incident(db, inc["id"], mgr["id"])
+        assert r["ok"] is True
+        assert r["incident"]["status"] == "closed"
+
+    def test_medium_routes_through_cro_coo_only(self, db):
+        emp = _mk_user(db, "employee", "emp10@test.com")
+        mgr = _mk_user(db, "she_manager", "mgr10@test.com")
+        cro = _mk_user(db, "cro", "cro2@test.com")
+        coo = _mk_user(db, "coo", "coo2@test.com")
+
+        inc = _mk_incident(db, emp["id"], severity="medium")
+        from sheplatform.modules.incidents import data_service
+        data_service.submit_root_cause_report(db, inc["id"], "root", "", "", mgr["id"])
+
+        step = data_service.get_pending_approval_step(db, inc["id"])
+        assert step["role_required"] == "cro"
+        data_service.approve_report_step(db, inc["id"], step["id"], cro, "approved")
+        step = data_service.get_pending_approval_step(db, inc["id"])
+        assert step["role_required"] == "coo"
+        data_service.approve_report_step(db, inc["id"], step["id"], coo, "approved")
+        assert data_service.get_pending_approval_step(db, inc["id"]) is None
+        assert data_service.approval_complete(db, inc["id"]) is True
+
+    def test_wrong_role_cannot_approve_report(self, db):
+        emp = _mk_user(db, "employee", "emp11@test.com")
+        mgr = _mk_user(db, "she_manager", "mgr11@test.com")
+        inc = _mk_incident(db, emp["id"], severity="high")
+        from sheplatform.modules.incidents import data_service
+        data_service.submit_root_cause_report(db, inc["id"], "root", "", "", mgr["id"])
+        step = data_service.get_pending_approval_step(db, inc["id"])
+        r = data_service.approve_report_step(db, inc["id"], step["id"], mgr, "approved")
+        assert r["ok"] is False
+        assert "requires role" in r["message"]
 
 
 class TestIncidentToRiskIntegration:
@@ -110,6 +194,7 @@ class TestIncidentToRiskIntegration:
 
         from sheplatform.modules.incidents import data_service
         data_service.submit_root_cause_report(db, inc["id"], "root", "", "", mgr["id"])
+        _approve_full_chain(db, inc["id"])
         data_service.close_incident(db, inc["id"], mgr["id"])
 
         from sheplatform.modules.risk_register import data_service as risk_svc
@@ -126,6 +211,7 @@ class TestIncidentToRiskIntegration:
 
         from sheplatform.modules.incidents import data_service
         data_service.submit_root_cause_report(db, inc["id"], "root", "", "", mgr["id"])
+        _approve_full_chain(db, inc["id"])
         data_service.close_incident(db, inc["id"], mgr["id"])
         data_service.close_incident(db, inc["id"], mgr["id"])
 

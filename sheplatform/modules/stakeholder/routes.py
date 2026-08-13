@@ -26,7 +26,7 @@ async def stakeholder_shell(request: Request):
 async def api_stakeholders(request: Request):
     db = get_db()
     try:
-        return JSONResponse({"stakeholders": data_service.list_stakeholders(db)})
+        return JSONResponse({"stakeholders": data_service.list_stakeholders(db, org_id=request.state.user.get("org_id"))})
     finally:
         db.close()
 

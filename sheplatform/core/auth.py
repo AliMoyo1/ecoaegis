@@ -45,7 +45,7 @@ def get_session_user(db, raw_token: str) -> dict | None:
     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
     row = db.execute(
         "SELECT s.id AS session_id, u.id AS id, u.email, u.first_name, u.last_name, "
-        "u.role_key, u.org_id, u.is_active, s.mfa_verified, s.expires_at "
+        "u.role_key, u.org_id, u.is_active, u.mfa_enabled, s.mfa_verified, s.expires_at "
         "FROM sessions s JOIN users u ON u.id = s.user_id "
         "WHERE s.token_hash = %s AND s.expires_at > %s",
         (token_hash, datetime.now(timezone.utc).isoformat()),

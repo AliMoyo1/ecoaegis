@@ -13,18 +13,27 @@ from datetime import datetime, timezone
 from sheplatform.core import events
 
 
-def _next_ref(db, table, column, prefix) -> str:
-    row = db.execute(f"SELECT {column} FROM {table} ORDER BY id DESC LIMIT 1").fetchone()
+# ---- ref generators (audit fix: identifiers hardcoded, no interpolation) ----
+def _next_need_ref(db) -> str:
+    row = db.execute("SELECT need_ref FROM training_needs ORDER BY id DESC LIMIT 1").fetchone()
     if row is None:
-        return f"{prefix}0001"
-    m = re.search(r"(\d+)$", row[column])
-    return f"{prefix}{(int(m.group(1)) if m else 0) + 1:04d}"
+        return "TN-0001"
+    m = re.search(r"(\d+)$", row["need_ref"])
+    return f"TN-{(int(m.group(1)) if m else 0) + 1:04d}"
+
+
+def _next_session_ref(db) -> str:
+    row = db.execute("SELECT session_ref FROM training_sessions ORDER BY id DESC LIMIT 1").fetchone()
+    if row is None:
+        return "TS-0001"
+    m = re.search(r"(\d+)$", row["session_ref"])
+    return f"TS-{(int(m.group(1)) if m else 0) + 1:04d}"
 
 
 def create_need(db, *, title: str, description: str = "", source_trigger: str = "gap_analysis",
                 source_id: int | None = None, created_by: int | None = None,
                 org_id: int | None = None) -> dict:
-    ref = _next_ref(db, "training_needs", "need_ref", "TN-")
+    ref = _next_need_ref(db)
     db.execute(
         "INSERT INTO training_needs (need_ref, title, description, source_trigger, "
         "source_id, delivery_method, status, created_by, org_id) "
@@ -36,19 +45,26 @@ def create_need(db, *, title: str, description: str = "", source_trigger: str = 
     return dict(row)
 
 
-def list_needs(db, status: str | None = None) -> list[dict]:
+def list_needs(db, status: str | None = None, org_id: int | None = None) -> list[dict]:
     sql = "SELECT * FROM training_needs"
+    conds, params = [], []
     if status:
-        sql += f" WHERE status = '{status}'"
+        conds.append("status = %s")
+        params.append(status)
+    if org_id:
+        conds.append("org_id = %s")
+        params.append(org_id)
+    if conds:
+        sql += " WHERE " + " AND ".join(conds)
     sql += " ORDER BY id DESC"
-    return [dict(r) for r in db.execute(sql).fetchall()]
+    return [dict(r) for r in db.execute(sql, params).fetchall()]
 
 
 def schedule_session(db, *, need_id: int | None, title: str, scheduled_date: str,
                      trainer: str = "", delivery_method: str = "internal",
                      created_by: int | None = None, org_id: int | None = None) -> dict:
     """Schedule a training session. BRN-014: outsourced -> procurement_ref generated."""
-    ref = _next_ref(db, "training_sessions", "session_ref", "TS-")
+    ref = _next_session_ref(db)
     procurement_ref = None
     if delivery_method == "outsourced":
         procurement_ref = f"PRC-TRN-{datetime.now(timezone.utc).strftime('%Y%m%d')}"

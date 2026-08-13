@@ -25,7 +25,8 @@ async def api_list(request: Request, entity_type: str = "", entity_id: int | Non
     db = get_db()
     try:
         items = data_service.list_evidence(db, entity_type=entity_type or None,
-                                           entity_id=entity_id)
+                                           entity_id=entity_id or None,
+                                           org_id=request.state.user.get("org_id"))
         return JSONResponse({"evidence": items})
     finally:
         db.close()

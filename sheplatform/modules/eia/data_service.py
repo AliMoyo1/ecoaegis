@@ -101,8 +101,12 @@ def register_consultant(db, *, name: str, company: str = "",
     return dict(row)
 
 
-def list_consultants(db) -> list[dict]:
-    rows = db.execute("SELECT * FROM eia_consultants ORDER BY id DESC").fetchall()
+def list_consultants(db, org_id: int | None = None) -> list[dict]:
+    if org_id:
+        rows = db.execute("SELECT * FROM eia_consultants WHERE org_id = %s ORDER BY id DESC",
+                          (org_id,)).fetchall()
+    else:
+        rows = db.execute("SELECT * FROM eia_consultants ORDER BY id DESC").fetchall()
     return [dict(r) for r in rows]
 
 

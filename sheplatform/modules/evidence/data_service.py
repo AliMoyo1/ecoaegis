@@ -48,7 +48,8 @@ def store_evidence(db, *, entity_type: str, entity_id: int, original_name: str,
     return dict(row)
 
 
-def list_evidence(db, entity_type: str | None = None, entity_id: int | None = None) -> list[dict]:
+def list_evidence(db, entity_type: str | None = None, entity_id: int | None = None,
+                  org_id: int | None = None) -> list[dict]:
     sql = "SELECT * FROM evidence"
     conds, params = [], []
     if entity_type:
@@ -57,6 +58,9 @@ def list_evidence(db, entity_type: str | None = None, entity_id: int | None = No
     if entity_id is not None:
         conds.append("entity_id = %s")
         params.append(entity_id)
+    if org_id:
+        conds.append("org_id = %s")
+        params.append(org_id)
     if conds:
         sql += " WHERE " + " AND ".join(conds)
     sql += " ORDER BY id DESC"

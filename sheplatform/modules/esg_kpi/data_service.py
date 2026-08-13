@@ -47,10 +47,12 @@ def seed_kpis(db, org_id: int | None = None) -> int:
 
 def list_kpis(db, category: str | None = None) -> list[dict]:
     sql = "SELECT * FROM esg_kpis WHERE is_active = 1"
+    params: list = []
     if category:
-        sql += f" AND category = '{category}'"
+        sql += " AND category = %s"
+        params.append(category)
     sql += " ORDER BY kpi_code"
-    return [dict(r) for r in db.execute(sql).fetchall()]
+    return [dict(r) for r in db.execute(sql, params).fetchall()]
 
 
 def get_kpi(db, kpi_id: int) -> dict | None:

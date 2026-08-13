@@ -1,0 +1,32 @@
+{% extends "base_shell.html" %}
+{% block title %}Two-factor verification - EcoAegis{% endblock %}
+{% block content %}
+<div class="login-wrap">
+  <div class="login-card">
+    <h1>Two-factor verification</h1>
+    <p style="color:var(--muted);font-size:14px;margin:8px 0 16px">
+      Enter the 6-digit code from your authenticator app, or a backup code.
+    </p>
+    <form id="mfa-form">
+      <label>Verification code <input type="text" name="code" autocomplete="one-time-code" required></label>
+      <button class="btn btn-primary" type="submit" style="width:100%">Verify</button>
+    </form>
+    <p id="mfa-error" style="color:var(--red);font-size:13px;display:none;margin-top:10px"></p>
+  </div>
+</div>
+<script>
+document.getElementById("mfa-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const resp = await fetch("/mfa/api/verify", { method: "POST", body: fd });
+  const data = await resp.json();
+  if (data.ok) {
+    window.location.href = data.redirect || "/";
+  } else {
+    const err = document.getElementById("mfa-error");
+    err.textContent = data.message || "Verification failed";
+    err.style.display = "block";
+  }
+});
+</script>
+{% endblock %}

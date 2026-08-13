@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from sheplatform.config import settings
-from sheplatform.core.middleware import security_headers_middleware
+from sheplatform.core.middleware import security_headers_middleware, csrf_middleware
 from sheplatform.database import init_db
 
 logging.basicConfig(level=logging.INFO)
@@ -16,6 +16,7 @@ logging.basicConfig(level=logging.INFO)
 app = FastAPI(title="SHE Management Platform", version="0.1.0")
 
 app.middleware("http")(security_headers_middleware)
+app.middleware("http")(csrf_middleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[] if not settings.DEBUG else ["*"],
@@ -67,6 +68,7 @@ from sheplatform.modules.compliance.routes import router as compliance_router
 from sheplatform.modules.contractors.routes import router as contractors_router
 from sheplatform.modules.chemicals.routes import router as chemicals_router
 from sheplatform.modules.benchmark.routes import router as benchmark_router
+from sheplatform.modules.mfa.routes import router as mfa_router
 
 app.include_router(auth_router)
 app.include_router(admin_router)
@@ -95,6 +97,7 @@ app.include_router(compliance_router)
 app.include_router(contractors_router)
 app.include_router(chemicals_router)
 app.include_router(benchmark_router)
+app.include_router(mfa_router)
 
 
 # ---- Background schedulers (guide 22; single-worker mode) ----

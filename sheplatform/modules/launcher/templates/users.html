@@ -3,6 +3,7 @@
 {% block content %}
 <h1>User Management</h1>
 <form method="post" action="/admin/users/create" class="card">
+  {% if user and user.csrf_token %}<input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">{% endif %}
   <h2>Create user</h2>
   <label>Email <input type="email" name="email" required></label>
   <label>First name <input type="text" name="first_name" required></label>
