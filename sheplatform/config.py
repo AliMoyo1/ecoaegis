@@ -62,6 +62,13 @@ class Settings:
     THEMIS_WEBHOOK_SECRET: str = os.getenv("THEMIS_WEBHOOK_SECRET", "")
     THEMIS_SYNC_ENABLED: bool = os.getenv("THEMIS_SYNC_ENABLED", "false").lower() == "true"
 
+    # Messaging channels
+    WHATSAPP_VERIFY_TOKEN: str = os.getenv("WHATSAPP_VERIFY_TOKEN", "")
+    WHATSAPP_APP_SECRET: str = os.getenv("WHATSAPP_APP_SECRET", "")
+    TWILIO_ACCOUNT_SID: str = os.getenv("TWILIO_ACCOUNT_SID", "")
+    TWILIO_AUTH_TOKEN: str = os.getenv("TWILIO_AUTH_TOKEN", "")
+    SMS_DEFAULT_ORG_ID: int = int(os.getenv("SMS_DEFAULT_ORG_ID", "1"))
+
     def is_postgres(self) -> bool:
         return bool(self.DATABASE_URL)
 

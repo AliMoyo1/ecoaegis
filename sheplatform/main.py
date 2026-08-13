@@ -70,6 +70,7 @@ from sheplatform.modules.contractors.routes import router as contractors_router
 from sheplatform.modules.chemicals.routes import router as chemicals_router
 from sheplatform.modules.benchmark.routes import router as benchmark_router
 from sheplatform.modules.mfa.routes import router as mfa_router
+from sheplatform.modules.channels.routes import router as channels_router
 
 app.include_router(auth_router)
 app.include_router(admin_router)
@@ -100,6 +101,7 @@ app.include_router(contractors_router)
 app.include_router(chemicals_router)
 app.include_router(benchmark_router)
 app.include_router(mfa_router)
+app.include_router(channels_router)
 
 
 # ---- Background schedulers (guide 22; single-worker mode) ----
