@@ -6,6 +6,18 @@
   SOP and policy library with versioning and staff acknowledgement.
 </div>
 
+<div class="card">
+  <h2>Ask the SOPs</h2>
+  <form id="ask-form">
+    <label>Question <input type="text" name="question" placeholder="e.g. what is the confined-space entry procedure?" required></label>
+    <button class="btn btn-primary" type="submit">Ask</button>
+  </form>
+  <div id="ask-answer" style="display:none;margin-top:12px;font-size:14px">
+    <p id="ask-answer-text"></p>
+    <div id="ask-sources" style="color:var(--muted);font-size:13px"></div>
+  </div>
+</div>
+
 {% if user.can_documents_manage %}
 <div class="card">
   <h2>Register document</h2>

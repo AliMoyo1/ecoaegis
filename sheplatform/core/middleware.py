@@ -37,6 +37,7 @@ _SIDEBAR_MODULES = {
     "documents": "documents",
     "statutory": "statutory",
     "integrations": "integrations",
+    "leading_indicators": "leading_indicators",
 }
 
 

@@ -66,6 +66,27 @@ document.getElementById("doc-form")?.addEventListener("submit", async (e) => {
   }
 });
 
+document.getElementById("ask-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const body = new FormData(e.target);
+  const answerBox = document.getElementById("ask-answer");
+  const answerText = document.getElementById("ask-answer-text");
+  const sourcesBox = document.getElementById("ask-sources");
+  answerBox.style.display = "block";
+  answerText.textContent = "Thinking...";
+  sourcesBox.textContent = "";
+  const resp = await fetch(`${API}/ask`, { method: "POST", body });
+  const data = await resp.json();
+  if (!data.ok) {
+    answerText.textContent = data.message || "Could not answer that question";
+    return;
+  }
+  answerText.textContent = data.answer;
+  sourcesBox.textContent = data.sources.length
+    ? "Sources: " + data.sources.map((s) => `${s.doc_ref} (${s.title})`).join(", ")
+    : "";
+});
+
 ["f-type", "f-status"].forEach((id) => {
   document.getElementById(id).addEventListener("change", loadDocuments);
 });

@@ -76,6 +76,7 @@ from sheplatform.modules.statutory_reporting.routes import router as statutory_r
 from sheplatform.modules.external_integration.routes import router as external_integration_router
 from sheplatform.modules.map.routes import router as map_router
 from sheplatform.modules.lone_worker.routes import router as lone_worker_router
+from sheplatform.modules.leading_indicators.routes import router as leading_indicators_router
 
 app.include_router(auth_router)
 app.include_router(admin_router)
@@ -112,6 +113,7 @@ app.include_router(statutory_router)
 app.include_router(external_integration_router)
 app.include_router(map_router)
 app.include_router(lone_worker_router)
+app.include_router(leading_indicators_router)
 
 
 # ---- Background schedulers (guide 22; single-worker mode) ----

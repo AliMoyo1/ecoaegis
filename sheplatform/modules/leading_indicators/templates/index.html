@@ -1,0 +1,24 @@
+{% extends "base_shell.html" %}
+{% block title %}Sites to Watch - EcoAegis{% endblock %}
+{% block content %}
+<h1>Sites to Watch</h1>
+<div class="login-sub" style="color:var(--muted);font-size:13px;margin-bottom:16px">
+  Leading indicators, not lagging counts: near-miss ratio, open corrective actions, and
+  inspection pass rate. A site with no completed inspections scores as high-risk on that
+  measure, not a clean record.
+</div>
+
+<div class="card">
+  <table class="data-table" id="watch-table">
+    <thead><tr><th>Rank</th><th>Site</th><th>Near-miss ratio</th><th>Overdue CAs</th><th>Inspection pass rate</th><th>Band</th><th></th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<div class="card" id="explain-card" style="display:none">
+  <h2 id="explain-site-name"></h2>
+  <p id="explain-text" style="font-size:14px"></p>
+</div>
+
+<script src="/static/js/leading_indicators.js"></script>
+{% endblock %}
