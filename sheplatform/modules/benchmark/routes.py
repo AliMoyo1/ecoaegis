@@ -26,6 +26,7 @@ async def benchmark_shell(request: Request):
 async def api_summary(request: Request):
     db = get_db()
     try:
-        return JSONResponse(data_service.benchmark_summary(db))
+        org_id = request.state.user.get("org_id")
+        return JSONResponse(data_service.benchmark_summary(db, org_id))
     finally:
         db.close()
