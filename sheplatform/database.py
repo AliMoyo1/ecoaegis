@@ -136,6 +136,7 @@ SCHEMA = [
     CREATE TABLE IF NOT EXISTS incidents (
         id              SERIAL PRIMARY KEY,
         incident_ref    TEXT UNIQUE NOT NULL,
+        idempotency_key TEXT UNIQUE,
         title           TEXT NOT NULL,
         description     TEXT,
         severity        TEXT NOT NULL CHECK (severity IN ('critical','high','medium','low')),
@@ -164,6 +165,7 @@ SCHEMA = [
         closed_at       TIMESTAMPTZ,
         closed_by       INTEGER REFERENCES users(id),
         org_id          INTEGER REFERENCES organisations(id),
+        ai_metadata     JSONB DEFAULT '{}',
         created_by      INTEGER REFERENCES users(id),
         created_at      TIMESTAMPTZ DEFAULT NOW(),
         updated_at      TIMESTAMPTZ DEFAULT NOW()
@@ -177,6 +179,18 @@ SCHEMA = [
     """
     CREATE INDEX IF NOT EXISTS idx_incidents_org ON incidents(org_id)
     """,
+    """
+    -- FTS5 for similar-incident retrieval (A4). In PostgreSQL we use a regular
+    -- table populated by triggers; in SQLite dev mode this is rewritten to a
+    -- VIRTUAL TABLE below.
+    CREATE TABLE IF NOT EXISTS incidents_fts (
+        incident_id INTEGER PRIMARY KEY,
+        title       TEXT,
+        description TEXT,
+        incident_type TEXT,
+        severity    TEXT,
+        content     TEXT
+    )""",
     """
     CREATE TABLE IF NOT EXISTS incident_timeline (
         id              SERIAL PRIMARY KEY,
@@ -749,6 +763,67 @@ SCHEMA = [
         created_at      TIMESTAMPTZ DEFAULT NOW(),
         updated_at      TIMESTAMPTZ DEFAULT NOW()
     )""",
+    """
+    CREATE TABLE IF NOT EXISTS statutory_report_templates (
+        id              SERIAL PRIMARY KEY,
+        template_key    TEXT UNIQUE NOT NULL,
+        authority       TEXT NOT NULL CHECK (authority IN ('nssa','ema','zrp','labour','custom')),
+        title           TEXT NOT NULL,
+        description     TEXT,
+        period_type     TEXT NOT NULL CHECK (period_type IN ('monthly','quarterly','annual','incident')),
+        fields          JSONB DEFAULT '[]' NOT NULL,
+        default_content JSONB DEFAULT '{}',
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+    )""",
+    """
+    CREATE TABLE IF NOT EXISTS statutory_reports (
+        id              SERIAL PRIMARY KEY,
+        report_ref      TEXT UNIQUE NOT NULL,
+        template_key    TEXT NOT NULL REFERENCES statutory_report_templates(template_key),
+        authority       TEXT NOT NULL CHECK (authority IN ('nssa','ema','zrp','labour','custom')),
+        title           TEXT NOT NULL,
+        period_start    TIMESTAMPTZ,
+        period_end      TIMESTAMPTZ,
+        status          TEXT DEFAULT 'draft' CHECK (status IN ('draft','locked','submitted','acknowledged','overdue','rejected')),
+        data            JSONB DEFAULT '{}',
+        rendered_text   TEXT,
+        submitted_at    TIMESTAMPTZ,
+        submitted_by    INTEGER REFERENCES users(id),
+        external_ref    TEXT,
+        lock_version    INTEGER DEFAULT 1,
+        org_id          INTEGER REFERENCES organisations(id),
+        created_by      INTEGER REFERENCES users(id),
+        created_at      TIMESTAMPTZ DEFAULT NOW(),
+        updated_at      TIMESTAMPTZ DEFAULT NOW()
+    )""",
+    """
+    CREATE INDEX IF NOT EXISTS idx_statutory_reports_org ON statutory_reports(org_id)
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_statutory_reports_status ON statutory_reports(status, period_end)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS statutory_report_submissions (
+        id              SERIAL PRIMARY KEY,
+        report_id       INTEGER NOT NULL REFERENCES statutory_reports(id) ON DELETE CASCADE,
+        channel         TEXT NOT NULL CHECK (channel IN ('email','portal','manual','api')),
+        recipient       TEXT,
+        tracking_ref    TEXT,
+        status          TEXT DEFAULT 'pending' CHECK (status IN ('pending','delivered','acknowledged','failed')),
+        payload         JSONB DEFAULT '{}',
+        created_by      INTEGER REFERENCES users(id),
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+    )""",
+    """
+    CREATE TABLE IF NOT EXISTS statutory_report_audit (
+        id              SERIAL PRIMARY KEY,
+        report_id       INTEGER NOT NULL REFERENCES statutory_reports(id) ON DELETE CASCADE,
+        action          TEXT NOT NULL,
+        actor_id        INTEGER REFERENCES users(id),
+        old_data        JSONB,
+        new_data        JSONB,
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+    )""",
     # ---- ESG KPI (4.11) ----
     """
     CREATE TABLE IF NOT EXISTS esg_kpis (
@@ -790,6 +865,65 @@ SCHEMA = [
     """
     CREATE INDEX IF NOT EXISTS idx_esg_entries ON esg_kpi_entries(kpi_id, period)
     """,
+    """
+    CREATE TABLE IF NOT EXISTS esg_csv_mappings (
+        id              SERIAL PRIMARY KEY,
+        mapping_name    TEXT NOT NULL,
+        kpi_id          INTEGER NOT NULL REFERENCES esg_kpis(id) ON DELETE CASCADE,
+        source_column   TEXT NOT NULL,
+        transform       TEXT DEFAULT 'value',
+        is_active       BOOLEAN DEFAULT TRUE,
+        org_id          INTEGER REFERENCES organisations(id),
+        created_by      INTEGER REFERENCES users(id),
+        created_at      TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(mapping_name, source_column)
+    )""",
+    """
+    CREATE TABLE IF NOT EXISTS esg_csv_uploads (
+        id              SERIAL PRIMARY KEY,
+        file_name       TEXT NOT NULL,
+        mapping_name    TEXT,
+        status          TEXT DEFAULT 'pending' CHECK (status IN ('pending','reconciled','committed','failed')),
+        rows_total      INTEGER DEFAULT 0,
+        rows_valid      INTEGER DEFAULT 0,
+        rows_anomalous  INTEGER DEFAULT 0,
+        rows_duplicate  INTEGER DEFAULT 0,
+        committed_at    TIMESTAMPTZ,
+        committed_by    INTEGER REFERENCES users(id),
+        org_id          INTEGER REFERENCES organisations(id),
+        created_by      INTEGER REFERENCES users(id),
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+    )""",
+    """
+    CREATE TABLE IF NOT EXISTS esg_csv_rows (
+        id              SERIAL PRIMARY KEY,
+        upload_id       INTEGER NOT NULL REFERENCES esg_csv_uploads(id) ON DELETE CASCADE,
+        row_number      INTEGER NOT NULL,
+        period          TEXT,
+        source_column   TEXT,
+        raw_value       TEXT,
+        mapped_kpi_id   INTEGER REFERENCES esg_kpis(id),
+        actual_value    NUMERIC,
+        status          TEXT DEFAULT 'pending' CHECK (status IN ('pending','valid','anomalous','duplicate','committed')),
+        anomaly_reason  TEXT,
+        committed_entry_id INTEGER REFERENCES esg_kpi_entries(id),
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+    )""",
+    """
+    CREATE INDEX IF NOT EXISTS idx_csv_rows_upload ON esg_csv_rows(upload_id, status)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS esg_api_keys (
+        id              SERIAL PRIMARY KEY,
+        name            TEXT NOT NULL,
+        key_hash        TEXT UNIQUE NOT NULL,
+        scopes          JSONB DEFAULT '["esg.ingest"]',
+        is_active       BOOLEAN DEFAULT TRUE,
+        last_used_at    TIMESTAMPTZ,
+        org_id          INTEGER REFERENCES organisations(id),
+        created_by      INTEGER REFERENCES users(id),
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+    )""",
     # ---- Stakeholder (4.12) ----
     """
     CREATE TABLE IF NOT EXISTS stakeholders (
@@ -956,11 +1090,13 @@ SCHEMA = [
     CREATE TABLE IF NOT EXISTS observations (
         id              SERIAL PRIMARY KEY,
         obs_ref         TEXT UNIQUE NOT NULL,
+        idempotency_key TEXT UNIQUE,
         obs_type        TEXT NOT NULL CHECK (obs_type IN ('hazard','near_miss','unsafe_act','unsafe_condition','good_practice')),
         title           TEXT NOT NULL,
         description     TEXT,
         location        TEXT,
         photo_path      TEXT,
+        ai_metadata     JSONB DEFAULT '{}',
         severity        TEXT DEFAULT 'low' CHECK (severity IN ('low','medium','high','critical')),
         status          TEXT DEFAULT 'open' CHECK (status IN ('open','acknowledged','corrective_action','closed')),
         site_id         INTEGER REFERENCES sites(id),
@@ -1014,6 +1150,25 @@ SCHEMA = [
         updated_at      TIMESTAMPTZ DEFAULT NOW()
     )""",
     """
+    CREATE TABLE IF NOT EXISTS attachments (
+        id            SERIAL PRIMARY KEY,
+        entity_type   TEXT NOT NULL,
+        entity_id     INTEGER NOT NULL,
+        file_name     TEXT NOT NULL,
+        original_name TEXT NOT NULL,
+        mime_type     TEXT,
+        size_bytes    INTEGER,
+        sha256        TEXT,
+        kind          TEXT DEFAULT 'file',
+        ai_labels     JSONB,
+        org_id        INTEGER NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+        uploaded_by   INTEGER REFERENCES users(id),
+        created_at    TIMESTAMPTZ DEFAULT NOW()
+    )""",
+    """
+    CREATE INDEX IF NOT EXISTS idx_attachments_entity ON attachments(entity_type, entity_id)
+    """,
+    """
     CREATE TABLE IF NOT EXISTS chemicals (
         id              SERIAL PRIMARY KEY,
         chem_ref        TEXT UNIQUE NOT NULL,
@@ -1023,6 +1178,10 @@ SCHEMA = [
         hazard_class    TEXT,
         pictogram       TEXT,
         sds_path        TEXT,
+        sds_attachment_id INTEGER REFERENCES attachments(id),
+        sds_review_date TIMESTAMPTZ,
+        sds_status      TEXT DEFAULT 'current' CHECK (sds_status IN ('current','expiring','expired','draft')),
+        sds_extracted   JSONB DEFAULT '{}',
         quantity_units  TEXT,
         storage_location TEXT,
         site_id         INTEGER REFERENCES sites(id),
@@ -1031,12 +1190,179 @@ SCHEMA = [
         created_at      TIMESTAMPTZ DEFAULT NOW(),
         updated_at      TIMESTAMPTZ DEFAULT NOW()
     )""",
+    # ---- B5 External integrations + portal submissions (ARCHITECTURE.md Sec 5, 6) ----
+    """
+    CREATE TABLE IF NOT EXISTS integration_endpoints (
+        id              SERIAL PRIMARY KEY,
+        endpoint_key    TEXT UNIQUE NOT NULL,
+        name            TEXT NOT NULL,
+        system_type     TEXT NOT NULL CHECK (system_type IN ('themisiq','erp','lms','ema_portal','nssa_portal','zrp_portal','board','comms','custom')),
+        direction       TEXT NOT NULL DEFAULT 'outbound' CHECK (direction IN ('inbound','outbound','bidirectional')),
+        base_url        TEXT,
+        auth_type       TEXT NOT NULL DEFAULT 'api_key' CHECK (auth_type IN ('api_key','oauth2','hmac','none')),
+        auth_config     JSONB DEFAULT '{}',
+        headers         JSONB DEFAULT '{}',
+        timeout_seconds INTEGER DEFAULT 30,
+        rate_limit_per_minute INTEGER DEFAULT 60,
+        active          BOOLEAN DEFAULT TRUE,
+        org_id          INTEGER REFERENCES organisations(id),
+        created_by      INTEGER REFERENCES users(id),
+        created_at      TIMESTAMPTZ DEFAULT NOW(),
+        updated_at      TIMESTAMPTZ DEFAULT NOW()
+    )""",
+    """
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_integration_endpoints_key ON integration_endpoints(endpoint_key, org_id)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS integration_logs (
+        id              SERIAL PRIMARY KEY,
+        endpoint_key    TEXT NOT NULL,
+        direction       TEXT NOT NULL CHECK (direction IN ('inbound','outbound')),
+        idempotency_key TEXT,
+        request_payload JSONB DEFAULT '{}',
+        response_payload JSONB DEFAULT '{}',
+        status_code     INTEGER,
+        success         BOOLEAN DEFAULT FALSE,
+        error_message   TEXT,
+        duration_ms     INTEGER,
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+    )""",
+    """
+    CREATE INDEX IF NOT EXISTS idx_integration_logs_endpoint ON integration_logs(endpoint_key, created_at)
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_integration_logs_idempotency ON integration_logs(idempotency_key)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS themisiq_links (
+        id                  SERIAL PRIMARY KEY,
+        she_entity_type     TEXT NOT NULL,
+        she_entity_id       INTEGER NOT NULL,
+        themis_entity_type  TEXT NOT NULL,
+        themis_entity_id    INTEGER NOT NULL,
+        relationship        TEXT NOT NULL DEFAULT 'related' CHECK (relationship IN ('derived_from','triggers','related','mirrors')),
+        direction           TEXT NOT NULL DEFAULT 'she_to_themis' CHECK (direction IN ('she_to_themis','themis_to_she','bidirectional')),
+        last_sync_hash      TEXT,
+        last_synced_at      TIMESTAMPTZ,
+        sync_error          TEXT,
+        created_at          TIMESTAMPTZ DEFAULT NOW(),
+        updated_at          TIMESTAMPTZ DEFAULT NOW()
+    )""",
+    """
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_themisiq_links ON themisiq_links(she_entity_type, she_entity_id, themis_entity_type, themis_entity_id, relationship)
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_themisiq_links_she ON themisiq_links(she_entity_type, she_entity_id)
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_themisiq_links_themis ON themisiq_links(themis_entity_type, themis_entity_id)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS integration_queue (
+        id              SERIAL PRIMARY KEY,
+        endpoint_key    TEXT NOT NULL,
+        entity_type     TEXT NOT NULL,
+        entity_id       INTEGER NOT NULL,
+        operation       TEXT NOT NULL DEFAULT 'push' CHECK (operation IN ('push','pull','sync','submit')),
+        payload         JSONB DEFAULT '{}',
+        idempotency_key TEXT,
+        status          TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','running','failed','completed','cancelled')),
+        attempts        INTEGER DEFAULT 0,
+        last_error      TEXT,
+        next_retry_at   TIMESTAMPTZ,
+        created_by      INTEGER REFERENCES users(id),
+        created_at      TIMESTAMPTZ DEFAULT NOW(),
+        updated_at      TIMESTAMPTZ DEFAULT NOW()
+    )""",
+    """
+    CREATE INDEX IF NOT EXISTS idx_integration_queue_status ON integration_queue(status, next_retry_at)
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_integration_queue_entity ON integration_queue(entity_type, entity_id)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS submission_channels (
+        id              SERIAL PRIMARY KEY,
+        channel_key     TEXT UNIQUE NOT NULL,
+        name            TEXT NOT NULL,
+        authority       TEXT NOT NULL,
+        channel_type    TEXT NOT NULL CHECK (channel_type IN ('portal','email','api','manual')),
+        endpoint_id     INTEGER REFERENCES integration_endpoints(id),
+        recipient_email TEXT,
+        submission_url  TEXT,
+        org_id          INTEGER REFERENCES organisations(id),
+        active          BOOLEAN DEFAULT TRUE,
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+    )""",
+    """
+    CREATE TABLE IF NOT EXISTS submission_deliveries (
+        id              SERIAL PRIMARY KEY,
+        report_id       INTEGER NOT NULL REFERENCES statutory_reports(id) ON DELETE CASCADE,
+        channel_id      INTEGER REFERENCES submission_channels(id),
+        channel_key     TEXT NOT NULL,
+        status          TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','queued','sent','delivered','acknowledged','failed','rejected')),
+        tracking_ref    TEXT,
+        dispatched_at   TIMESTAMPTZ,
+        acknowledged_at TIMESTAMPTZ,
+        response_payload JSONB DEFAULT '{}',
+        error_message   TEXT,
+        created_at      TIMESTAMPTZ DEFAULT NOW(),
+        updated_at      TIMESTAMPTZ DEFAULT NOW()
+    )""",
+    """
+    CREATE INDEX IF NOT EXISTS idx_submission_deliveries_report ON submission_deliveries(report_id)
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_submission_deliveries_status ON submission_deliveries(status, channel_key)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS integration_secrets (
+        id              SERIAL PRIMARY KEY,
+        endpoint_id     INTEGER NOT NULL REFERENCES integration_endpoints(id) ON DELETE CASCADE,
+        secret_name     TEXT NOT NULL,
+        secret_value    TEXT NOT NULL,
+        created_at      TIMESTAMPTZ DEFAULT NOW(),
+        updated_at      TIMESTAMPTZ DEFAULT NOW()
+    )""",
+    """
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_integration_secrets_endpoint_name ON integration_secrets(endpoint_id, secret_name)
+    """,
+]
+
+# Column-level additions required by B2 SDS extraction
+SDS_COLUMNS = [
+    "ALTER TABLE chemicals ADD COLUMN IF NOT EXISTS sds_attachment_id INTEGER REFERENCES attachments(id)",
+    "ALTER TABLE chemicals ADD COLUMN IF NOT EXISTS sds_review_date TIMESTAMPTZ",
+    "ALTER TABLE chemicals ADD COLUMN IF NOT EXISTS sds_status TEXT DEFAULT 'current' CHECK (sds_status IN ('current','expiring','expired','draft'))",
+    "ALTER TABLE chemicals ADD COLUMN IF NOT EXISTS sds_extracted JSONB DEFAULT '{}'",
 ]
 
 # Column-level additions required by the integration spec (11.1)
 RISK_ORIGIN_COLUMNS = [
     "ALTER TABLE risks ADD COLUMN IF NOT EXISTS origin_system TEXT DEFAULT 'she'",
     "ALTER TABLE risks ADD COLUMN IF NOT EXISTS themis_mirror_id INTEGER",
+]
+
+ESG_CSV_COLUMNS = [
+    "ALTER TABLE esg_kpi_entries ADD COLUMN IF NOT EXISTS source_upload_id INTEGER REFERENCES esg_csv_uploads(id)",
+    "ALTER TABLE esg_kpi_entries ADD COLUMN IF NOT EXISTS source_row_id INTEGER REFERENCES esg_csv_rows(id)",
+]
+
+STATUTORY_REPORT_COLUMNS = [
+    "ALTER TABLE statutory_reports ADD COLUMN IF NOT EXISTS lock_version INTEGER DEFAULT 1",
+]
+
+# Column-level additions required by B5 external integrations
+B5_MIGRATION_COLUMNS = [
+    "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS themis_event_id INTEGER",
+    "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS nssa_submitted BOOLEAN DEFAULT FALSE",
+    "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS ema_submitted BOOLEAN DEFAULT FALSE",
+    "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS zrp_submitted BOOLEAN DEFAULT FALSE",
+]
+
+IDEMPOTENCY_COLUMNS = [
+    "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS idempotency_key TEXT UNIQUE",
+    "ALTER TABLE observations ADD COLUMN IF NOT EXISTS idempotency_key TEXT UNIQUE",
 ]
 
 
@@ -1055,6 +1381,10 @@ _SQLITE_REWRITES = [
         "GENERATED ALWAYS AS (CAST(likelihood * impact AS REAL) / NULLIF(control_effectiveness, 0)) STORED",
     ),
     (r"DEFAULT NOW\(\)", "DEFAULT (datetime('now'))"),
+    (
+        r"CREATE TABLE IF NOT EXISTS incidents_fts \(\s*incident_id INTEGER PRIMARY KEY,\s*title\s+TEXT,\s*description\s+TEXT,\s*incident_type\s+TEXT,\s*severity\s+TEXT,\s*content\s+TEXT\s*\)",
+        "CREATE VIRTUAL TABLE IF NOT EXISTS incidents_fts USING fts5(incident_id UNINDEXED, title, description, incident_type, severity, content)"
+    ),
     # SQLite supports ON DELETE CASCADE natively (with PRAGMA foreign_keys=ON),
     # so do NOT strip it - child rows must cascade (guide 4: FK rules).
 ]
@@ -1205,3 +1535,57 @@ def init_db() -> None:
                     db.execute("ALTER TABLE risks ADD COLUMN origin_system TEXT DEFAULT 'she'")
                 if "themis_mirror_id" not in cols:
                     db.execute("ALTER TABLE risks ADD COLUMN themis_mirror_id INTEGER")
+        for col in IDEMPOTENCY_COLUMNS:
+            if settings.is_postgres():
+                db.execute(col)
+            else:
+                cols_inc = {r[1] for r in db.execute("PRAGMA table_info(incidents)").fetchall()}
+                if "idempotency_key" not in cols_inc:
+                    db.execute("ALTER TABLE incidents ADD COLUMN idempotency_key TEXT")
+                    db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_incidents_idempotency ON incidents(idempotency_key)")
+                cols_obs = {r[1] for r in db.execute("PRAGMA table_info(observations)").fetchall()}
+                if "idempotency_key" not in cols_obs:
+                    db.execute("ALTER TABLE observations ADD COLUMN idempotency_key TEXT")
+                    db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_observations_idempotency ON observations(idempotency_key)")
+        for col in SDS_COLUMNS:
+            if settings.is_postgres():
+                db.execute(col)
+            else:
+                cols_chem = {r[1] for r in db.execute("PRAGMA table_info(chemicals)").fetchall()}
+                if "sds_attachment_id" not in cols_chem:
+                    db.execute("ALTER TABLE chemicals ADD COLUMN sds_attachment_id INTEGER REFERENCES attachments(id)")
+                if "sds_review_date" not in cols_chem:
+                    db.execute("ALTER TABLE chemicals ADD COLUMN sds_review_date TEXT")
+                if "sds_status" not in cols_chem:
+                    db.execute("ALTER TABLE chemicals ADD COLUMN sds_status TEXT DEFAULT 'current' CHECK (sds_status IN ('current','expiring','expired','draft'))")
+                if "sds_extracted" not in cols_chem:
+                    db.execute("ALTER TABLE chemicals ADD COLUMN sds_extracted TEXT DEFAULT '{}'")
+        for col in STATUTORY_REPORT_COLUMNS:
+            if settings.is_postgres():
+                db.execute(col)
+            else:
+                cols_sr = {r[1] for r in db.execute("PRAGMA table_info(statutory_reports)").fetchall()}
+                if "lock_version" not in cols_sr:
+                    db.execute("ALTER TABLE statutory_reports ADD COLUMN lock_version INTEGER DEFAULT 1")
+        for col in B5_MIGRATION_COLUMNS:
+            if settings.is_postgres():
+                db.execute(col)
+            else:
+                cols_inc = {r[1] for r in db.execute("PRAGMA table_info(incidents)").fetchall()}
+                if "themis_event_id" not in cols_inc:
+                    db.execute("ALTER TABLE incidents ADD COLUMN themis_event_id INTEGER")
+                if "nssa_submitted" not in cols_inc:
+                    db.execute("ALTER TABLE incidents ADD COLUMN nssa_submitted INTEGER DEFAULT 0")
+                if "ema_submitted" not in cols_inc:
+                    db.execute("ALTER TABLE incidents ADD COLUMN ema_submitted INTEGER DEFAULT 0")
+                if "zrp_submitted" not in cols_inc:
+                    db.execute("ALTER TABLE incidents ADD COLUMN zrp_submitted INTEGER DEFAULT 0")
+        for col in ESG_CSV_COLUMNS:
+            if settings.is_postgres():
+                db.execute(col)
+            else:
+                cols_entries = {r[1] for r in db.execute("PRAGMA table_info(esg_kpi_entries)").fetchall()}
+                if "source_upload_id" not in cols_entries:
+                    db.execute("ALTER TABLE esg_kpi_entries ADD COLUMN source_upload_id INTEGER REFERENCES esg_csv_uploads(id)")
+                if "source_row_id" not in cols_entries:
+                    db.execute("ALTER TABLE esg_kpi_entries ADD COLUMN source_row_id INTEGER REFERENCES esg_csv_rows(id)")

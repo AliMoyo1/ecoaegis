@@ -8,6 +8,15 @@
   <form id="incident-form">
     <label>Title <input type="text" name="title" required></label>
     <label>Description <textarea name="description" rows="3" required></textarea></label>
+    <div style="margin-bottom:12px">
+      <button class="btn btn-sm" type="button" id="ai-classify-btn">AI: classify &amp; suggest</button>
+      <span id="ai-suggestion-status" style="color:var(--muted);font-size:13px;margin-left:8px"></span>
+    </div>
+    <div id="ai-suggestion-card" class="card" style="display:none;margin-bottom:14px;background:rgba(0,0,0,0.03)">
+      <strong>AI suggestion</strong>
+      <div id="ai-suggestion-body" style="font-size:13px;margin-top:6px"></div>
+      <label style="margin-top:8px;font-size:13px"><input type="checkbox" id="accept-ai" name="accept_ai" value="true"> Use AI suggestion</label>
+    </div>
     <label>Severity
       <select name="severity">
         <option value="critical">Critical (48h statutory deadline)</option>

@@ -21,7 +21,7 @@ async def dashboard(request: Request):
         return RedirectResponse(url="/incidents", status_code=303)
     db = get_db()
     try:
-        stats = dashboard_stats(db, request.state.user["id"])
+        stats = dashboard_stats(db, request.state.user["id"], request.state.user.get("org_id"))
         return templates.TemplateResponse(request, "dashboard.html",
                                           {"stats": stats, "user": request.state.user})
     finally:
@@ -33,6 +33,6 @@ async def dashboard(request: Request):
 async def dashboard_stats_api(request: Request):
     db = get_db()
     try:
-        return JSONResponse(dashboard_stats(db, request.state.user["id"]))
+        return JSONResponse(dashboard_stats(db, request.state.user["id"], request.state.user.get("org_id")))
     finally:
         db.close()

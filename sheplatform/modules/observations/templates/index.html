@@ -33,6 +33,23 @@
     <label>Description <textarea name="description" rows="2"></textarea></label>
     <button class="btn btn-primary" type="submit">Report</button>
   </form>
+
+  <hr style="margin:20px 0;border:0;border-top:1px solid #e5e7eb">
+
+  <h3>Or take a photo</h3>
+  <form id="photo-form" enctype="multipart/form-data">
+    <label>Photo
+      <input type="file" name="file" accept="image/*" capture="environment" required>
+    </label>
+    <label>Location <input type="text" name="location" id="photo-location"></label>
+    <button class="btn btn-primary" type="submit" id="photo-submit">Classify from photo</button>
+    <span id="photo-status" style="margin-left:10px;color:var(--muted)"></span>
+  </form>
+
+  <div id="photo-preview-card" style="display:none;margin-top:16px;padding:12px;background:#f8fafc;border-radius:8px">
+    <img id="photo-preview-img" src="" style="max-width:100%;max-height:240px;border-radius:6px" alt="Preview">
+    <div id="photo-suggestion-body" style="margin-top:10px"></div>
+  </div>
 </div>
 
 <div class="card">

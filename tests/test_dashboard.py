@@ -28,7 +28,7 @@ class TestDashboardService:
         _mk_incident(db, officer["id"], severity="critical")
 
         from sheplatform.modules.launcher.dashboard_service import dashboard_stats
-        stats = dashboard_stats(db, officer["id"])
+        stats = dashboard_stats(db, officer["id"], 1)
 
         assert stats["active_incidents"] >= 1
         assert "incident_trend" in stats
@@ -53,6 +53,6 @@ class TestDashboardService:
             created_by=officer["id"])
 
         from sheplatform.modules.launcher.dashboard_service import dashboard_stats
-        stats = dashboard_stats(db, officer["id"])
+        stats = dashboard_stats(db, officer["id"], 1)
         # likelihood 4 (index 3), impact 5 (index 4)
         assert stats["risk_heatmap"][3][4] >= 1

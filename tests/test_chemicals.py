@@ -42,7 +42,29 @@ class TestChemicals:
         create_chemical(db, name="Acid 2", hazard_class="corrosive", created_by=officer["id"])
         create_chemical(db, name="Gas", hazard_class="compressed_gas", created_by=officer["id"])
 
-        summary = hazard_summary(db)
+        summary = hazard_summary(db, org_id=1)
         assert summary["corrosive"] == 2
         assert summary["compressed_gas"] == 1
         assert summary["total"] == 3
+
+    def test_update_chemical(self, db):
+        officer = _mk_user(db, "she_officer", "chem4@test.com")
+        from sheplatform.modules.chemicals.data_service import create_chemical, update_chemical
+        chem = create_chemical(db, name="X", created_by=officer["id"], org_id=1)
+        updated = update_chemical(
+            db, chem["id"], org_id=1, user_id=officer["id"],
+            cas_number="123-45-6", supplier="Acme", sds_status="draft",
+            sds_extracted={"ppe_required": ["gloves"]})
+        assert updated["cas_number"] == "123-45-6"
+        assert updated["supplier"] == "Acme"
+
+    def test_sds_review_date_check(self, db):
+        officer = _mk_user(db, "she_officer", "chem5@test.com")
+        from datetime import datetime, timezone, timedelta
+        from sheplatform.modules.chemicals.data_service import (
+            create_chemical, check_sds_review_dates)
+        review = (datetime.now(timezone.utc) - timedelta(days=5)).isoformat()
+        create_chemical(db, name="Old SDS", sds_review_date=review,
+                        sds_status="current", created_by=officer["id"], org_id=1)
+        due = check_sds_review_dates(db, org_id=1, horizon_days=30)
+        assert any(c["name"] == "Old SDS" for c in due)

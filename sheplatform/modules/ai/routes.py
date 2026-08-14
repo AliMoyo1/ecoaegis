@@ -4,7 +4,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from sheplatform.core.middleware import require_auth
+from sheplatform.core.middleware import require_auth, require_capability
+from sheplatform.database import get_db
 from sheplatform.modules.ai import service
 from sheplatform.templating import templates
 
@@ -39,14 +40,74 @@ async def api_briefing(request: Request):
 
 @router.post("/api/incident-copilot/{incident_id}")
 @require_auth
+@require_capability("incident.investigate")
 async def api_incident_copilot(request: Request, incident_id: int):
-    return JSONResponse(await service.incident_copilot(incident_id, request.state.user.get("org_id")))
+    result = await service.incident_copilot(incident_id, request.state.user.get("org_id"))
+    if not result.get("ok"):
+        status = 404 if "not found" in result.get("message", "") else 400
+        return JSONResponse(result, status_code=status)
+    return JSONResponse(result)
 
 
 @router.post("/api/root-cause/{incident_id}")
 @require_auth
+@require_capability("incident.investigate")
 async def api_root_cause(request: Request, incident_id: int):
-    return JSONResponse(await service.root_cause_assistant(incident_id, request.state.user.get("org_id")))
+    result = await service.root_cause_assistant(incident_id, request.state.user.get("org_id"))
+    if not result.get("ok"):
+        status = 404 if "not found" in result.get("message", "") else 400
+        return JSONResponse(result, status_code=status)
+    return JSONResponse(result)
+
+
+@router.post("/api/draft-actions/{incident_id}")
+@require_auth
+@require_capability("incident.investigate")
+async def api_draft_actions(request: Request, incident_id: int):
+    result = await service.draft_corrective_actions(
+        incident_id, request.state.user.get("org_id"))
+    if not result.get("ok"):
+        status = 404 if "not found" in result.get("message", "") else 400
+        return JSONResponse(result, status_code=status)
+    return JSONResponse(result)
+
+
+@router.post("/api/classify-incident")
+@require_auth
+@require_capability("incident.create")
+async def api_classify_incident(request: Request, description: str = Form(...)):
+    result = await service.classify_incident(description)
+    if not result.get("ok"):
+        return JSONResponse(result, status_code=400)
+    return JSONResponse(result)
+
+
+@router.post("/api/similar-incidents")
+@require_auth
+async def api_similar_incidents(request: Request, description: str = Form(""),
+                                incident_id: int = Form(0)):
+    org_id = request.state.user.get("org_id")
+    if incident_id:
+        from sheplatform.modules.incidents.data_service import get_incident
+        db = get_db()
+        try:
+            inc = get_incident(db, incident_id)
+            if inc and org_id and inc.get("org_id") == org_id:
+                description = f"{inc.get('title', '')} {inc.get('description', '')}"
+                exclude = incident_id
+            else:
+                exclude = None
+        finally:
+            db.close()
+    else:
+        exclude = None
+    return JSONResponse(await service.similar_incidents(description, org_id, exclude_id=exclude))
+
+
+@router.post("/api/sql-chat")
+@require_auth
+async def api_sql_chat(request: Request, question: str = Form(...)):
+    return JSONResponse(await service.safe_sql_chat(question, request.state.user.get("org_id")))
 
 
 @router.post("/api/predictive-risk")

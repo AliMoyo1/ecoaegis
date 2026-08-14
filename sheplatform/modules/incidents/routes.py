@@ -49,22 +49,37 @@ async def api_create(request: Request,
                      severity: str = Form(...),
                      incident_type: str = Form("accident"),
                      occurred_at: str = Form(""),
-                     location: str = Form("")):
+                     location: str = Form(""),
+                     ai_classify: str = Form(""),
+                     accept_ai: str = Form("")):
+    from sheplatform.modules.ai import service as ai_service
     db = get_db()
     try:
+        suggestion = None
+        if ai_classify == "true" and description:
+            suggestion = await ai_service.classify_incident(description)
+            suggestion = suggestion.get("suggestion") if suggestion.get("ok") else None
+
+        if accept_ai == "true" and suggestion:
+            title = suggestion.get("title") or title
+            severity = suggestion.get("severity") or severity
+            incident_type = suggestion.get("incident_type") or incident_type
+
         if severity not in ("critical", "high", "medium", "low"):
             return JSONResponse({"ok": False, "message": "invalid severity"}, status_code=400)
         if incident_type not in ("accident", "near_miss", "environmental", "vehicle", "medical", "fatality"):
             return JSONResponse({"ok": False, "message": "invalid incident_type"}, status_code=400)
         occurred_at = occurred_at or datetime.now(timezone.utc).isoformat()
+        ai_metadata = {"suggestion": suggestion} if suggestion else None
         incident = data_service.create_incident(
             db, title=title, description=description, severity=severity,
             incident_type=incident_type, occurred_at=occurred_at,
             location=location, reported_by=request.state.user["id"],
-            org_id=request.state.user.get("org_id"))
+            org_id=request.state.user.get("org_id"), ai_metadata=ai_metadata)
         log_audit(db, request.state.user["id"], request.state.user.get("org_id"),
                   "incident.create", "incidents", incident["id"],
-                  new_value={"ref": incident["incident_ref"], "severity": severity})
+                  new_value={"ref": incident["incident_ref"], "severity": severity,
+                             "ai_classified": bool(ai_metadata)})
         return JSONResponse({"ok": True, "incident": incident}, status_code=201)
     finally:
         db.close()
@@ -79,8 +94,26 @@ async def api_detail(request: Request, incident_id: int):
         incident = data_service.get_incident(db, incident_id)
         if incident is None:
             return JSONResponse({"ok": False, "message": "not found"}, status_code=404)
+        org_id = request.state.user.get("org_id")
+        if org_id and incident.get("org_id") and incident["org_id"] != org_id:
+            return JSONResponse({"ok": False, "message": "not found"}, status_code=404)
         incident["timeline"] = data_service.get_timeline(db, incident_id)
         return JSONResponse({"incident": incident})
+    finally:
+        db.close()
+
+
+@router.get("/{incident_id}", response_class=HTMLResponse)
+@require_auth
+@require_capability("module.incidents.access")
+async def incident_detail_page(request: Request, incident_id: int):
+    db = get_db()
+    try:
+        incident = data_service.get_incident(db, incident_id)
+        if incident is None:
+            return RedirectResponse(url="/incidents", status_code=303)
+        return templates.TemplateResponse(request, "incidents/templates/detail.html",
+                                          {"user": request.state.user, "incident_id": incident_id})
     finally:
         db.close()
 

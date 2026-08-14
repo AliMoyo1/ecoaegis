@@ -1,0 +1,187 @@
+{% extends "base_shell.html" %}
+{% block title %}Incident detail - EcoAegis{% endblock %}
+{% block content %}
+<h1>Incident <span id="inc-ref">...</span></h1>
+
+<div class="card">
+  <div id="inc-header"></div>
+  <p id="inc-description" style="margin-top:12px;color:var(--muted)"></p>
+
+  <div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:10px">
+    <button class="btn btn-sm btn-primary" onclick="runCopilot()">AI: investigation help</button>
+    <button class="btn btn-sm btn-primary" onclick="runRootCause()">AI: root cause</button>
+    <button class="btn btn-sm" onclick="runDraftActions()">AI: draft corrective actions</button>
+  </div>
+
+  <div style="margin-top:24px">
+    <h3>Similar incidents</h3>
+    <button class="btn btn-sm" id="ai-similar-btn">Find similar</button>
+    <div id="ai-similar-result" style="margin-top:8px"></div>
+  </div>
+
+  <div style="margin-top:24px">
+    <h3>Ask data a question</h3>
+    <form id="sql-chat-form" class="filters">
+      <input type="text" name="question" placeholder="e.g. recent critical incidents" style="flex:1">
+      <button class="btn btn-sm btn-primary" type="submit">Ask</button>
+    </form>
+    <div id="sql-chat-result" style="margin-top:8px"></div>
+  </div>
+</div>
+
+<div class="card" id="ai-result-card" style="display:none">
+  <h2 id="ai-result-title">Result</h2>
+  <div id="ai-result-body" style="white-space:pre-wrap;font-size:14px;line-height:1.6"></div>
+  <div id="draft-actions-mount" style="margin-top:16px"></div>
+</div>
+
+<div class="card">
+  <h2>Timeline</h2>
+  <ul id="timeline-list" style="padding-left:18px"></ul>
+  <form id="timeline-form" style="margin-top:12px">
+    <input type="text" name="event_text" placeholder="Add timeline note" required>
+    <button class="btn btn-sm btn-primary" type="submit">Add</button>
+  </form>
+</div>
+
+<script>
+const API = "/incidents/api";
+const AI_API = "/ai/api";
+const incidentId = location.pathname.split("/").pop();
+
+async function loadIncident() {
+  const resp = await fetch(`${API}/${incidentId}`);
+  if (!resp.ok) { document.body.innerHTML = "<p>Incident not found</p>"; return; }
+  const data = await resp.json();
+  const inc = data.incident;
+  document.getElementById("inc-ref").textContent = inc.incident_ref;
+  document.getElementById("inc-header").innerHTML = `
+    <strong>${inc.title}</strong>
+    <span class="badge" style="margin-left:8px">${inc.severity}</span>
+    <span class="badge">${inc.incident_type}</span>
+    <span class="badge">${inc.status}</span>
+    <div style="margin-top:6px;font-size:12px;color:var(--muted)">
+      Location: ${inc.location || "-"} | Reported: ${inc.reported_at || "-"}
+    </div>`;
+  document.getElementById("inc-description").textContent = inc.description;
+
+  const list = document.getElementById("timeline-list");
+  list.innerHTML = "";
+  for (const e of inc.timeline || []) {
+    const li = document.createElement("li");
+    li.style.marginBottom = "6px";
+    li.innerHTML = `<strong>${e.event_type}</strong>: ${e.event_text}
+      <span style="color:var(--muted);font-size:12px">(${e.occurred_at})</span>`;
+    list.appendChild(li);
+  }
+}
+
+function showAI(title, html) {
+  document.getElementById("ai-result-card").style.display = "block";
+  document.getElementById("ai-result-title").textContent = title;
+  document.getElementById("ai-result-body").innerHTML = html;
+  document.getElementById("draft-actions-mount").innerHTML = "";
+}
+
+async function runCopilot() {
+  showAI("AI investigation help", "Thinking...");
+  const resp = await fetch(`${AI_API}/incident-copilot/${incidentId}`, { method: "POST" });
+  const data = await resp.json();
+  showAI("AI investigation help", data.result ? data.result.replace(/\n/g, "<br>") : (data.message || "No response"));
+}
+
+async function runRootCause() {
+  showAI("AI root cause analysis", "Thinking...");
+  const resp = await fetch(`${AI_API}/root-cause/${incidentId}`, { method: "POST" });
+  const data = await resp.json();
+  showAI("AI root cause analysis", data.result ? data.result.replace(/\n/g, "<br>") : (data.message || "No response"));
+}
+
+async function runDraftActions() {
+  showAI("AI draft corrective actions", "Thinking...");
+  const resp = await fetch(`${AI_API}/draft-actions/${incidentId}`, { method: "POST" });
+  const data = await resp.json();
+  if (!data.ok) { showAI("AI draft corrective actions", data.message || "Failed"); return; }
+  const mount = document.getElementById("draft-actions-mount");
+  mount.innerHTML = "<h3>Draft actions</h3>";
+  if (!data.draft_actions || !data.draft_actions.length) {
+    mount.innerHTML += "<p>No draft actions could be generated.</p>";
+    return;
+  }
+  for (const [idx, action] of data.draft_actions.entries()) {
+    const div = document.createElement("div");
+    div.className = "card";
+    div.style.marginBottom = "10px";
+    div.innerHTML = `
+      <strong>${action.title || "Untitled"}</strong>
+      <p style="margin:6px 0;color:var(--muted)">${action.description || ""}</p>
+      <div style="font-size:12px">Type: ${action.type || "-"} | Role: ${action.suggested_role || "-"} | Due: ${action.due_in_days || "-"} days</div>
+      <button class="btn btn-sm btn-primary" style="margin-top:8px" onclick="acceptAction(${idx})">Accept &amp; create CAPA</button>
+    `;
+    mount.appendChild(div);
+    window._draftActions = data.draft_actions;
+  }
+}
+
+async function acceptAction(idx) {
+  const action = window._draftActions[idx];
+  const fd = new FormData();
+  fd.append("title", action.title || "AI-suggested action");
+  fd.append("description", action.description || "");
+  fd.append("type", action.type || "corrective");
+  fd.append("priority", "high");
+  fd.append("due_days", action.due_in_days || "7");
+  fd.append("source_incident_id", incidentId);
+  const resp = await fetch("/capa/api/create", { method: "POST", body: fd });
+  const data = await resp.json();
+  if (data.ok) {
+    alert("CAPA created: " + data.capa.capa_ref);
+  } else {
+    alert(data.message || "Failed to create CAPA");
+  }
+}
+
+document.getElementById("timeline-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  await fetch(`${API}/${incidentId}/timeline`, { method: "POST", body: fd });
+  e.target.reset();
+  loadIncident();
+});
+
+document.getElementById("ai-similar-btn").addEventListener("click", async () => {
+  const mount = document.getElementById("ai-similar-result");
+  mount.textContent = "Searching...";
+  const fd = new FormData();
+  fd.append("incident_id", incidentId);
+  const resp = await fetch(`${AI_API}/similar-incidents`, { method: "POST", body: fd });
+  const data = await resp.json();
+  if (!data.ok || !data.matches.length) {
+    mount.innerHTML = "<em>No similar incidents found.</em>";
+    return;
+  }
+  mount.innerHTML = data.matches.map(m =>
+    `<div><strong>${m.incident_ref}</strong> - ${m.title} (${m.severity})</div>`).join("");
+});
+
+document.getElementById("sql-chat-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const mount = document.getElementById("sql-chat-result");
+  mount.textContent = "Thinking...";
+  const fd = new FormData(e.target);
+  const resp = await fetch(`${AI_API}/sql-chat`, { method: "POST", body: fd });
+  const data = await resp.json();
+  if (data.answer) {
+    mount.innerHTML = `<p>${data.answer}</p>`;
+  } else if (data.rows && data.rows.length) {
+    const keys = Object.keys(data.rows[0]);
+    mount.innerHTML = `<table class="data-table"><thead><tr>${keys.map(k => `<th>${k}</th>`).join("")}</tr></thead>` +
+      `<tbody>${data.rows.map(r => `<tr>${keys.map(k => `<td>${r[k] || "-"}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+  } else {
+    mount.innerHTML = "<em>No results.</em>";
+  }
+});
+
+loadIncident();
+</script>
+{% endblock %}

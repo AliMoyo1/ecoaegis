@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}EcoAegis{% endblock %}</title>
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#0f172a">
   <link rel="stylesheet" href="/static/fonts/fonts.css">
   <link rel="stylesheet" href="/static/css/app.css">
 </head>
@@ -39,6 +41,8 @@
     {% endif %}
   </div>
 </nav>
+
+<div id="offline-indicator" style="display:none;position:fixed;top:0;left:0;right:0;z-index:10000;padding:6px 14px;font-size:13px;text-align:center;background:#f59e0b;color:#fff">Offline - reports will queue</div>
 
 <div class="layout">
   {% if user %}
@@ -173,5 +177,13 @@
   })();
 </script>
 <script src="/static/js/particles.js"></script>
+<script src="/static/js/offline.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/static/js/sw.js')
+      .then(function (reg) { console.log('SW registered', reg.scope); })
+      .catch(function (err) { console.warn('SW registration failed', err); });
+  }
+</script>
 </body>
 </html>

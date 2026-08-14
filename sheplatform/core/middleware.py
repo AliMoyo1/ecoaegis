@@ -33,6 +33,8 @@ _SIDEBAR_MODULES = {
     "stakeholders": "stakeholder",
     "observations": "observations",
     "documents": "documents",
+    "statutory": "statutory",
+    "integrations": "integrations",
 }
 
 
@@ -150,7 +152,11 @@ def make_csrf_token() -> str:
 
 # Paths exempt from CSRF: login (no session yet), static assets, MFA challenge
 # (challenge runs before the session is fully usable, token is sent via JS).
-CSRF_EXEMPT_PREFIXES = ("/static", "/login", "/mfa/challenge", "/mfa/api/verify")
+CSRF_EXEMPT_PREFIXES = (
+    "/static", "/login", "/mfa/challenge", "/mfa/api/verify",
+    "/channels/whatsapp", "/channels/twilio", "/esg/api/ingest",
+    "/webhooks/",
+)
 
 
 async def csrf_middleware(request, call_next):

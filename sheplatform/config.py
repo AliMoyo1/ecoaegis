@@ -43,6 +43,12 @@ class Settings:
     AI_API_KEY: str = os.getenv("AI_API_KEY", "")
     AI_MODEL: str = os.getenv("AI_MODEL", "Kimi-K2.7-Code")
 
+    # Vision AI provider override (defaults to AI_PROVIDER; Gemini/Anthropic recommended)
+    VISION_AI_PROVIDER: str = os.getenv("VISION_AI_PROVIDER", os.getenv("AI_PROVIDER", "kimi"))
+    VISION_AI_MODEL: str = os.getenv("VISION_AI_MODEL", "")
+    VISION_AI_BASE_URL: str = os.getenv("VISION_AI_BASE_URL", "")
+    VISION_AI_API_KEY: str = os.getenv("VISION_AI_API_KEY", "")
+
     # Email
     EMAIL_PROVIDER: str = os.getenv("EMAIL_PROVIDER", "console")
     SMTP_HOST: str = os.getenv("SMTP_HOST", "")
@@ -55,6 +61,13 @@ class Settings:
     THEMIS_API_KEY: str = os.getenv("THEMIS_API_KEY", "")
     THEMIS_WEBHOOK_SECRET: str = os.getenv("THEMIS_WEBHOOK_SECRET", "")
     THEMIS_SYNC_ENABLED: bool = os.getenv("THEMIS_SYNC_ENABLED", "false").lower() == "true"
+
+    # Messaging channels
+    WHATSAPP_VERIFY_TOKEN: str = os.getenv("WHATSAPP_VERIFY_TOKEN", "")
+    WHATSAPP_APP_SECRET: str = os.getenv("WHATSAPP_APP_SECRET", "")
+    TWILIO_ACCOUNT_SID: str = os.getenv("TWILIO_ACCOUNT_SID", "")
+    TWILIO_AUTH_TOKEN: str = os.getenv("TWILIO_AUTH_TOKEN", "")
+    SMS_DEFAULT_ORG_ID: int = int(os.getenv("SMS_DEFAULT_ORG_ID", "1"))
 
     def is_postgres(self) -> bool:
         return bool(self.DATABASE_URL)

@@ -7,10 +7,12 @@ Business rules enforced:
 """
 from __future__ import annotations
 
+import json
 import re
 from datetime import datetime, timedelta, timezone
 
 from sheplatform.core import events
+from sheplatform.core.ai_client import ask_ai
 from sheplatform.database import resolve_org
 
 
@@ -37,21 +39,33 @@ def next_incident_ref(db) -> str:
 def create_incident(db, *, title: str, description: str, severity: str,
                     incident_type: str, occurred_at: str, location: str = "",
                     reported_by: int, org_id: int | None = None,
-                    latitude: float | None = None, longitude: float | None = None) -> dict:
-    """Create an incident. Sets statutory_deadline = reported_at + 48h for critical (BRN-002)."""
+                    latitude: float | None = None, longitude: float | None = None,
+                    ai_metadata: dict | None = None,
+                    idempotency_key: str | None = None) -> dict:
+    """Create an incident. Sets statutory_deadline = reported_at + 48h for critical (BRN-002).
+
+    If idempotency_key is provided and already exists, returns the existing record
+    with no side effects (safe for offline replay).
+    """
+    import json
+    if idempotency_key:
+        row = db.execute("SELECT * FROM incidents WHERE idempotency_key = %s", (idempotency_key,)).fetchone()
+        if row:
+            return {**dict(row), "_idempotent": True}
     org_id = resolve_org(db, org_id, reported_by)
     ref = next_incident_ref(db)
     reported_at = datetime.now(timezone.utc)
     statutory_deadline = None
     if severity == "critical":
         statutory_deadline = (reported_at + timedelta(hours=48)).isoformat()
+    ai_metadata_json = json.dumps(ai_metadata) if ai_metadata else "{}"
 
     db.execute(
-        "INSERT INTO incidents (incident_ref, title, description, severity, incident_type, "
+        "INSERT INTO incidents (incident_ref, idempotency_key, title, description, severity, incident_type, "
         "location, latitude, longitude, occurred_at, reported_at, reported_by, org_id, "
-        "statutory_deadline) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-        (ref, title, description, severity, incident_type, location, latitude, longitude,
-         occurred_at, reported_at.isoformat(), reported_by, org_id, statutory_deadline),
+        "statutory_deadline, ai_metadata) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+        (ref, idempotency_key, title, description, severity, incident_type, location, latitude, longitude,
+         occurred_at, reported_at.isoformat(), reported_by, org_id, statutory_deadline, ai_metadata_json),
     )
     db.commit()
     row = db.execute("SELECT * FROM incidents WHERE incident_ref = %s", (ref,)).fetchone()
@@ -62,6 +76,9 @@ def create_incident(db, *, title: str, description: str, severity: str,
         "incident_id": incident["id"], "ref": ref, "severity": severity, "title": title,
         "entity_type": "incident", "entity_id": incident["id"],
     }, db, user_id=reported_by, source_module="incidents")
+    # Index for FTS/hybrid retrieval (A4)
+    from sheplatform.modules.incidents.retrieval import index_incident
+    index_incident(db, incident["id"], title, description, incident_type, severity)
     return incident
 
 

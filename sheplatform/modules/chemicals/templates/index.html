@@ -36,6 +36,7 @@
       <label>Quantity/units <input type="text" name="quantity_units" style="width:140px"></label>
       <label>Storage location <input type="text" name="storage_location"></label>
       <label>SDS path <input type="text" name="sds_path" placeholder="docs/SDS/..."></label>
+      <label>SDS review date <input type="date" name="sds_review_date" style="width:160px"></label>
     </div>
     <button class="btn btn-primary" type="submit">Register</button>
   </form>
@@ -57,9 +58,55 @@
     </select>
   </div>
   <table class="data-table" id="chem-table">
-    <thead><tr><th>Ref</th><th>Name</th><th>CAS</th><th>Hazard class</th><th>Supplier</th><th>Site</th><th>Storage</th><th>SDS</th></tr></thead>
+    <thead><tr><th>Ref</th><th>Name</th><th>CAS</th><th>Hazard class</th><th>Supplier</th><th>Site</th><th>Storage</th><th>SDS status</th><th>Actions</th></tr></thead>
     <tbody></tbody>
   </table>
+</div>
+
+<div id="sds-modal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2000;display:flex;align-items:flex-start;justify-content:center;padding-top:40px">
+  <div class="card" style="width:min(900px,92vw);max-height:90vh;overflow:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2>Upload &amp; review SDS</h2>
+      <button type="button" class="btn btn-sm" onclick="closeSdsModal()">Close</button>
+    </div>
+    <form id="sds-upload-form" style="margin-top:12px">
+      <div class="filters">
+        <label>SDS PDF <input type="file" id="sds-file" name="file" accept="application/pdf" required></label>
+        <label>Review date <input type="date" id="sds-review-date" name="sds_review_date"></label>
+      </div>
+      <button class="btn btn-primary" type="submit">Extract fields</button>
+    </form>
+    <div id="sds-preview" style="margin:16px 0"></div>
+    <form id="sds-apply-form" class="hidden">
+      <h3>Apply reviewed fields</h3>
+      <div class="filters">
+        <label>Hazard class
+          <select id="a-hazard" name="hazard_class">
+            <option value="">None</option>
+            <option value="flammable">Flammable</option>
+            <option value="corrosive">Corrosive</option>
+            <option value="toxic">Toxic</option>
+            <option value="oxidising">Oxidising</option>
+            <option value="explosive">Explosive</option>
+            <option value="environmental_hazard">Environmental hazard</option>
+            <option value="irritant">Irritant</option>
+            <option value="compressed_gas">Compressed gas</option>
+          </select>
+        </label>
+        <label>CAS number <input type="text" id="a-cas" name="cas_number" style="width:160px"></label>
+        <label>Supplier <input type="text" id="a-supplier" name="supplier"></label>
+        <label>SDS status
+          <select name="sds_status">
+            <option value="current">Current</option>
+            <option value="draft">Draft</option>
+            <option value="expiring">Expiring</option>
+            <option value="expired">Expired</option>
+          </select>
+        </label>
+      </div>
+      <button class="btn btn-primary" type="submit">Apply to chemical</button>
+    </form>
+  </div>
 </div>
 
 <script src="/static/js/chemicals.js"></script>

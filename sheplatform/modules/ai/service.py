@@ -10,6 +10,51 @@ import json
 from sheplatform.core.ai_client import ask_ai
 from sheplatform.database import get_db
 
+
+def _safe_json(text: str) -> dict:
+    """Tolerant JSON object parser: returns {} on any failure."""
+    if not text:
+        return {}
+    s = text.strip()
+    if s.startswith("```"):
+        lines = s.splitlines()
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].startswith("```"):
+            lines = lines[:-1]
+        s = "\n".join(lines).strip()
+    # Find the first JSON object
+    start = s.find("{")
+    end = s.rfind("}")
+    if start == -1 or end == -1 or end < start:
+        return {}
+    try:
+        return json.loads(s[start:end + 1])
+    except Exception:
+        return {}
+
+
+def _safe_json_array(text: str) -> list:
+    """Tolerant JSON array parser: returns [] on any failure."""
+    if not text:
+        return []
+    s = text.strip()
+    if s.startswith("```"):
+        lines = s.splitlines()
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].startswith("```"):
+            lines = lines[:-1]
+        s = "\n".join(lines).strip()
+    start = s.find("[")
+    end = s.rfind("]")
+    if start == -1 or end == -1 or end < start:
+        return []
+    try:
+        return json.loads(s[start:end + 1])
+    except Exception:
+        return []
+
 # ---------- data gathering (grounding) ----------
 
 
@@ -134,6 +179,135 @@ async def root_cause_assistant(incident_id: int, org_id: int | None = None) -> d
         )
         reply = await ask_ai(prompt, max_tokens=1500)
         return {"ok": True, "incident_ref": incident.get("incident_ref"), "result": reply}
+    finally:
+        db.close()
+
+
+async def classify_incident(description: str) -> dict:
+    """AI auto-classification on intake: title, severity, type, summary."""
+    prompt = (
+        "Analyse the following incident description and return ONLY a JSON object with keys: "
+        "title (short, under 80 chars), severity (one of: critical, high, medium, low), "
+        "incident_type (one of: accident, near_miss, environmental, vehicle, medical, fatality), "
+        "summary (one sentence). No prose, no markdown fences.\n\nDescription: "
+        + description
+    )
+    raw = await ask_ai(prompt, max_tokens=400)
+    parsed = _safe_json(raw)
+    return {
+        "ok": True,
+        "suggestion": {
+            "title": parsed.get("title", ""),
+            "severity": parsed.get("severity", ""),
+            "incident_type": parsed.get("incident_type", ""),
+            "summary": parsed.get("summary", ""),
+        }
+    }
+
+
+async def draft_corrective_actions(incident_id: int, org_id: int | None = None) -> dict:
+    """AI drafts corrective/preventive actions as structured records."""
+    db = get_db()
+    try:
+        incident = _incident_detail(db, incident_id)
+        if not incident:
+            return {"ok": False, "message": "incident not found"}
+        if org_id and incident.get("org_id") and incident["org_id"] != org_id:
+            return {"ok": False, "message": "incident not found"}
+        prompt = (
+            f"Incident: {incident.get('title')}\n"
+            f"Root cause: {incident.get('root_cause') or 'not recorded'}\n\n"
+            "Propose 2-4 corrective/preventive actions. Return ONLY a JSON array of objects "
+            'with keys: title, description, type ("corrective"|"preventive"), '
+            "suggested_role, due_in_days. No prose."
+        )
+        raw = await ask_ai(prompt, max_tokens=1200)
+        actions = _safe_json_array(raw)
+        return {"ok": True, "incident_ref": incident.get("incident_ref"), "draft_actions": actions}
+    finally:
+        db.close()
+
+
+async def similar_incidents(description: str, org_id: int | None = None,
+                            exclude_id: int | None = None) -> dict:
+    """Return incidents similar to the supplied description using FTS5 / LIKE fallback."""
+    db = get_db()
+    try:
+        from sheplatform.modules.incidents.retrieval import search_similar
+        results = search_similar(db, description, org_id=org_id, limit=5, exclude_id=exclude_id)
+        return {"ok": True, "matches": results}
+    finally:
+        db.close()
+
+
+async def safe_sql_chat(question: str, org_id: int | None = None) -> dict:
+    """Read-only natural-language query over incidents with allow-list SQL.
+
+    The model is only asked to pick one of a fixed set of safe query templates;
+    parameters are bound separately. No arbitrary SQL is executed.
+    """
+    from sheplatform.core.ai_client import ask_ai
+
+    templates = [
+        {
+            "id": "recent_incidents",
+            "description": "List recent incidents",
+            "sql": "SELECT incident_ref, title, severity, status, occurred_at FROM incidents WHERE org_id = %s ORDER BY id DESC LIMIT 10",
+            "params": [org_id],
+        },
+        {
+            "id": "critical_open",
+            "description": "Open critical incidents",
+            "sql": "SELECT incident_ref, title, reported_at, statutory_deadline FROM incidents WHERE severity = 'critical' AND status != 'closed' AND org_id = %s ORDER BY reported_at DESC LIMIT 10",
+            "params": [org_id],
+        },
+        {
+            "id": "count_by_type",
+            "description": "Count incidents by type",
+            "sql": "SELECT incident_type, COUNT(*) AS n FROM incidents WHERE org_id = %s GROUP BY incident_type ORDER BY n DESC",
+            "params": [org_id],
+        },
+        {
+            "id": "overdue_actions",
+            "description": "Overdue corrective actions",
+            "sql": "SELECT action_ref, title, priority, due_date FROM corrective_actions WHERE status IN ('open','in_progress','overdue') AND due_date < datetime('now') AND org_id = %s ORDER BY due_date LIMIT 10",
+            "params": [org_id],
+        },
+        {
+            "id": "recent_observations",
+            "description": "Recent hazard observations",
+            "sql": "SELECT obs_ref, obs_type, title, severity, status FROM observations WHERE org_id = %s ORDER BY id DESC LIMIT 10",
+            "params": [org_id],
+        },
+    ]
+
+    prompt = (
+        "Pick the single best query template for the user's question. "
+        "Return ONLY a JSON object with keys: template_id, params (list). "
+        "Available templates:\n" +
+        "\n".join(f"- {t['id']}: {t['description']}" for t in templates) +
+        f"\n\nQuestion: {question}\n\nIf no template matches, return template_id 'none'."
+    )
+    raw = await ask_ai(prompt, max_tokens=300)
+    parsed = _safe_json(raw)
+    template_id = parsed.get("template_id", "")
+    selected = next((t for t in templates if t["id"] == template_id), None)
+    if selected is None:
+        return {
+            "ok": True,
+            "answer": "I don't have a safe pre-built query for that. Try asking about recent incidents, open critical incidents, counts by type, overdue actions, or recent observations.",
+            "rows": [],
+        }
+    db = get_db()
+    try:
+        params = parsed.get("params") or selected["params"]
+        params = [org_id if p is None else p for p in params]
+        rows = db.execute(selected["sql"], params).fetchall()
+        return {
+            "ok": True,
+            "template_id": selected["id"],
+            "rows": [dict(r) for r in rows],
+        }
     finally:
         db.close()
 

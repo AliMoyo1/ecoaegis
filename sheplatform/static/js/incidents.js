@@ -1,5 +1,6 @@
 /* Incidents module JS - vanilla, no framework (guide 2). */
 const API = "/incidents/api";
+let currentSuggestion = null;
 
 // Deep links from dashboard tiles: ?status=open, ?type=near_miss
 const params = new URLSearchParams(location.search);
@@ -36,14 +37,17 @@ async function loadIncidents() {
                 `<button class="btn btn-sm" onclick="approveReport(${inc.id}, ${inc.pending_step.id}, 'rejected')">Reject</button>`;
     }
     tr.innerHTML = `
-      <td>${inc.incident_ref}</td>
+      <td><a href="/incidents/${inc.id}">${inc.incident_ref}</a></td>
       <td>${inc.title}</td>
       <td>${inc.severity}</td>
       <td>${inc.incident_type}</td>
       <td>${inc.status}</td>
       <td>${deadline}</td>
       <td>${inc.reported_at || ""}</td>
-      <td>${actions}</td>`;
+      <td>
+        <a class="btn btn-sm" href="/incidents/${inc.id}">Open</a>
+        ${actions}
+      </td>`;
     tbody.appendChild(tr);
   }
 }
@@ -66,13 +70,71 @@ document.getElementById("incident-form").addEventListener("submit", async (e) =>
   e.preventDefault();
   const form = e.target;
   const body = new FormData(form);
+  if (currentSuggestion) body.append("ai_classify", "true");
+
+  // Offline capture (B1)
+  if (!navigator.onLine) {
+    const key = OfflineQueue.uuid();
+    const data = {
+      title: body.get("title"),
+      description: body.get("description"),
+      severity: body.get("severity"),
+      incident_type: body.get("incident_type"),
+      location: body.get("location") || "",
+      occurred_at: new Date().toISOString(),
+      idempotency_key: key,
+    };
+    await OfflineQueue.enqueue({ type: "incident", idempotencyKey: key, data });
+    form.reset();
+    currentSuggestion = null;
+    document.getElementById("ai-suggestion-card").style.display = "none";
+    OfflineQueue.updateIndicator();
+    alert("Saved offline. It will sync when connectivity returns.");
+    return;
+  }
+
   const resp = await fetch(`${API}/create`, { method: "POST", body });
   const data = await resp.json();
   if (data.ok) {
     form.reset();
+    currentSuggestion = null;
+    document.getElementById("ai-suggestion-card").style.display = "none";
     loadIncidents();
   } else {
     alert(data.message || "Failed to create incident");
+  }
+});
+
+async function classifyIncident() {
+  const description = document.querySelector("[name='description']").value.trim();
+  const status = document.getElementById("ai-suggestion-status");
+  const card = document.getElementById("ai-suggestion-card");
+  if (!description) { status.textContent = "Enter a description first"; return; }
+  status.textContent = "Analysing...";
+  const fd = new FormData();
+  fd.append("description", description);
+  const resp = await fetch("/ai/api/classify-incident", { method: "POST", body: fd });
+  const data = await resp.json();
+  if (!data.ok) { status.textContent = "AI classification failed"; return; }
+  currentSuggestion = data.suggestion;
+  const s = data.suggestion;
+  document.getElementById("ai-suggestion-body").innerHTML = `
+    <strong>Title:</strong> ${s.title}<br>
+    <strong>Severity:</strong> ${s.severity}<br>
+    <strong>Type:</strong> ${s.incident_type}<br>
+    <strong>Summary:</strong> ${s.summary}`;
+  card.style.display = "block";
+  status.textContent = "Suggestion ready";
+}
+
+document.getElementById("ai-classify-btn").addEventListener("click", classifyIncident);
+
+document.getElementById("accept-ai").addEventListener("change", (e) => {
+  if (!currentSuggestion) return;
+  if (e.target.checked) {
+    document.querySelector("[name='title']").value = currentSuggestion.title || "";
+    document.querySelector("[name='severity']").value = currentSuggestion.severity || "medium";
+    document.querySelector("[name='incident_type']").value = currentSuggestion.incident_type || "accident";
   }
 });
 

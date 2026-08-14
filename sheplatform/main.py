@@ -60,6 +60,7 @@ from sheplatform.modules.stakeholder.routes import router as stakeholder_router
 from sheplatform.modules.evidence.routes import router as evidence_router
 from sheplatform.modules.integration.routes import router as integration_router
 from sheplatform.modules.ai.routes import router as ai_router
+from sheplatform.modules.attachments.routes import router as attachments_router
 from sheplatform.modules.capa.routes import router as capa_router
 from sheplatform.modules.inspections.routes import router as inspections_router
 from sheplatform.modules.observations.routes import router as observations_router
@@ -69,10 +70,15 @@ from sheplatform.modules.contractors.routes import router as contractors_router
 from sheplatform.modules.chemicals.routes import router as chemicals_router
 from sheplatform.modules.benchmark.routes import router as benchmark_router
 from sheplatform.modules.mfa.routes import router as mfa_router
+from sheplatform.modules.channels.routes import router as channels_router
+from sheplatform.modules.offline.routes import router as offline_router
+from sheplatform.modules.statutory_reporting.routes import router as statutory_router
+from sheplatform.modules.external_integration.routes import router as external_integration_router
 
 app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(dashboard_router)
+app.include_router(offline_router)
 app.include_router(incidents_router)
 app.include_router(risks_router)
 app.include_router(vendors_router)
@@ -89,6 +95,7 @@ app.include_router(stakeholder_router)
 app.include_router(evidence_router)
 app.include_router(integration_router)
 app.include_router(ai_router)
+app.include_router(attachments_router)
 app.include_router(capa_router)
 app.include_router(inspections_router)
 app.include_router(observations_router)
@@ -98,6 +105,9 @@ app.include_router(contractors_router)
 app.include_router(chemicals_router)
 app.include_router(benchmark_router)
 app.include_router(mfa_router)
+app.include_router(channels_router)
+app.include_router(statutory_router)
+app.include_router(external_integration_router)
 
 
 # ---- Background schedulers (guide 22; single-worker mode) ----
@@ -108,9 +118,11 @@ async def start_scheduler():
         from sheplatform.modules.incidents.scheduler import start_scheduler as start_inc_scheduler
         from sheplatform.modules.vendor_compliance.scheduler import start_scheduler as start_vendor_scheduler
         from sheplatform.modules.reporting.scheduler import start_scheduler as start_report_scheduler
+        from sheplatform.modules.chemicals.scheduler import start_scheduler as start_chemicals_scheduler
         app.state.inc_scheduler = start_inc_scheduler(get_db_background)
         app.state.vendor_scheduler = start_vendor_scheduler(get_db_background)
         app.state.report_scheduler = start_report_scheduler(get_db_background)
+        app.state.chemicals_scheduler = start_chemicals_scheduler(get_db_background)
 
         # ThemisIQ sync queue drainer (spec 11.4: every 5 minutes)
         from sheplatform.modules.integration.themis_sync import drain_queue
