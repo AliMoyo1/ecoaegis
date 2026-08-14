@@ -69,6 +69,13 @@ class Settings:
     TWILIO_AUTH_TOKEN: str = os.getenv("TWILIO_AUTH_TOKEN", "")
     SMS_DEFAULT_ORG_ID: int = int(os.getenv("SMS_DEFAULT_ORG_ID", "1"))
 
+    # Map (guide C1) - full Leaflet XYZ URL template incl. key, e.g. a MapTiler/
+    # Stadia/Geoapify free-tier URL. No default: tile.openstreetmap.org is not
+    # licensed for production use, so an unset value means "not configured yet"
+    # rather than silently falling back to a policy-violating tile source.
+    MAP_TILE_URL_TEMPLATE: str = os.getenv("MAP_TILE_URL_TEMPLATE", "")
+    MAP_TILE_ATTRIBUTION: str = os.getenv("MAP_TILE_ATTRIBUTION", "")
+
     def is_postgres(self) -> bool:
         return bool(self.DATABASE_URL)
 

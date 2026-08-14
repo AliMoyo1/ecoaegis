@@ -1111,6 +1111,8 @@ SCHEMA = [
         region          TEXT,
         site_type       TEXT DEFAULT 'facility' CHECK (site_type IN ('facility','tower','retail','warehouse','office')),
         status          TEXT DEFAULT 'active' CHECK (status IN ('active','inactive')),
+        latitude        NUMERIC,
+        longitude       NUMERIC,
         org_id          INTEGER REFERENCES organisations(id),
         created_at      TIMESTAMPTZ DEFAULT NOW()
     )""",
@@ -1393,6 +1395,21 @@ IDEMPOTENCY_COLUMNS = [
     "ALTER TABLE observations ADD COLUMN IF NOT EXISTS idempotency_key TEXT UNIQUE",
 ]
 
+# Column-level additions required by B5 incident intake depth (missed when
+# B5 shipped: CREATE TABLE IF NOT EXISTS only creates incidents fresh, it
+# does not retrofit columns onto a database where incidents already existed)
+INCIDENT_DEPTH_COLUMNS = [
+    "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS immediate_actions TEXT",
+    "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS estimated_cost NUMERIC",
+    "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS witnesses JSONB DEFAULT '[]'",
+]
+
+# Column-level additions required by C1 geographic map
+SITE_COORD_COLUMNS = [
+    "ALTER TABLE sites ADD COLUMN IF NOT EXISTS latitude NUMERIC",
+    "ALTER TABLE sites ADD COLUMN IF NOT EXISTS longitude NUMERIC",
+]
+
 
 # ---------------------------------------------------------------------------
 # SQLite rewrite of PostgreSQL types
@@ -1617,3 +1634,23 @@ def init_db() -> None:
                     db.execute("ALTER TABLE esg_kpi_entries ADD COLUMN source_upload_id INTEGER REFERENCES esg_csv_uploads(id)")
                 if "source_row_id" not in cols_entries:
                     db.execute("ALTER TABLE esg_kpi_entries ADD COLUMN source_row_id INTEGER REFERENCES esg_csv_rows(id)")
+        for col in INCIDENT_DEPTH_COLUMNS:
+            if settings.is_postgres():
+                db.execute(col)
+            else:
+                cols_inc = {r[1] for r in db.execute("PRAGMA table_info(incidents)").fetchall()}
+                if "immediate_actions" not in cols_inc:
+                    db.execute("ALTER TABLE incidents ADD COLUMN immediate_actions TEXT")
+                if "estimated_cost" not in cols_inc:
+                    db.execute("ALTER TABLE incidents ADD COLUMN estimated_cost REAL")
+                if "witnesses" not in cols_inc:
+                    db.execute("ALTER TABLE incidents ADD COLUMN witnesses TEXT DEFAULT '[]'")
+        for col in SITE_COORD_COLUMNS:
+            if settings.is_postgres():
+                db.execute(col)
+            else:
+                cols_sites = {r[1] for r in db.execute("PRAGMA table_info(sites)").fetchall()}
+                if "latitude" not in cols_sites:
+                    db.execute("ALTER TABLE sites ADD COLUMN latitude REAL")
+                if "longitude" not in cols_sites:
+                    db.execute("ALTER TABLE sites ADD COLUMN longitude REAL")

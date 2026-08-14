@@ -55,7 +55,9 @@ async def api_create(request: Request,
                      accept_ai: str = Form(""),
                      immediate_actions: str = Form(""),
                      estimated_cost: str = Form(""),
-                     witnesses_json: str = Form("")):
+                     witnesses_json: str = Form(""),
+                     latitude: str = Form(""),
+                     longitude: str = Form("")):
     from sheplatform.modules.ai import service as ai_service
     db = get_db()
     try:
@@ -89,10 +91,18 @@ async def api_create(request: Request,
             except ValueError:
                 return JSONResponse({"ok": False, "message": "witnesses_json must be valid JSON"}, status_code=400)
 
+        lat = lng = None
+        if latitude and longitude:
+            try:
+                lat, lng = float(latitude), float(longitude)
+            except ValueError:
+                return JSONResponse({"ok": False, "message": "latitude/longitude must be numbers"}, status_code=400)
+
         incident = data_service.create_incident(
             db, title=title, description=description, severity=severity,
             incident_type=incident_type, occurred_at=occurred_at,
-            location=location, reported_by=request.state.user["id"],
+            location=location, latitude=lat, longitude=lng,
+            reported_by=request.state.user["id"],
             org_id=request.state.user.get("org_id"), ai_metadata=ai_metadata,
             immediate_actions=immediate_actions, estimated_cost=cost, witnesses=witnesses)
         log_audit(db, request.state.user["id"], request.state.user.get("org_id"),

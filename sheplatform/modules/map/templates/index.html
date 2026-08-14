@@ -1,0 +1,58 @@
+{% extends "base_shell.html" %}
+{% block title %}Map - EcoAegis{% endblock %}
+{% block content %}
+<h1>Geographic Map</h1>
+<div class="login-sub" style="color:var(--muted);font-size:13px;margin-bottom:16px">
+  Incidents and sites with recorded coordinates. Clustered when zoomed out, click a marker to open the record.
+</div>
+
+{% if not tile_url %}
+<div class="card">
+  <h2>Map tile provider not configured</h2>
+  <p style="font-size:13px;color:var(--muted)">
+    Set <code>MAP_TILE_URL_TEMPLATE</code> (and optionally <code>MAP_TILE_ATTRIBUTION</code>) in the
+    server's environment to enable the map. See <code>.env.example</code> for MapTiler, Stadia Maps,
+    and Geoapify free-tier examples. <code>tile.openstreetmap.org</code> cannot be used here, its usage
+    policy forbids production traffic.
+  </p>
+</div>
+{% else %}
+<link rel="stylesheet" href="/static/css/leaflet.css">
+<link rel="stylesheet" href="/static/css/MarkerCluster.css">
+<link rel="stylesheet" href="/static/css/MarkerCluster.Default.css">
+
+<div class="card" style="margin-bottom:14px">
+  <div class="filters">
+    <select id="f-severity">
+      <option value="">All severities</option>
+      <option value="critical">Critical</option>
+      <option value="high">High</option>
+      <option value="medium">Medium</option>
+      <option value="low">Low</option>
+      <option value="near_miss">Near miss</option>
+    </select>
+    <select id="f-type">
+      <option value="">All types</option>
+      <option value="accident">Accident</option>
+      <option value="near_miss">Near miss</option>
+      <option value="environmental">Environmental</option>
+      <option value="vehicle">Vehicle</option>
+      <option value="medical">Medical</option>
+      <option value="fatality">Fatality</option>
+    </select>
+    <label style="font-size:13px;color:var(--muted)">Since <input type="date" id="f-since"></label>
+    <span style="font-size:12px;color:var(--muted);margin-left:auto">
+      <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--red);margin-right:4px"></span>Incident
+      &nbsp;<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#4a89dc;margin-right:4px"></span>Site
+    </span>
+  </div>
+</div>
+
+<div id="map" data-tile-url="{{ tile_url }}" data-tile-attribution="{{ tile_attribution }}"
+     style="height:600px;border-radius:var(--radius);overflow:hidden"></div>
+
+<script src="/static/js/leaflet.js"></script>
+<script src="/static/js/leaflet.markercluster.js"></script>
+<script src="/static/js/map.js"></script>
+{% endif %}
+{% endblock %}

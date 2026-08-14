@@ -18,6 +18,7 @@ CSRF_COOKIE = "she_csrf"
 
 # module -> capability prefix used to compute sidebar visibility flags
 _SIDEBAR_MODULES = {
+    "map": "map",
     "incidents": "incidents",
     "risks": "risk_register",
     "vendors": "vendors",
