@@ -103,3 +103,16 @@ async def api_acknowledge(request: Request, doc_id: int):
         return JSONResponse({"ok": False, "message": str(e)}, status_code=400)
     finally:
         db.close()
+
+
+@router.post("/api/ask")
+@require_auth
+async def api_ask(request: Request, question: str = Form(...)):
+    """Guide C3 document Q&A. Same broad read access as list/view - anyone
+    who can read the SOP library can ask it a question."""
+    db = get_db()
+    try:
+        result = await data_service.ask_sops(db, question, request.state.user.get("org_id"))
+        return JSONResponse(result)
+    finally:
+        db.close()

@@ -1170,6 +1170,7 @@ SCHEMA = [
         version         TEXT DEFAULT '1.0',
         description     TEXT,
         file_path       TEXT,
+        content_text    TEXT,
         status          TEXT DEFAULT 'draft' CHECK (status IN ('draft','in_review','approved','superseded','archived')),
         approved_by     INTEGER REFERENCES users(id),
         approved_at     TIMESTAMPTZ,
@@ -1187,6 +1188,14 @@ SCHEMA = [
         user_id         INTEGER REFERENCES users(id),
         acknowledged_at TIMESTAMPTZ DEFAULT NOW(),
         UNIQUE (document_id, user_id)
+    )""",
+    # ---- Document Q&A retrieval index (guide C3), mirrors incidents_fts ----
+    """
+    CREATE TABLE IF NOT EXISTS documents_fts (
+        document_id INTEGER PRIMARY KEY,
+        title       TEXT,
+        description TEXT,
+        content     TEXT
     )""",
     """
     CREATE TABLE IF NOT EXISTS compliance_obligations (
@@ -1436,6 +1445,11 @@ SITE_COORD_COLUMNS = [
     "ALTER TABLE sites ADD COLUMN IF NOT EXISTS longitude NUMERIC",
 ]
 
+# Column-level additions required by C3 document Q&A
+DOCUMENT_CONTENT_COLUMNS = [
+    "ALTER TABLE documents ADD COLUMN IF NOT EXISTS content_text TEXT",
+]
+
 
 # ---------------------------------------------------------------------------
 # SQLite rewrite of PostgreSQL types
@@ -1455,6 +1469,10 @@ _SQLITE_REWRITES = [
     (
         r"CREATE TABLE IF NOT EXISTS incidents_fts \(\s*incident_id INTEGER PRIMARY KEY,\s*title\s+TEXT,\s*description\s+TEXT,\s*incident_type\s+TEXT,\s*severity\s+TEXT,\s*content\s+TEXT\s*\)",
         "CREATE VIRTUAL TABLE IF NOT EXISTS incidents_fts USING fts5(incident_id UNINDEXED, title, description, incident_type, severity, content)"
+    ),
+    (
+        r"CREATE TABLE IF NOT EXISTS documents_fts \(\s*document_id INTEGER PRIMARY KEY,\s*title\s+TEXT,\s*description\s+TEXT,\s*content\s+TEXT\s*\)",
+        "CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(document_id UNINDEXED, title, description, content)"
     ),
     # SQLite supports ON DELETE CASCADE natively (with PRAGMA foreign_keys=ON),
     # so do NOT strip it - child rows must cascade (guide 4: FK rules).
@@ -1680,3 +1698,10 @@ def init_db() -> None:
                     db.execute("ALTER TABLE sites ADD COLUMN latitude REAL")
                 if "longitude" not in cols_sites:
                     db.execute("ALTER TABLE sites ADD COLUMN longitude REAL")
+        for col in DOCUMENT_CONTENT_COLUMNS:
+            if settings.is_postgres():
+                db.execute(col)
+            else:
+                cols_docs = {r[1] for r in db.execute("PRAGMA table_info(documents)").fetchall()}
+                if "content_text" not in cols_docs:
+                    db.execute("ALTER TABLE documents ADD COLUMN content_text TEXT")

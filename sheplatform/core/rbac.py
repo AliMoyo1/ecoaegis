@@ -59,6 +59,7 @@ CAPABILITIES = {
     "module.chemicals.access": {"super_admin", "she_manager", "she_officer"},
     "chemicals.manage": {"super_admin", "she_manager", "she_officer"},
     "module.benchmark.access": {"super_admin", "she_manager", "she_officer", "cro", "coo"},
+    "module.leading_indicators.access": {"super_admin", "she_manager", "she_officer", "cro", "coo"},
     "module.comms.access": {"super_admin", "she_manager", "she_officer", "she_hod"},
     "module.settings.access": {"super_admin", "she_manager"},
 
