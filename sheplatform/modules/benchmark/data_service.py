@@ -11,9 +11,12 @@ from datetime import datetime, timezone
 
 def site_benchmark(db, org_id: int | None = None) -> list[dict]:
     """Per-site metrics with a composite rank. Sorted worst-first (most incidents)."""
+    if not org_id:
+        return []  # fail closed: no tenant scope -> no data (audit S5)
     sites = [dict(r) for r in db.execute(
         "SELECT id, site_code, site_name, city, site_type FROM sites "
-        "WHERE status = 'active' ORDER BY site_name").fetchall()]
+        "WHERE status = 'active' AND org_id = %s ORDER BY site_name",
+        (org_id,)).fetchall()]
 
     out = []
     for s in sites:
@@ -21,23 +24,25 @@ def site_benchmark(db, org_id: int | None = None) -> list[dict]:
         loc_like = f"%{s['site_name']}%"
         incident_count = db.execute(
             "SELECT COUNT(*) FROM incidents WHERE (location LIKE %s OR %s = '') "
-            "AND status != 'closed'",
-            (loc_like, loc_like)).fetchone()[0]
+            "AND status != 'closed' AND org_id = %s",
+            (loc_like, loc_like, org_id)).fetchone()[0]
         observation_count = db.execute(
             "SELECT COUNT(*) FROM observations WHERE (location LIKE %s OR %s = '') "
-            "AND status NOT IN ('closed')",
-            (loc_like, loc_like)).fetchone()[0]
+            "AND status NOT IN ('closed') AND org_id = %s",
+            (loc_like, loc_like, org_id)).fetchone()[0]
         inspection_count = db.execute(
             "SELECT COUNT(*) FROM inspections WHERE (site_location LIKE %s OR %s = '') "
-            "AND status = 'overdue'",
-            (loc_like, loc_like)).fetchone()[0]
+            "AND status = 'overdue' AND org_id = %s",
+            (loc_like, loc_like, org_id)).fetchone()[0]
         ca_count = db.execute(
             "SELECT COUNT(*) FROM corrective_actions ca JOIN incidents i ON "
             "ca.source_type = 'incident' AND ca.source_id = i.id "
-            "WHERE i.location LIKE %s AND ca.status IN ('open','in_progress','overdue')",
-            (loc_like,)).fetchone()[0]
+            "WHERE i.location LIKE %s AND ca.status IN ('open','in_progress','overdue') "
+            "AND ca.org_id = %s",
+            (loc_like, org_id)).fetchone()[0]
         chem_count = db.execute(
-            "SELECT COUNT(*) FROM chemicals WHERE site_id = %s", (s["id"],)).fetchone()[0]
+            "SELECT COUNT(*) FROM chemicals WHERE site_id = %s AND org_id = %s",
+            (s["id"], org_id)).fetchone()[0]
 
         # composite: incidents + observations weighted, minus completed inspections
         score = incident_count * 3 + observation_count * 2 + inspection_count * 2 + ca_count
@@ -63,8 +68,8 @@ def site_benchmark(db, org_id: int | None = None) -> list[dict]:
     return out
 
 
-def benchmark_summary(db) -> dict:
-    rows = site_benchmark(db)
+def benchmark_summary(db, org_id: int | None = None) -> dict:
+    rows = site_benchmark(db, org_id)
     return {
         "sites": rows,
         "total_sites": len(rows),
