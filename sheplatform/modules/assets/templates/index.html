@@ -1,0 +1,61 @@
+{% extends "base_shell.html" %}
+{% block title %}Assets - EcoAegis{% endblock %}
+{% block content %}
+<h1>Asset Register</h1>
+<div class="login-sub" style="color:var(--muted);font-size:13px;margin-bottom:16px">
+  Generators, vehicles, and tower equipment. Telemetry (run hours, fuel level) posted by a field
+  device or gateway script auto-updates usage and raises maintenance when a service interval is due.
+</div>
+
+{% if user.can_assets_manage %}
+<div class="card">
+  <h2>Register asset</h2>
+  <form id="asset-form">
+    <label>Asset reference <input type="text" name="asset_ref" placeholder="e.g. GEN-001" required></label>
+    <label>Name <input type="text" name="name" required></label>
+    <div class="filters">
+      <label>Type
+        <select name="asset_type">
+          <option value="generator">Generator</option>
+          <option value="vehicle">Vehicle</option>
+          <option value="tower_equipment">Tower equipment</option>
+          <option value="other">Other</option>
+        </select>
+      </label>
+      <label>Install date <input type="date" name="install_date"></label>
+      <label>Service interval (run hours) <input type="number" name="service_interval_hours" min="0" step="0.1"></label>
+    </div>
+    <label>Feeds ESG KPI code, optional <input type="text" name="esg_kpi_code" placeholder="e.g. ESG-ENV-05"></label>
+    <button class="btn btn-primary" type="submit">Register</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Telemetry API key</h2>
+  <p style="font-size:13px;color:var(--muted)">Give this to the field device or gateway script. Shown once - it cannot be retrieved again.</p>
+  <form id="api-key-form">
+    <label>Key name <input type="text" name="name" placeholder="e.g. Bulawayo Tower 1 gateway" required></label>
+    <button class="btn btn-sm" type="submit">Create key</button>
+  </form>
+  <div id="api-key-result" style="display:none;margin-top:10px;font-family:var(--mono);font-size:13px;word-break:break-all"></div>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Open maintenance</h2>
+  <table class="data-table" id="maintenance-table">
+    <thead><tr><th>Asset</th><th>Reason</th><th>Raised</th><th></th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>Assets</h2>
+  <table class="data-table" id="asset-table">
+    <thead><tr><th>Ref</th><th>Name</th><th>Type</th><th>Run hours</th><th>Since service</th><th>Status</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script src="/static/js/assets.js"></script>
+{% endblock %}
