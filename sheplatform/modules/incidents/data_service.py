@@ -41,11 +41,18 @@ def create_incident(db, *, title: str, description: str, severity: str,
                     reported_by: int, org_id: int | None = None,
                     latitude: float | None = None, longitude: float | None = None,
                     ai_metadata: dict | None = None,
-                    idempotency_key: str | None = None) -> dict:
+                    idempotency_key: str | None = None,
+                    immediate_actions: str = "", estimated_cost: float | None = None,
+                    witnesses: list | None = None) -> dict:
     """Create an incident. Sets statutory_deadline = reported_at + 48h for critical (BRN-002).
 
     If idempotency_key is provided and already exists, returns the existing record
     with no side effects (safe for offline replay).
+
+    B5: immediate_actions/estimated_cost/witnesses are the incident-level intake
+    depth fields (1:1 with the incident). Injured-person detail is 1:many and
+    lives in incident_injuries via add_injury(), added after create since it
+    needs the new incident's id.
     """
     import json
     if idempotency_key:
@@ -59,13 +66,16 @@ def create_incident(db, *, title: str, description: str, severity: str,
     if severity == "critical":
         statutory_deadline = (reported_at + timedelta(hours=48)).isoformat()
     ai_metadata_json = json.dumps(ai_metadata) if ai_metadata else "{}"
+    witnesses_json = json.dumps(witnesses) if witnesses else "[]"
 
     db.execute(
         "INSERT INTO incidents (incident_ref, idempotency_key, title, description, severity, incident_type, "
         "location, latitude, longitude, occurred_at, reported_at, reported_by, org_id, "
-        "statutory_deadline, ai_metadata) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+        "statutory_deadline, ai_metadata, immediate_actions, estimated_cost, witnesses) "
+        "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
         (ref, idempotency_key, title, description, severity, incident_type, location, latitude, longitude,
-         occurred_at, reported_at.isoformat(), reported_by, org_id, statutory_deadline, ai_metadata_json),
+         occurred_at, reported_at.isoformat(), reported_by, org_id, statutory_deadline, ai_metadata_json,
+         immediate_actions or None, estimated_cost, witnesses_json),
     )
     db.commit()
     row = db.execute("SELECT * FROM incidents WHERE incident_ref = %s", (ref,)).fetchone()
@@ -138,6 +148,118 @@ def get_timeline(db, incident_id: int) -> list[dict]:
         "SELECT * FROM incident_timeline WHERE incident_id = %s ORDER BY id", (incident_id,)
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+# ---- B5: incident intake depth (injured-person detail, LTIFR) ----
+
+def add_injury(db, incident_id: int, *, injured_name: str = "",
+               injured_type: str = "employee", body_part: str = "",
+               injury_type: str = "", lost_time_days: int = 0,
+               medical_treatment: str = "", created_by: int | None = None,
+               org_id: int | None = None) -> dict:
+    """Record an injured person against an incident. One incident can have
+    several (e.g. one event injuring multiple workers), hence a child table
+    rather than columns on incidents. org_id is denormalised onto the row so
+    LTIFR (get_ltifr_stats) never needs to join back to incidents.
+
+    Does not re-check the incident's org here, matching this file's existing
+    convention (get_timeline, assign_team, etc. all trust the caller already
+    resolved and org-checked the incident, e.g. via api_detail's guard); the
+    tenant boundary for this data lives at the route layer.
+    """
+    incident = get_incident(db, incident_id)
+    if incident is None:
+        return {"ok": False, "message": "incident not found"}
+    db.execute(
+        "INSERT INTO incident_injuries (incident_id, injured_name, injured_type, body_part, "
+        "injury_type, lost_time_days, medical_treatment, org_id, created_by) "
+        "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+        (incident_id, injured_name or None, injured_type, body_part or None, injury_type or None,
+         lost_time_days or 0, medical_treatment or None,
+         org_id or incident.get("org_id"), created_by))
+    db.commit()
+    row = db.execute(
+        "SELECT * FROM incident_injuries WHERE incident_id = %s ORDER BY id DESC LIMIT 1",
+        (incident_id,)).fetchone()
+    note = f"Injury recorded: {injured_name or 'unnamed'} ({body_part or 'unspecified'})"
+    if lost_time_days:
+        note += f", {lost_time_days} lost-time day(s)"
+    _add_timeline(db, incident_id, note, "injury", created_by)
+    return {"ok": True, "injury": dict(row)}
+
+
+def list_injuries(db, incident_id: int) -> list[dict]:
+    rows = db.execute(
+        "SELECT * FROM incident_injuries WHERE incident_id = %s ORDER BY id", (incident_id,)
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_ltifr_stats(db, org_id: int | None, period_start: str | None = None,
+                    period_end: str | None = None) -> dict:
+    """Lost Time Injury Frequency Rate: (lost-time injuries x 1,000,000) /
+    hours worked. This is the ISO 45001 / international-standard million-hour
+    base, NOT the US OSHA 200,000-hour TRIR base (verified against current
+    sources; Zimbabwe/NSSA and the rest of the world outside the US follow the
+    million-hour convention).
+
+    hours_worked is read from organisations.settings.annual_exposure_hours
+    (see api_set_exposure_hours). If it has never been configured, the real
+    counts are still returned but ltifr is None rather than a fabricated rate
+    (guide Section 7 rule 1: never invent a figure the data does not support).
+
+    Defaults to a trailing 12-month window when no period is given, which is
+    the conventional LTIFR reporting window; callers building a report for a
+    specific statutory period pass period_start/period_end explicitly.
+    """
+    if not org_id:
+        return {"lost_time_injuries": 0, "total_lost_days": 0, "hours_worked": None,
+                "ltifr": None, "period_start": period_start, "period_end": period_end}
+    if not period_start:
+        period_start = (datetime.now(timezone.utc) - timedelta(days=365)).isoformat()
+    if not period_end:
+        period_end = datetime.now(timezone.utc).isoformat()
+
+    row = db.execute(
+        "SELECT COUNT(*) AS n, COALESCE(SUM(lost_time_days), 0) AS total_days "
+        "FROM incident_injuries WHERE org_id = %s AND lost_time_days > 0 "
+        "AND created_at >= %s AND created_at <= %s",
+        (org_id, period_start, period_end)).fetchone()
+    lti_count = row["n"] if row else 0
+    total_days = row["total_days"] if row else 0
+
+    org_row = db.execute("SELECT settings FROM organisations WHERE id = %s", (org_id,)).fetchone()
+    org_settings = json.loads(org_row["settings"] or "{}") if org_row else {}
+    hours_worked = org_settings.get("annual_exposure_hours")
+
+    ltifr = None
+    if hours_worked:
+        ltifr = round((lti_count * 1_000_000) / float(hours_worked), 2)
+
+    return {
+        "lost_time_injuries": lti_count,
+        "total_lost_days": total_days,
+        "hours_worked": hours_worked,
+        "ltifr": ltifr,
+        "period_start": period_start,
+        "period_end": period_end,
+    }
+
+
+def set_exposure_hours(db, org_id: int, annual_exposure_hours: float) -> dict:
+    """Configure the LTIFR denominator for an org. Stored on the existing
+    organisations.settings JSONB column rather than a new table/column: it is
+    a single admin-set number, not a growing dataset.
+    """
+    row = db.execute("SELECT settings FROM organisations WHERE id = %s", (org_id,)).fetchone()
+    if row is None:
+        return {"ok": False, "message": "organisation not found"}
+    org_settings = json.loads(row["settings"] or "{}")
+    org_settings["annual_exposure_hours"] = annual_exposure_hours
+    db.execute("UPDATE organisations SET settings = %s WHERE id = %s",
+              (json.dumps(org_settings), org_id))
+    db.commit()
+    return {"ok": True, "annual_exposure_hours": annual_exposure_hours}
 
 
 def assign_team(db, incident_id: int, user_ids: list[int], by_user: int) -> dict:

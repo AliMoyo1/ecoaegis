@@ -166,6 +166,9 @@ SCHEMA = [
         closed_by       INTEGER REFERENCES users(id),
         org_id          INTEGER REFERENCES organisations(id),
         ai_metadata     JSONB DEFAULT '{}',
+        immediate_actions TEXT,
+        estimated_cost  NUMERIC,
+        witnesses       JSONB DEFAULT '[]',
         created_by      INTEGER REFERENCES users(id),
         created_at      TIMESTAMPTZ DEFAULT NOW(),
         updated_at      TIMESTAMPTZ DEFAULT NOW()
@@ -178,6 +181,31 @@ SCHEMA = [
     """,
     """
     CREATE INDEX IF NOT EXISTS idx_incidents_org ON incidents(org_id)
+    """,
+    """
+    -- B5: incident intake depth. injured_type/body_part/injury_type are free
+    -- text (not enums) since real-world descriptions vary too much for a
+    -- fixed list to stay useful; org_id is denormalised from the parent
+    -- incident so LTIFR/statutory queries never need a join to filter by
+    -- tenant (guide golden rule 3: fail closed on tenancy).
+    CREATE TABLE IF NOT EXISTS incident_injuries (
+        id              SERIAL PRIMARY KEY,
+        incident_id     INTEGER REFERENCES incidents(id) ON DELETE CASCADE,
+        injured_name    TEXT,
+        injured_type    TEXT CHECK (injured_type IN ('employee','contractor','public','other')),
+        body_part       TEXT,
+        injury_type     TEXT,
+        lost_time_days  INTEGER DEFAULT 0,
+        medical_treatment TEXT,
+        org_id          INTEGER REFERENCES organisations(id),
+        created_by      INTEGER REFERENCES users(id),
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+    )""",
+    """
+    CREATE INDEX IF NOT EXISTS idx_incident_injuries_incident ON incident_injuries(incident_id)
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_incident_injuries_org ON incident_injuries(org_id)
     """,
     """
     -- FTS5 for similar-incident retrieval (A4). In PostgreSQL we use a regular

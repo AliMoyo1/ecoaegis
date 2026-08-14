@@ -42,8 +42,8 @@ def seed_templates(db) -> None:
                 {"name": "time_of_accident", "label": "Time of Accident", "source": "incident.occurred_at", "type": "time"},
                 {"name": "location", "label": "Location", "source": "incident.location", "type": "text"},
                 {"name": "description", "label": "Description", "source": "incident.description", "type": "textarea"},
-                {"name": "injured_persons", "label": "Injured Persons", "source": "static", "static": "To be confirmed", "type": "text"},
-                {"name": "immediate_action", "label": "Immediate Action Taken", "source": "incident.immediate_cause", "type": "textarea"},
+                {"name": "injured_persons", "label": "Injured Persons", "source": "injuries.summary", "type": "text"},
+                {"name": "immediate_action", "label": "Immediate Action Taken", "source": "incident.immediate_actions", "type": "textarea"},
             ],
             "default_content": {"authority_code": "NSSA", "form": "Accident Notification Form"},
         },
@@ -173,6 +173,26 @@ def _resolve_field(db, field: dict, org: dict, incident: dict | None,
         return incident.get("description", "") if incident else ""
     if source == "incident.immediate_cause":
         return incident.get("immediate_cause", "") if incident else ""
+    if source == "incident.immediate_actions":
+        return incident.get("immediate_actions", "") if incident else ""
+    if source == "injuries.summary":
+        # B5: real injury detail instead of a static "To be confirmed" placeholder.
+        if not incident:
+            return "No incident on record for this period"
+        rows = db.execute(
+            "SELECT injured_name, injured_type, body_part, lost_time_days "
+            "FROM incident_injuries WHERE incident_id = %s ORDER BY id", (incident["id"],)
+        ).fetchall()
+        if not rows:
+            return "No injuries recorded"
+        parts = []
+        for r in rows:
+            name = r["injured_name"] or f"1 {r['injured_type']}"
+            desc = f"{name} ({r['body_part'] or 'unspecified injury'})"
+            if r["lost_time_days"]:
+                desc += f", {r['lost_time_days']} lost-time day(s)"
+            parts.append(desc)
+        return "; ".join(parts)
     if source == "period.label":
         return period_start[:7] if len(period_start) >= 7 else period_start
     if source.startswith("esg."):

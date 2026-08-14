@@ -52,6 +52,15 @@
     <span class="kpi-value">{{ stats.ca_closure_rate }}%</span>
     <span class="kpi-label">CA Closure Rate</span>
   </a>
+  <a href="/incidents" class="kpi-card kpi-link" title="Trailing 12 months. Lost time injuries per 1,000,000 hours worked (ISO 45001).">
+    {% if stats.ltifr.ltifr is not none %}
+    <span class="kpi-value">{{ stats.ltifr.ltifr }}</span>
+    <span class="kpi-label">LTIFR (per 1M hrs)</span>
+    {% else %}
+    <span class="kpi-value">{{ stats.ltifr.lost_time_injuries }}</span>
+    <span class="kpi-label">Lost-Time Injuries (set exposure hours for a rate)</span>
+    {% endif %}
+  </a>
   <a href="/esg" class="kpi-card kpi-link">
     <span class="kpi-value">{{ stats.unread }}</span>
     <span class="kpi-label">Unread Notifications</span>

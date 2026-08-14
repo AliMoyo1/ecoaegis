@@ -37,6 +37,28 @@
       </select>
     </label>
     <label>Location <input type="text" name="location"></label>
+
+    <fieldset id="injury-fields" style="display:none;border:1px solid var(--border,#ddd);border-radius:6px;padding:12px;margin:12px 0">
+      <legend style="font-size:13px;font-weight:600">Injury detail</legend>
+      <label>Injured person's name <input type="text" name="injured_name"></label>
+      <label>Injured person type
+        <select name="injured_type">
+          <option value="employee">Employee</option>
+          <option value="contractor">Contractor</option>
+          <option value="public">Member of the public</option>
+          <option value="other">Other</option>
+        </select>
+      </label>
+      <label>Body part affected <input type="text" name="body_part" placeholder="e.g. left ankle"></label>
+      <label>Injury type <input type="text" name="injury_type" placeholder="e.g. sprain, laceration, fracture"></label>
+      <label>Lost time (days) <input type="number" name="lost_time_days" min="0" value="0"></label>
+      <label>Medical treatment given <input type="text" name="medical_treatment"></label>
+    </fieldset>
+
+    <label>Immediate actions taken <textarea name="immediate_actions" rows="2" placeholder="e.g. area cordoned off, injured person taken to clinic"></textarea></label>
+    <label>Witnesses (comma-separated names) <input type="text" name="witnesses_text"></label>
+    <label>Estimated cost, optional <input type="number" name="estimated_cost" min="0" step="0.01"></label>
+
     <button class="btn btn-primary" type="submit">Report incident</button>
   </form>
 </div>

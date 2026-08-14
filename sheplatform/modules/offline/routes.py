@@ -63,6 +63,11 @@ def _apply_item(db, item: dict, user_id: int, org_id: int | None) -> dict:
     if not isinstance(data, dict):
         return {"ok": False, "type": item_type, "message": "data must be an object"}
 
+    # B5: an incident queued offline may carry an injury alongside it. Pop it
+    # before spreading data into create_incident(), which has no injury kwarg;
+    # the injury is applied separately once the incident (and its id) exists.
+    injury_data = data.pop("injury", None) if item_type == "incident" else None
+
     data.setdefault("reported_by", user_id)
     if org_id and not data.get("org_id"):
         data["org_id"] = org_id
@@ -72,12 +77,22 @@ def _apply_item(db, item: dict, user_id: int, org_id: int | None) -> dict:
 
     try:
         record = handler(db, **data)
-        return {
+        result = {
             "ok": True,
             "type": item_type,
             "id": record.get("id"),
             "ref": record.get("incident_ref") or record.get("obs_ref"),
             "idempotent": record.get("_idempotent", False),
         }
+        # Only add the injury on first-time creation. create_incident() already
+        # dedupes the incident itself on idempotency_key, but add_injury() has
+        # no dedup of its own, so a retried sync of the same queued item would
+        # otherwise record the same injury (and inflate LTIFR) a second time.
+        if injury_data and record.get("id") and not record.get("_idempotent"):
+            from sheplatform.modules.incidents.data_service import add_injury
+            injury_result = add_injury(
+                db, record["id"], created_by=user_id, org_id=org_id, **injury_data)
+            result["injury"] = injury_result
+        return result
     except Exception as exc:
         return {"ok": False, "type": item_type, "message": str(exc)}

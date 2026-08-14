@@ -1,6 +1,7 @@
 """SHEIMI - Incident routes (guide 8). SPA shell + JSON API."""
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Form, Request
@@ -51,7 +52,10 @@ async def api_create(request: Request,
                      occurred_at: str = Form(""),
                      location: str = Form(""),
                      ai_classify: str = Form(""),
-                     accept_ai: str = Form("")):
+                     accept_ai: str = Form(""),
+                     immediate_actions: str = Form(""),
+                     estimated_cost: str = Form(""),
+                     witnesses_json: str = Form("")):
     from sheplatform.modules.ai import service as ai_service
     db = get_db()
     try:
@@ -71,11 +75,26 @@ async def api_create(request: Request,
             return JSONResponse({"ok": False, "message": "invalid incident_type"}, status_code=400)
         occurred_at = occurred_at or datetime.now(timezone.utc).isoformat()
         ai_metadata = {"suggestion": suggestion} if suggestion else None
+
+        cost = None
+        if estimated_cost:
+            try:
+                cost = float(estimated_cost)
+            except ValueError:
+                return JSONResponse({"ok": False, "message": "estimated_cost must be a number"}, status_code=400)
+        witnesses = []
+        if witnesses_json:
+            try:
+                witnesses = json.loads(witnesses_json)
+            except ValueError:
+                return JSONResponse({"ok": False, "message": "witnesses_json must be valid JSON"}, status_code=400)
+
         incident = data_service.create_incident(
             db, title=title, description=description, severity=severity,
             incident_type=incident_type, occurred_at=occurred_at,
             location=location, reported_by=request.state.user["id"],
-            org_id=request.state.user.get("org_id"), ai_metadata=ai_metadata)
+            org_id=request.state.user.get("org_id"), ai_metadata=ai_metadata,
+            immediate_actions=immediate_actions, estimated_cost=cost, witnesses=witnesses)
         log_audit(db, request.state.user["id"], request.state.user.get("org_id"),
                   "incident.create", "incidents", incident["id"],
                   new_value={"ref": incident["incident_ref"], "severity": severity,
@@ -98,6 +117,7 @@ async def api_detail(request: Request, incident_id: int):
         if org_id and incident.get("org_id") and incident["org_id"] != org_id:
             return JSONResponse({"ok": False, "message": "not found"}, status_code=404)
         incident["timeline"] = data_service.get_timeline(db, incident_id)
+        incident["injuries"] = data_service.list_injuries(db, incident_id)
         return JSONResponse({"incident": incident})
     finally:
         db.close()
@@ -198,6 +218,83 @@ async def api_statutory(request: Request, incident_id: int, body: str = Form(...
     db = get_db()
     try:
         result = data_service.set_statutory_notified(db, incident_id, body)
+        return JSONResponse(result)
+    finally:
+        db.close()
+
+
+# ---- B5: incident intake depth ----
+
+@router.post("/api/{incident_id}/injuries")
+@require_auth
+@require_capability("module.incidents.access")
+async def api_add_injury(request: Request, incident_id: int,
+                         injured_name: str = Form(""),
+                         injured_type: str = Form("employee"),
+                         body_part: str = Form(""),
+                         injury_type: str = Form(""),
+                         lost_time_days: str = Form("0"),
+                         medical_treatment: str = Form("")):
+    db = get_db()
+    try:
+        # Same org guard as api_detail: an injury can only be added to an
+        # incident the caller's own org can see.
+        incident = data_service.get_incident(db, incident_id)
+        if incident is None:
+            return JSONResponse({"ok": False, "message": "incident not found"}, status_code=404)
+        org_id = request.state.user.get("org_id")
+        if org_id and incident.get("org_id") and incident["org_id"] != org_id:
+            return JSONResponse({"ok": False, "message": "incident not found"}, status_code=404)
+        if injured_type not in ("employee", "contractor", "public", "other"):
+            return JSONResponse({"ok": False, "message": "invalid injured_type"}, status_code=400)
+        try:
+            days = int(lost_time_days or 0)
+        except ValueError:
+            return JSONResponse({"ok": False, "message": "lost_time_days must be a number"}, status_code=400)
+
+        result = data_service.add_injury(
+            db, incident_id, injured_name=injured_name, injured_type=injured_type,
+            body_part=body_part, injury_type=injury_type, lost_time_days=days,
+            medical_treatment=medical_treatment, created_by=request.state.user["id"],
+            org_id=org_id)
+        if not result["ok"]:
+            return JSONResponse(result, status_code=404)
+        return JSONResponse(result, status_code=201)
+    finally:
+        db.close()
+
+
+@router.get("/api/settings/exposure-hours")
+@require_auth
+@require_capability("module.settings.access")
+async def api_get_exposure_hours(request: Request):
+    """The LTIFR denominator (organisations.settings.annual_exposure_hours)."""
+    db = get_db()
+    try:
+        stats = data_service.get_ltifr_stats(db, request.state.user.get("org_id"))
+        return JSONResponse({"ok": True, "hours_worked": stats["hours_worked"]})
+    finally:
+        db.close()
+
+
+@router.post("/api/settings/exposure-hours")
+@require_auth
+@require_capability("module.settings.access")
+async def api_set_exposure_hours(request: Request, annual_exposure_hours: str = Form(...)):
+    db = get_db()
+    try:
+        org_id = request.state.user.get("org_id")
+        if not org_id:
+            return JSONResponse({"ok": False, "message": "no organisation"}, status_code=400)
+        try:
+            hours = float(annual_exposure_hours)
+        except ValueError:
+            return JSONResponse({"ok": False, "message": "must be a number"}, status_code=400)
+        if hours <= 0:
+            return JSONResponse({"ok": False, "message": "must be positive"}, status_code=400)
+        result = data_service.set_exposure_hours(db, org_id, hours)
+        log_audit(db, request.state.user["id"], org_id, "settings.exposure_hours",
+                  "organisations", org_id, new_value={"annual_exposure_hours": hours})
         return JSONResponse(result)
     finally:
         db.close()
