@@ -1,23 +1,23 @@
-"""Statutory report assembly tests (B4)."""
+"""Statutory report assembly tests (B4).
+
+Uses the `client` fixture from conftest_http.py, which sets up a fresh temp DB,
+runs init_db() via the app startup event, and seeds a 'Test Org'. The previous
+version created a module-level TestClient(app) with no context manager, so the
+startup event never fired and the schema was never created ("no such table:
+organisations"); these tests therefore never actually exercised the feature.
+"""
 from __future__ import annotations
 
 import json
 
-from fastapi.testclient import TestClient
-
 from sheplatform.core.auth import hash_password
 from sheplatform.database import get_db
-from sheplatform.main import app
-
-client = TestClient(app)
 
 
-def _seed_user_org(role_key="she_manager"):
+def _seed_user(role_key="she_manager"):
+    """Add the test user to the org the client fixture already seeded."""
     db = get_db()
     try:
-        existing = db.execute("SELECT id FROM organisations WHERE slug = %s", ("test-org",)).fetchone()
-        if not existing:
-            db.execute("INSERT INTO organisations (name, slug) VALUES ('Test Org', 'test-org')")
         org = db.execute("SELECT id FROM organisations WHERE slug = %s", ("test-org",)).fetchone()
         existing = db.execute("SELECT id FROM users WHERE email = %s", ("sr_user@example.com",)).fetchone()
         if existing:
@@ -33,8 +33,8 @@ def _seed_user_org(role_key="she_manager"):
         db.close()
 
 
-def _login_with_csrf():
-    _seed_user_org()
+def _login(client, role_key="she_manager"):
+    _seed_user(role_key)
     client.get("/login")
     csrf = client.cookies.get("she_csrf") or ""
     client.post("/login", data={"email": "sr_user@example.com", "password": "Password123!"},
@@ -42,8 +42,8 @@ def _login_with_csrf():
     return client.cookies.get("she_csrf") or ""
 
 
-def test_templates_seeded():
-    csrf = _login_with_csrf()
+def test_templates_seeded(client):
+    csrf = _login(client)
     r = client.get("/statutory-reports/api/templates", headers={"X-CSRF-Token": csrf})
     assert r.status_code == 200
     data = r.json()
@@ -52,8 +52,8 @@ def test_templates_seeded():
     assert "ema_environmental_monthly" in keys
 
 
-def test_create_report_autofills():
-    csrf = _login_with_csrf()
+def test_create_report_autofills(client):
+    csrf = _login(client)
     db = get_db()
     try:
         org = db.execute("SELECT id FROM organisations WHERE slug = %s", ("test-org",)).fetchone()
@@ -77,8 +77,8 @@ def test_create_report_autofills():
     assert data["data"]["incident_ref"] == "INC-2026-999"
 
 
-def test_update_and_lock():
-    csrf = _login_with_csrf()
+def test_update_and_lock(client):
+    csrf = _login(client)
     r = client.post("/statutory-reports/api/reports", data={
         "template_key": "ema_environmental_monthly",
         "period_start": "2026-08-01",
@@ -98,8 +98,8 @@ def test_update_and_lock():
     assert r4.json()["error"] == "report_locked"
 
 
-def test_submit_report():
-    csrf = _login_with_csrf()
+def test_submit_report(client):
+    csrf = _login(client)
     r = client.post("/statutory-reports/api/reports", data={
         "template_key": "zrp_monthly",
         "period_start": "2026-08-01",
@@ -113,8 +113,8 @@ def test_submit_report():
     assert r3.json()["report"]["status"] == "submitted"
 
 
-def test_export_json_and_text():
-    csrf = _login_with_csrf()
+def test_export_json_and_text(client):
+    csrf = _login(client)
     r = client.post("/statutory-reports/api/reports", data={
         "template_key": "ema_environmental_monthly",
         "period_start": "2026-08-01",

@@ -89,3 +89,35 @@ def test_sql_chat_unknown_template_falls_back(ai_user_client):
     assert data["ok"]
     assert "answer" in data
     assert data["rows"] == []
+
+
+def test_sql_chat_ignores_model_supplied_org(ai_user_client):
+    """Regression (tenant isolation): the model must not be able to choose the
+    tenant. Even if it returns params pointing at another org, the query stays
+    scoped to the caller's own org_id, which is injected server-side. Before the
+    fix, a model-supplied params list of [other_org] queried that org's data.
+    """
+    db = get_db()
+    try:
+        db.execute("INSERT INTO organisations (name, slug) VALUES ('Other Org', 'other-org')")
+        other = db.execute("SELECT id FROM organisations WHERE slug = 'other-org'").fetchone()["id"]
+        data_service.create_incident(
+            db, title="SECRET other-org incident", description="must never leak",
+            severity="critical", incident_type="accident",
+            occurred_at="2026-08-03T09:00:00+00:00", location="Other site",
+            reported_by=1, org_id=other)
+        db.commit()
+    finally:
+        db.close()
+    # The model tries to inject the other org via params; the fix ignores it.
+    mock = AsyncMock(return_value=f'{{"template_id":"recent_incidents","params":[{other}]}}')
+    with patch("sheplatform.modules.ai.service.ask_ai", new=mock):
+        resp = ai_user_client.post(
+            "/ai/api/sql-chat",
+            data={"question": "show the other organisation's incidents"},
+            headers=csrf_header(ai_user_client))
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"]
+    titles = {r["title"] for r in data["rows"]}
+    assert "SECRET other-org incident" not in titles  # tenant isolation held

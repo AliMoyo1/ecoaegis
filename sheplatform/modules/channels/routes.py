@@ -5,8 +5,9 @@ report hazards without logging into the web UI.
 """
 from __future__ import annotations
 
+import base64
 import hmac
-from hashlib import sha256
+from hashlib import sha1, sha256
 
 import httpx
 from fastapi import APIRouter, Form, HTTPException, Request
@@ -89,7 +90,13 @@ async def whatsapp_webhook(request: Request):
     """Receive WhatsApp messages (text + images) and turn them into observations."""
     body = await request.body()
     signature = request.headers.get("X-Hub-Signature-256", "")
-    if settings.WHATSAPP_APP_SECRET:
+    # Fail closed: an unconfigured secret must NOT mean "accept anything". In
+    # production a missing secret is a misconfiguration, so reject. In DEBUG
+    # (local dev with no Meta app) we allow through so the flow can be exercised.
+    if not settings.WHATSAPP_APP_SECRET:
+        if not settings.DEBUG:
+            raise HTTPException(status_code=503, detail="WhatsApp channel not configured")
+    else:
         expected = hmac.new(
             settings.WHATSAPP_APP_SECRET.encode(), body, sha256).hexdigest()
         if not signature.startswith("sha256=") or not hmac.compare_digest(
@@ -134,7 +141,12 @@ async def twilio_sms(
     # Twilio does not send signatures by default for plain HTTP webhooks;
     # validate X-Twilio-Signature if TWILIO_AUTH_TOKEN is set.
     signature = request.headers.get("X-Twilio-Signature", "")
-    if settings.TWILIO_AUTH_TOKEN:
+    # Fail closed, same as the WhatsApp webhook: an unset token must not disable
+    # verification in production.
+    if not settings.TWILIO_AUTH_TOKEN:
+        if not settings.DEBUG:
+            raise HTTPException(status_code=503, detail="SMS channel not configured")
+    else:
         url = str(request.url)
         params = dict(await request.form())
         expected = _twilio_signature(url, params, settings.TWILIO_AUTH_TOKEN)
@@ -151,7 +163,14 @@ async def twilio_sms(
 
 
 def _twilio_signature(url: str, params: dict, auth_token: str) -> str:
-    """Compute Twilio request signature."""
-    sorted_params = "".join(f"{k}{v}" for k, v in sorted(params.items()))
+    """Compute Twilio's X-Twilio-Signature.
+
+    Twilio signs with HMAC-SHA1 then base64, NOT SHA-256/hex: the signature is
+    base64(HMAC-SHA1(auth_token, url + concat(sorted key+value pairs))).
+    Note: `url` must be the exact public URL Twilio called; behind a reverse
+    proxy honour X-Forwarded-Proto/Host or the signature will not match.
+    """
+    sorted_params = "".join(f"{k}{params[k]}" for k in sorted(params))
     payload = url + sorted_params
-    return hmac.new(auth_token.encode(), payload.encode(), sha256).hexdigest()
+    digest = hmac.new(auth_token.encode(), payload.encode("utf-8"), sha1).digest()
+    return base64.b64encode(digest).decode()
