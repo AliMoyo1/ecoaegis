@@ -37,6 +37,12 @@
       </select>
     </label>
     <label>Location <input type="text" name="location"></label>
+    <div style="margin:-6px 0 12px">
+      <button class="btn btn-sm" type="button" id="geolocate-btn">Capture my location</button>
+      <span id="geolocate-status" style="color:var(--muted);font-size:13px;margin-left:8px"></span>
+      <input type="hidden" name="latitude">
+      <input type="hidden" name="longitude">
+    </div>
 
     <fieldset id="injury-fields" style="display:none;border:1px solid var(--border,#ddd);border-radius:6px;padding:12px;margin:12px 0">
       <legend style="font-size:13px;font-weight:600">Injury detail</legend>

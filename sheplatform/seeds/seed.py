@@ -48,8 +48,8 @@ def seed() -> None:
         ]
         for code, name, city, stype in sites:
             db.execute(
-                "INSERT OR IGNORE INTO sites (site_code, site_name, city, site_type) "
-                "VALUES (%s, %s, %s, %s)", (code, name, city, stype))
+                "INSERT OR IGNORE INTO sites (site_code, site_name, city, site_type, org_id) "
+                "VALUES (%s, %s, %s, %s, %s)", (code, name, city, stype, org_id))
         db.commit()
         print("Seeded organisation + users (password for all: ChangeMe!123)")
     finally:

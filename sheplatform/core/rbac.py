@@ -19,6 +19,7 @@ ROLES = {
 CAPABILITIES = {
     # Module access
     "module.dashboard.access": {"super_admin", "she_manager", "she_hod", "she_officer", "she_champion", "cro", "coo", "ceo", "board_chair", "line_manager"},
+    "module.map.access": {"super_admin", "she_manager", "she_hod", "she_officer", "she_champion", "cro", "coo", "ceo", "board_chair", "line_manager"},
     "module.incidents.access": {"super_admin", "she_manager", "she_officer", "she_champion", "cro", "line_manager", "employee"},
     "module.risk_register.access": {"super_admin", "she_manager", "she_officer", "cro", "coo", "ceo", "board_chair"},
     "module.risk_register.write": {"super_admin", "she_manager", "she_officer"},

@@ -94,8 +94,29 @@ function resetIncidentForm(form) {
   form.reset();
   currentSuggestion = null;
   document.getElementById("ai-suggestion-card").style.display = "none";
+  document.getElementById("geolocate-status").textContent = "";
   toggleInjuryFields();
 }
+
+// C1: populate the hidden lat/long inputs so the incident can be plotted on
+// the map. Best-effort - a missing/denied location must not block reporting.
+document.getElementById("geolocate-btn").addEventListener("click", () => {
+  const status = document.getElementById("geolocate-status");
+  if (!navigator.geolocation) {
+    status.textContent = "Geolocation not supported on this device";
+    return;
+  }
+  status.textContent = "Locating...";
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      document.querySelector("[name='latitude']").value = pos.coords.latitude;
+      document.querySelector("[name='longitude']").value = pos.coords.longitude;
+      status.textContent = `Captured (${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)})`;
+    },
+    () => { status.textContent = "Could not get location"; },
+    { timeout: 10000 }
+  );
+});
 
 document.getElementById("incident-form").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -131,6 +152,8 @@ document.getElementById("incident-form").addEventListener("submit", async (e) =>
       immediate_actions: body.get("immediate_actions") || "",
       estimated_cost: cost,
       witnesses: witnesses,
+      latitude: body.get("latitude") ? parseFloat(body.get("latitude")) : null,
+      longitude: body.get("longitude") ? parseFloat(body.get("longitude")) : null,
     };
     if (injuryData) data.injury = injuryData;
     await OfflineQueue.enqueue({ type: "incident", idempotencyKey: key, data });

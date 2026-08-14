@@ -74,6 +74,7 @@ from sheplatform.modules.channels.routes import router as channels_router
 from sheplatform.modules.offline.routes import router as offline_router
 from sheplatform.modules.statutory_reporting.routes import router as statutory_router
 from sheplatform.modules.external_integration.routes import router as external_integration_router
+from sheplatform.modules.map.routes import router as map_router
 
 app.include_router(auth_router)
 app.include_router(admin_router)
@@ -108,6 +109,7 @@ app.include_router(mfa_router)
 app.include_router(channels_router)
 app.include_router(statutory_router)
 app.include_router(external_integration_router)
+app.include_router(map_router)
 
 
 # ---- Background schedulers (guide 22; single-worker mode) ----
