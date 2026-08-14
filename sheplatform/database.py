@@ -1116,6 +1116,32 @@ SCHEMA = [
         org_id          INTEGER REFERENCES organisations(id),
         created_at      TIMESTAMPTZ DEFAULT NOW()
     )""",
+    # ---- Lone worker / man-down (guide C2) ----
+    """
+    CREATE TABLE IF NOT EXISTS lone_worker_checkins (
+        id                          SERIAL PRIMARY KEY,
+        session_ref                 TEXT UNIQUE NOT NULL,
+        worker_id                   INTEGER REFERENCES users(id),
+        expected_duration_minutes   INTEGER NOT NULL,
+        location                    TEXT,
+        latitude                    NUMERIC,
+        longitude                   NUMERIC,
+        nominated_contact_name      TEXT,
+        nominated_contact_phone     TEXT,
+        started_at                  TIMESTAMPTZ DEFAULT NOW(),
+        expected_checkin_at         TIMESTAMPTZ NOT NULL,
+        last_checkin_at             TIMESTAMPTZ,
+        status                      TEXT DEFAULT 'active' CHECK (status IN ('active','checked_in','escalated','cancelled')),
+        escalated_at                TIMESTAMPTZ,
+        org_id                      INTEGER REFERENCES organisations(id),
+        created_at                  TIMESTAMPTZ DEFAULT NOW()
+    )""",
+    """
+    CREATE INDEX IF NOT EXISTS idx_lone_worker_checkins_org ON lone_worker_checkins(org_id)
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_lone_worker_checkins_status ON lone_worker_checkins(status, expected_checkin_at)
+    """,
     """
     CREATE TABLE IF NOT EXISTS observations (
         id              SERIAL PRIMARY KEY,

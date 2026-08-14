@@ -1,0 +1,44 @@
+{% extends "base_shell.html" %}
+{% block title %}Lone Worker - EcoAegis{% endblock %}
+{% block content %}
+<h1 id="lw-root" data-user-id="{{ user.id }}">Lone Worker Check-in</h1>
+<div class="login-sub" style="color:var(--muted);font-size:13px;margin-bottom:16px">
+  Working alone at a remote site? Start a check-in. If you don't check back in by the
+  deadline, your SHE Manager and nominated contact are alerted with your last known location.
+</div>
+
+<div class="card" id="active-session-card" style="display:none">
+  <h2>Your active check-in</h2>
+  <div id="active-session-body" style="font-size:14px;margin-bottom:12px"></div>
+  <button class="btn btn-primary" type="button" id="checkin-btn">I'm safe - check in</button>
+  <button class="btn btn-sm" type="button" id="extend-btn">Need more time (+30 min)</button>
+  <button class="btn btn-sm" type="button" id="cancel-btn">Cancel session</button>
+</div>
+
+<div class="card" id="start-session-card">
+  <h2>Start a check-in</h2>
+  <form id="checkin-form">
+    <label>Expected duration (minutes) <input type="number" name="expected_duration_minutes" min="1" max="1440" value="60" required></label>
+    <label>Location <input type="text" name="location" placeholder="e.g. Bulawayo Tower 1"></label>
+    <div style="margin:-6px 0 12px">
+      <button class="btn btn-sm" type="button" id="geolocate-btn">Capture my location</button>
+      <span id="geolocate-status" style="color:var(--muted);font-size:13px;margin-left:8px"></span>
+      <input type="hidden" name="latitude">
+      <input type="hidden" name="longitude">
+    </div>
+    <label>Nominated contact name <input type="text" name="nominated_contact_name"></label>
+    <label>Nominated contact phone <input type="tel" name="nominated_contact_phone" placeholder="+263..."></label>
+    <button class="btn btn-primary" type="submit">Start check-in</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Active check-ins (all workers)</h2>
+  <table class="data-table" id="sessions-table">
+    <thead><tr><th>Ref</th><th>Location</th><th>Started</th><th>Deadline</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script src="/static/js/lone_worker.js"></script>
+{% endblock %}
