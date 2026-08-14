@@ -243,47 +243,42 @@ async def similar_incidents(description: str, org_id: int | None = None,
 async def safe_sql_chat(question: str, org_id: int | None = None) -> dict:
     """Read-only natural-language query over incidents with allow-list SQL.
 
-    The model is only asked to pick one of a fixed set of safe query templates;
-    parameters are bound separately. No arbitrary SQL is executed.
+    The model only picks one of a fixed set of safe query templates by id; it
+    never supplies SQL or parameters. Every template is parameterised solely by
+    the caller's org_id, which is injected server-side, so tenant isolation can
+    never depend on the model cooperating. No arbitrary SQL is executed.
     """
-    from sheplatform.core.ai_client import ask_ai
-
     templates = [
         {
             "id": "recent_incidents",
             "description": "List recent incidents",
             "sql": "SELECT incident_ref, title, severity, status, occurred_at FROM incidents WHERE org_id = %s ORDER BY id DESC LIMIT 10",
-            "params": [org_id],
         },
         {
             "id": "critical_open",
             "description": "Open critical incidents",
             "sql": "SELECT incident_ref, title, reported_at, statutory_deadline FROM incidents WHERE severity = 'critical' AND status != 'closed' AND org_id = %s ORDER BY reported_at DESC LIMIT 10",
-            "params": [org_id],
         },
         {
             "id": "count_by_type",
             "description": "Count incidents by type",
             "sql": "SELECT incident_type, COUNT(*) AS n FROM incidents WHERE org_id = %s GROUP BY incident_type ORDER BY n DESC",
-            "params": [org_id],
         },
         {
             "id": "overdue_actions",
             "description": "Overdue corrective actions",
             "sql": "SELECT action_ref, title, priority, due_date FROM corrective_actions WHERE status IN ('open','in_progress','overdue') AND due_date < datetime('now') AND org_id = %s ORDER BY due_date LIMIT 10",
-            "params": [org_id],
         },
         {
             "id": "recent_observations",
             "description": "Recent hazard observations",
             "sql": "SELECT obs_ref, obs_type, title, severity, status FROM observations WHERE org_id = %s ORDER BY id DESC LIMIT 10",
-            "params": [org_id],
         },
     ]
 
     prompt = (
         "Pick the single best query template for the user's question. "
-        "Return ONLY a JSON object with keys: template_id, params (list). "
+        "Return ONLY a JSON object with key: template_id. "
         "Available templates:\n" +
         "\n".join(f"- {t['id']}: {t['description']}" for t in templates) +
         f"\n\nQuestion: {question}\n\nIf no template matches, return template_id 'none'."
@@ -300,9 +295,10 @@ async def safe_sql_chat(question: str, org_id: int | None = None) -> dict:
         }
     db = get_db()
     try:
-        params = parsed.get("params") or selected["params"]
-        params = [org_id if p is None else p for p in params]
-        rows = db.execute(selected["sql"], params).fetchall()
+        # org_id is always the caller's own, injected here; the model cannot
+        # influence which tenant is queried. A missing org_id binds NULL, which
+        # matches no rows (fail closed).
+        rows = db.execute(selected["sql"], [org_id]).fetchall()
         return {
             "ok": True,
             "template_id": selected["id"],

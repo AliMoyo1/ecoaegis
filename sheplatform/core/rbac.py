@@ -82,10 +82,21 @@ CAPABILITIES = {
 
 
 def get_capa_default_assignee(db, org_id: int | None = None) -> int | None:
-    """Default CAPA assignee: first SHE officer in the org, else any SHE officer."""
-    row = db.execute(
-        "SELECT id FROM users WHERE role_key = 'she_officer' "
-        "AND is_active = TRUE ORDER BY id LIMIT 1").fetchone()
+    """Default CAPA assignee: first active SHE officer IN THE GIVEN ORG.
+
+    Fail closed on tenancy: when an org is supplied, only that org's officers
+    are eligible, so a corrective action can never be auto-assigned to an
+    officer in a different organisation. Returns None if the org has no active
+    officer (callers fall back to the reporting user).
+    """
+    if org_id is not None:
+        row = db.execute(
+            "SELECT id FROM users WHERE role_key = 'she_officer' AND is_active = TRUE "
+            "AND org_id = %s ORDER BY id LIMIT 1", (org_id,)).fetchone()
+    else:
+        row = db.execute(
+            "SELECT id FROM users WHERE role_key = 'she_officer' AND is_active = TRUE "
+            "ORDER BY id LIMIT 1").fetchone()
     return row["id"] if row else None
 
 

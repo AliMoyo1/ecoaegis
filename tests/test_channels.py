@@ -1,6 +1,7 @@
 """Tests for messaging channel webhooks (A5)."""
+import base64
 import hmac
-from hashlib import sha256
+from hashlib import sha1, sha256
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -8,6 +9,12 @@ import pytest
 from sheplatform.config import settings
 from sheplatform.core.auth import hash_password
 from sheplatform.database import get_db
+
+
+def _twilio_sig(url: str, params: dict, token: bytes) -> str:
+    """The real Twilio signature: base64(HMAC-SHA1(url + sorted k+v))."""
+    payload = url + "".join(f"{k}{params[k]}" for k in sorted(params))
+    return base64.b64encode(hmac.new(token, payload.encode("utf-8"), sha1).digest()).decode()
 
 
 @pytest.fixture
@@ -73,8 +80,7 @@ def test_whatsapp_text_message_creates_observation(channel_env):
 def test_twilio_sms_creates_observation(channel_env):
     url = "http://testserver/channels/twilio/sms"
     params = {"Body": "Machine guard missing", "From": "+263783047375", "MediaUrl0": "http://example.com/photo.jpg"}
-    sorted_params = "".join(f"{k}{v}" for k, v in sorted(params.items()))
-    sig = hmac.new(b"twilio-token", (url + sorted_params).encode(), sha256).hexdigest()
+    sig = _twilio_sig(url, params, b"twilio-token")
     with patch("sheplatform.modules.channels.routes._download_image") as mock_dl:
         mock_dl.return_value = b"\xff\xd8\xfffake"
         with patch("sheplatform.modules.channels.routes.classify_photo", new=AsyncMock(return_value={
@@ -103,4 +109,27 @@ def test_twilio_signature_validation(channel_env):
         "/channels/twilio/sms",
         data={"From": "+263783047375", "Body": "Test"},
         headers={"X-Twilio-Signature": "bad"})
+    assert resp.status_code == 403
+
+
+def test_whatsapp_fails_closed_when_secret_unset_in_production(client, monkeypatch):
+    """Regression: an unconfigured app secret must REJECT (not accept) an
+    unsigned webhook POST in production. Previously the verification was skipped
+    entirely when the secret was empty, accepting spoofed reports.
+    """
+    monkeypatch.setattr("sheplatform.config.settings.WHATSAPP_APP_SECRET", "")
+    monkeypatch.setattr("sheplatform.config.settings.DEBUG", False)
+    resp = client.post(
+        "/channels/whatsapp/webhook",
+        content=b'{"entry": []}',
+        headers={"Content-Type": "application/json"})
+    assert resp.status_code == 503
+
+
+def test_whatsapp_rejects_bad_signature(channel_env):
+    """With a secret configured, a wrong signature is rejected."""
+    resp = channel_env.post(
+        "/channels/whatsapp/webhook",
+        content=b'{"entry": []}',
+        headers={"X-Hub-Signature-256": "sha256=deadbeef", "Content-Type": "application/json"})
     assert resp.status_code == 403
