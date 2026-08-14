@@ -67,6 +67,7 @@ class Settings:
     WHATSAPP_APP_SECRET: str = os.getenv("WHATSAPP_APP_SECRET", "")
     TWILIO_ACCOUNT_SID: str = os.getenv("TWILIO_ACCOUNT_SID", "")
     TWILIO_AUTH_TOKEN: str = os.getenv("TWILIO_AUTH_TOKEN", "")
+    TWILIO_FROM_NUMBER: str = os.getenv("TWILIO_FROM_NUMBER", "")
     SMS_DEFAULT_ORG_ID: int = int(os.getenv("SMS_DEFAULT_ORG_ID", "1"))
 
     # Map (guide C1) - full Leaflet XYZ URL template incl. key, e.g. a MapTiler/

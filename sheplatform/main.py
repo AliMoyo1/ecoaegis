@@ -75,6 +75,7 @@ from sheplatform.modules.offline.routes import router as offline_router
 from sheplatform.modules.statutory_reporting.routes import router as statutory_router
 from sheplatform.modules.external_integration.routes import router as external_integration_router
 from sheplatform.modules.map.routes import router as map_router
+from sheplatform.modules.lone_worker.routes import router as lone_worker_router
 
 app.include_router(auth_router)
 app.include_router(admin_router)
@@ -110,6 +111,7 @@ app.include_router(channels_router)
 app.include_router(statutory_router)
 app.include_router(external_integration_router)
 app.include_router(map_router)
+app.include_router(lone_worker_router)
 
 
 # ---- Background schedulers (guide 22; single-worker mode) ----
@@ -121,10 +123,12 @@ async def start_scheduler():
         from sheplatform.modules.vendor_compliance.scheduler import start_scheduler as start_vendor_scheduler
         from sheplatform.modules.reporting.scheduler import start_scheduler as start_report_scheduler
         from sheplatform.modules.chemicals.scheduler import start_scheduler as start_chemicals_scheduler
+        from sheplatform.modules.lone_worker.scheduler import start_scheduler as start_lone_worker_scheduler
         app.state.inc_scheduler = start_inc_scheduler(get_db_background)
         app.state.vendor_scheduler = start_vendor_scheduler(get_db_background)
         app.state.report_scheduler = start_report_scheduler(get_db_background)
         app.state.chemicals_scheduler = start_chemicals_scheduler(get_db_background)
+        app.state.lone_worker_scheduler = start_lone_worker_scheduler(get_db_background)
 
         # ThemisIQ sync queue drainer (spec 11.4: every 5 minutes)
         from sheplatform.modules.integration.themis_sync import drain_queue
