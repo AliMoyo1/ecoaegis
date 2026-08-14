@@ -184,12 +184,21 @@ async def root_cause_assistant(incident_id: int, org_id: int | None = None) -> d
 
 
 async def classify_incident(description: str) -> dict:
-    """AI auto-classification on intake: title, severity, type, summary."""
+    """AI auto-classification on intake: title, severity, type, summary, and
+    (B5) whether an injury is likely so the intake form can pre-open its
+    injury detail section and prefill body part / injury type. This is a
+    suggestion only: the server-side critical->48h deadline rule and every
+    field the user sees remain editable before submission (guide Section 7
+    rule 2 - AI output is a draft, never an auto-commit).
+    """
     prompt = (
         "Analyse the following incident description and return ONLY a JSON object with keys: "
         "title (short, under 80 chars), severity (one of: critical, high, medium, low), "
         "incident_type (one of: accident, near_miss, environmental, vehicle, medical, fatality), "
-        "summary (one sentence). No prose, no markdown fences.\n\nDescription: "
+        "summary (one sentence), injury_suspected (true or false), "
+        "likely_body_part (string, or null if none/unclear), "
+        "likely_injury_type (short string such as 'laceration', 'fracture', 'burn', or null). "
+        "No prose, no markdown fences.\n\nDescription: "
         + description
     )
     raw = await ask_ai(prompt, max_tokens=400)
@@ -201,6 +210,9 @@ async def classify_incident(description: str) -> dict:
             "severity": parsed.get("severity", ""),
             "incident_type": parsed.get("incident_type", ""),
             "summary": parsed.get("summary", ""),
+            "injury_suspected": bool(parsed.get("injury_suspected")),
+            "likely_body_part": parsed.get("likely_body_part") or "",
+            "likely_injury_type": parsed.get("likely_injury_type") or "",
         }
     }
 

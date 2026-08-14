@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 
 from sheplatform.core.notifications import unread_count
 from sheplatform.database import get_db
+from sheplatform.modules.incidents.data_service import get_ltifr_stats
 
 
 def _scalar(db, sql, params=()):
@@ -129,6 +130,9 @@ def dashboard_stats(db, user_id: int | None = None, org_id: int | None = None) -
         "SELECT rag_status, COUNT(*) AS n FROM esg_kpi_entries WHERE org_id = %s GROUP BY rag_status", (org_id,))
     stats["esg_rag"] = {r["rag_status"]: r["n"] for r in rag_rows}
 
+    # ---- LTIFR (B5): trailing 12 months, ISO 45001 million-hour base ----
+    stats["ltifr"] = get_ltifr_stats(db, org_id)
+
     return stats
 
 
@@ -157,4 +161,6 @@ def _empty_stats() -> dict:
         "key_issues": [],
         "grievance_trend": {"labels": [], "values": []},
         "esg_rag": {},
+        "ltifr": {"lost_time_injuries": 0, "total_lost_days": 0, "hours_worked": None,
+                  "ltifr": None, "period_start": None, "period_end": None},
     }

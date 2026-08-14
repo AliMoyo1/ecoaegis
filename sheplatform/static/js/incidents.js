@@ -2,6 +2,30 @@
 const API = "/incidents/api";
 let currentSuggestion = null;
 
+// B5: injury fields are progressive disclosure - only shown for incident
+// types where an injury is plausible, so the quick-capture path (near miss,
+// environmental) stays fast.
+function toggleInjuryFields() {
+  const type = document.querySelector("[name='incident_type']").value;
+  const show = ["accident", "medical", "fatality"].includes(type);
+  document.getElementById("injury-fields").style.display = show ? "block" : "none";
+}
+
+function collectInjuryData(form) {
+  const visible = document.getElementById("injury-fields").style.display !== "none";
+  if (!visible) return null;
+  const data = {
+    injured_name: form.querySelector("[name='injured_name']").value,
+    injured_type: form.querySelector("[name='injured_type']").value,
+    body_part: form.querySelector("[name='body_part']").value,
+    injury_type: form.querySelector("[name='injury_type']").value,
+    lost_time_days: parseInt(form.querySelector("[name='lost_time_days']").value || "0", 10) || 0,
+    medical_treatment: form.querySelector("[name='medical_treatment']").value,
+  };
+  // Nothing meaningful entered - do not create an empty injury record.
+  return (data.injured_name || data.body_part || data.injury_type) ? data : null;
+}
+
 // Deep links from dashboard tiles: ?status=open, ?type=near_miss
 const params = new URLSearchParams(location.search);
 if (params.get("status") && document.getElementById("f-status")) {
@@ -66,13 +90,34 @@ async function approveReport(incidentId, stepId, decision) {
   loadIncidents();
 }
 
+function resetIncidentForm(form) {
+  form.reset();
+  currentSuggestion = null;
+  document.getElementById("ai-suggestion-card").style.display = "none";
+  toggleInjuryFields();
+}
+
 document.getElementById("incident-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const form = e.target;
   const body = new FormData(form);
   if (currentSuggestion) body.append("ai_classify", "true");
 
-  // Offline capture (B1)
+  // Witnesses: comma-separated names -> JSON array of {name}, matching what
+  // the server's witnesses_json field expects.
+  const witnessesText = (form.querySelector("[name='witnesses_text']").value || "").trim();
+  const witnesses = witnessesText
+    ? witnessesText.split(",").map((w) => ({ name: w.trim() })).filter((w) => w.name)
+    : [];
+  body.set("witnesses_json", JSON.stringify(witnesses));
+
+  const injuryData = collectInjuryData(form);
+  const costRaw = form.querySelector("[name='estimated_cost']").value;
+  const cost = costRaw ? parseFloat(costRaw) : null;
+
+  // Offline capture (B1). The injury (if any) rides inside data.injury so it
+  // stays a single queued item; offline/routes.py._apply_item creates the
+  // incident then the injury against its new id once synced.
   if (!navigator.onLine) {
     const key = OfflineQueue.uuid();
     const data = {
@@ -83,11 +128,13 @@ document.getElementById("incident-form").addEventListener("submit", async (e) =>
       location: body.get("location") || "",
       occurred_at: new Date().toISOString(),
       idempotency_key: key,
+      immediate_actions: body.get("immediate_actions") || "",
+      estimated_cost: cost,
+      witnesses: witnesses,
     };
+    if (injuryData) data.injury = injuryData;
     await OfflineQueue.enqueue({ type: "incident", idempotencyKey: key, data });
-    form.reset();
-    currentSuggestion = null;
-    document.getElementById("ai-suggestion-card").style.display = "none";
+    resetIncidentForm(form);
     OfflineQueue.updateIndicator();
     alert("Saved offline. It will sync when connectivity returns.");
     return;
@@ -96,9 +143,12 @@ document.getElementById("incident-form").addEventListener("submit", async (e) =>
   const resp = await fetch(`${API}/create`, { method: "POST", body });
   const data = await resp.json();
   if (data.ok) {
-    form.reset();
-    currentSuggestion = null;
-    document.getElementById("ai-suggestion-card").style.display = "none";
+    if (injuryData) {
+      const ifd = new FormData();
+      Object.entries(injuryData).forEach(([k, v]) => ifd.append(k, v));
+      await fetch(`${API}/${data.incident.id}/injuries`, { method: "POST", body: ifd });
+    }
+    resetIncidentForm(form);
     loadIncidents();
   } else {
     alert(data.message || "Failed to create incident");
@@ -122,7 +172,10 @@ async function classifyIncident() {
     <strong>Title:</strong> ${s.title}<br>
     <strong>Severity:</strong> ${s.severity}<br>
     <strong>Type:</strong> ${s.incident_type}<br>
-    <strong>Summary:</strong> ${s.summary}`;
+    <strong>Summary:</strong> ${s.summary}` +
+    (s.injury_suspected
+      ? `<br><strong>Possible injury:</strong> ${s.likely_body_part || "unspecified"} (${s.likely_injury_type || "unspecified"})`
+      : "");
   card.style.display = "block";
   status.textContent = "Suggestion ready";
 }
@@ -135,8 +188,23 @@ document.getElementById("accept-ai").addEventListener("change", (e) => {
     document.querySelector("[name='title']").value = currentSuggestion.title || "";
     document.querySelector("[name='severity']").value = currentSuggestion.severity || "medium";
     document.querySelector("[name='incident_type']").value = currentSuggestion.incident_type || "accident";
+    toggleInjuryFields();
+    // B5: AI suspects an injury -> open the injury section and prefill what
+    // it inferred. The user still confirms/edits every field before submit.
+    if (currentSuggestion.injury_suspected) {
+      document.getElementById("injury-fields").style.display = "block";
+      if (currentSuggestion.likely_body_part) {
+        document.querySelector("[name='body_part']").value = currentSuggestion.likely_body_part;
+      }
+      if (currentSuggestion.likely_injury_type) {
+        document.querySelector("[name='injury_type']").value = currentSuggestion.likely_injury_type;
+      }
+    }
   }
 });
+
+document.querySelector("[name='incident_type']").addEventListener("change", toggleInjuryFields);
+toggleInjuryFields();
 
 ["f-status", "f-severity", "f-type"].forEach((id) => {
   document.getElementById(id).addEventListener("change", loadIncidents);
