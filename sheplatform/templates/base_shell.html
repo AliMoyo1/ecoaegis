@@ -135,7 +135,7 @@
       var method = (opts.method || "GET").toUpperCase();
       if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
         var token = csrfToken();
-        if (token && !(opts.headers || {}).hasOwnProperty && !(opts.headers && opts.headers["X-CSRF-Token"])) {
+        if (token && !(opts.headers && opts.headers["X-CSRF-Token"])) {
           opts.headers = Object.assign({}, opts.headers, { "X-CSRF-Token": token });
         }
       }
