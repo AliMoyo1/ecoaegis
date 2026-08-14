@@ -52,7 +52,8 @@ _tpl_dirs = [
     BASE_DIR / "modules" / "contractors" / "templates",
     BASE_DIR / "modules" / "chemicals" / "templates",
     BASE_DIR / "modules" / "benchmark" / "templates",
-    BASE_DIR / "modules" / "mfa" / "templates",
+    BASE_DIR / "modules" / "statutory_reporting" / "templates",
+    BASE_DIR / "modules" / "external_integration" / "templates",
 ]
 for d in _tpl_dirs:
     if str(d) not in templates.env.loader.searchpath:

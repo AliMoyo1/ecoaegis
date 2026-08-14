@@ -50,11 +50,30 @@ async function obsAct(id, action) {
 
 document.getElementById("obs-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const body = new FormData(e.target);
+  const form = e.target;
+  const body = new FormData(form);
+
+  if (!navigator.onLine) {
+    const key = OfflineQueue.uuid();
+    const data = {
+      obs_type: body.get("obs_type"),
+      title: body.get("title"),
+      description: body.get("description") || "",
+      location: body.get("location") || "",
+      severity: body.get("severity"),
+      idempotency_key: key,
+    };
+    await OfflineQueue.enqueue({ type: "observation", idempotencyKey: key, data });
+    form.reset();
+    OfflineQueue.updateIndicator();
+    alert("Saved offline. It will sync when connectivity returns.");
+    return;
+  }
+
   const resp = await fetch(`${API}/create`, { method: "POST", body });
   const data = await resp.json();
   if (data.ok) {
-    e.target.reset();
+    form.reset();
     loadObservations();
   } else {
     alert(data.message || "Failed to report");

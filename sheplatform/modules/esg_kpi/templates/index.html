@@ -18,6 +18,17 @@
 </div>
 
 <div class="card">
+  <h2>CSV / API ingestion</h2>
+  <form id="csv-form" enctype="multipart/form-data">
+    <label>CSV file <input type="file" name="file" accept=".csv,.txt" required></label>
+    <label>Mapping name <input type="text" name="mapping_name" placeholder="env_monthly"></label>
+    <label>Default period <input type="text" name="default_period" placeholder="2026-08"></label>
+    <button class="btn btn-secondary" type="submit">Upload & preview</button>
+  </form>
+  <div id="csv-preview" style="margin-top:1rem;"></div>
+</div>
+
+<div class="card">
   <h2>RAG summary</h2>
   <div class="kpi-grid" id="rag-summary"></div>
 </div>

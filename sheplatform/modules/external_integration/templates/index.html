@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>External Integrations - SHE Platform</title>
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">SHE Platform</div>
+    <nav>
+      <a href="/">Dashboard</a>
+      <a href="/statutory-reports">Statutory Reports</a>
+      <a href="/integrations" class="active">Integrations</a>
+    </nav>
+  </header>
+  <main class="container">
+    <h1>External Integrations</h1>
+    <section id="endpoints-section">
+      <h2>Endpoints</h2>
+      <table id="endpoints-table">
+        <thead><tr><th>Key</th><th>Name</th><th>System</th><th>Direction</th><th>Base URL</th><th>Auth</th><th>Active</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <form id="endpoint-form" class="card">
+        <h3>Add Endpoint</h3>
+        <input name="endpoint_key" placeholder="endpoint_key" required>
+        <input name="name" placeholder="Name" required>
+        <select name="system_type" required>
+          <option value="themisiq">ThemisIQ</option>
+          <option value="erp">ERP</option>
+          <option value="lms">LMS</option>
+          <option value="ema_portal">EMA Portal</option>
+          <option value="nssa_portal">NSSA Portal</option>
+          <option value="zrp_portal">ZRP Portal</option>
+          <option value="board">Board</option>
+          <option value="comms">Comms</option>
+          <option value="custom">Custom</option>
+        </select>
+        <select name="direction">
+          <option value="outbound">Outbound</option>
+          <option value="inbound">Inbound</option>
+          <option value="bidirectional">Bidirectional</option>
+        </select>
+        <input name="base_url" placeholder="Base URL">
+        <select name="auth_type">
+          <option value="api_key">API Key</option>
+          <option value="oauth2">OAuth2</option>
+          <option value="hmac">HMAC</option>
+          <option value="none">None</option>
+        </select>
+        <button type="submit">Save Endpoint</button>
+      </form>
+    </section>
+    <section id="channels-section">
+      <h2>Submission Channels</h2>
+      <button id="seed-channels">Seed Default Channels</button>
+      <table id="channels-table">
+        <thead><tr><th>Key</th><th>Name</th><th>Authority</th><th>Type</th><th>Active</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+    <section id="submissions-section">
+      <h2>Deliveries</h2>
+      <table id="submissions-table">
+        <thead><tr><th>ID</th><th>Report</th><th>Channel</th><th>Status</th><th>Tracking Ref</th><th>Updated</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <button id="process-queue">Process Pending Queue</button>
+    </section>
+  </main>
+  <script src="/static/js/integrations.js"></script>
+</body>
+</html>

@@ -71,6 +71,28 @@ document.getElementById("incident-form").addEventListener("submit", async (e) =>
   const form = e.target;
   const body = new FormData(form);
   if (currentSuggestion) body.append("ai_classify", "true");
+
+  // Offline capture (B1)
+  if (!navigator.onLine) {
+    const key = OfflineQueue.uuid();
+    const data = {
+      title: body.get("title"),
+      description: body.get("description"),
+      severity: body.get("severity"),
+      incident_type: body.get("incident_type"),
+      location: body.get("location") || "",
+      occurred_at: new Date().toISOString(),
+      idempotency_key: key,
+    };
+    await OfflineQueue.enqueue({ type: "incident", idempotencyKey: key, data });
+    form.reset();
+    currentSuggestion = null;
+    document.getElementById("ai-suggestion-card").style.display = "none";
+    OfflineQueue.updateIndicator();
+    alert("Saved offline. It will sync when connectivity returns.");
+    return;
+  }
+
   const resp = await fetch(`${API}/create`, { method: "POST", body });
   const data = await resp.json();
   if (data.ok) {

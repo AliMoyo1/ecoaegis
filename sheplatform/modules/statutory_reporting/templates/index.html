@@ -1,0 +1,56 @@
+{% extends "base_shell.html" %}
+{% block title %}Statutory Reports - EcoAegis{% endblock %}
+{% block content %}
+<h1>Statutory Reports</h1>
+
+<div class="card">
+  <h2>New report</h2>
+  <form id="sr-form">
+    <label>Authority / template
+      <select name="template_key" id="sr-template" required></select>
+    </label>
+    <div class="grid-2">
+      <label>Period start
+        <input type="date" name="period_start" required>
+      </label>
+      <label>Period end
+        <input type="date" name="period_end" required>
+      </label>
+    </div>
+    <button type="submit" class="btn primary">Create draft</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Drafts / submissions</h2>
+  <table class="data-table">
+    <thead>
+      <tr><th>Ref</th><th>Title</th><th>Period</th><th>Status</th><th>Actions</th></tr>
+    </thead>
+    <tbody id="sr-list"></tbody>
+  </table>
+</div>
+
+<div class="card" id="sr-editor" style="display:none">
+  <h2>Edit report <span id="sr-editor-ref"></span></h2>
+  <div id="sr-fields"></div>
+  <div class="actions">
+    <button id="sr-save" class="btn">Save</button>
+    <button id="sr-lock" class="btn">Lock</button>
+    <button id="sr-submit" class="btn primary">Submit</button>
+    <a id="sr-export-json" class="btn" target="_blank" href="#">Export JSON</a>
+    <a id="sr-export-txt" class="btn" target="_blank" href="#">Export text</a>
+  </div>
+</div>
+
+<template id="sr-field-template">
+  <label class="sr-field-label">
+    <span class="sr-field-name"></span>
+    <input class="sr-field-input" type="text">
+  </label>
+</template>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/statutory_reports.js"></script>
+{% endblock %}

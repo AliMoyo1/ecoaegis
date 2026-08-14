@@ -64,7 +64,7 @@ def _fts_search(db, terms: list[str], org_id: int | None, limit: int, exclude_id
     if exclude_id:
         sql += " AND i.id != %s"
         params.append(exclude_id)
-    sql += " ORDER BY rank LIMIT %s"
+    sql += " ORDER BY f.rank LIMIT %s"
     params.append(limit)
     rows = db.execute(sql, params).fetchall()
     return [dict(r) for r in rows]

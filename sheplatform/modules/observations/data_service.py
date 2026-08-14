@@ -25,17 +25,22 @@ def _next_ref(db, year: int | None = None) -> str:
 def create_observation(db, *, obs_type: str, title: str, description: str,
                        location: str, severity: str, reported_by: int,
                        org_id: int | None = None, photo_path: str = "",
-                       ai_metadata: dict | None = None) -> dict:
+                       ai_metadata: dict | None = None,
+                       idempotency_key: str | None = None) -> dict:
     if obs_type not in ("hazard", "near_miss", "unsafe_act", "unsafe_condition", "good_practice"):
         raise ValueError("invalid obs_type")
     if severity not in ("low", "medium", "high", "critical"):
         raise ValueError("invalid severity")
+    if idempotency_key:
+        row = db.execute("SELECT * FROM observations WHERE idempotency_key = %s", (idempotency_key,)).fetchone()
+        if row:
+            return {**dict(row), "_idempotent": True}
     ref = _next_ref(db)
     db.execute(
-        "INSERT INTO observations (obs_ref, obs_type, title, description, location, "
+        "INSERT INTO observations (obs_ref, idempotency_key, obs_type, title, description, location, "
                 "photo_path, severity, status, reported_by, org_id, ai_metadata) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s, 'open', %s, %s, %s)",
-                (ref, obs_type, title, description, location, photo_path or "",
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'open', %s, %s, %s)",
+                (ref, idempotency_key, obs_type, title, description, location, photo_path or "",
                  severity, reported_by, org_id, json.dumps(ai_metadata or {})))
     db.commit()
     log_audit(db, reported_by, org_id, "observation.created", "observations", ref,
