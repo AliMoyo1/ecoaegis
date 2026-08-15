@@ -195,6 +195,41 @@ class TestCoordinateImportService:
         ).fetchone()
         assert batch["status"] == "previewed"
 
+    def test_commit_rejects_when_a_previewed_site_gains_coordinates_before_commit(self, db):
+        manager = _mk_user(db)
+        first = _mk_site(db, "RACE-1")
+        second = _mk_site(db, "RACE-2")
+        preview = coordinate_import_service.preview_coordinate_import(
+            db, file_bytes=_csv("RACE-1,-17.8,31.0,", "RACE-2,-18.0,30.9,"),
+            org_id=1, created_by=manager["id"])
+        # A different admin locates RACE-2 through the single-site editor
+        # while this preview batch sits uncommitted. RACE-2 was previewed as
+        # "valid" (no existing coordinates), so nobody was ever asked to
+        # approve overwriting it.
+        data_service.set_site_coords(
+            db, site_id=second["id"], latitude=-1.0, longitude=1.0,
+            source="manual", updated_by=manager["id"], org_id=1)
+        with pytest.raises(ValueError, match="gained coordinates"):
+            coordinate_import_service.commit_coordinate_import(
+                db, import_id=preview["batch"]["id"], org_id=1,
+                updated_by=manager["id"], overwrite_existing=False)
+        # RACE-1 was processed first and updated within the transaction
+        # before the race was detected on RACE-2; the whole commit must
+        # still roll back atomically, not leave RACE-1 half-applied.
+        first_now = db.execute(
+            "SELECT latitude FROM sites WHERE id = %s", (first["id"],)).fetchone()
+        assert first_now["latitude"] is None
+        batch = db.execute(
+            "SELECT status FROM site_coordinate_imports WHERE id = %s",
+            (preview["batch"]["id"],)).fetchone()
+        assert batch["status"] == "previewed"
+        # RACE-2 keeps the other admin's value, not the stale CSV value.
+        second_now = db.execute(
+            "SELECT latitude, longitude FROM sites WHERE id = %s",
+            (second["id"],)).fetchone()
+        assert second_now["latitude"] == -1.0
+        assert second_now["longitude"] == 1.0
+
     def test_metric_failure_never_blocks_preview_or_commit(self, db, monkeypatch):
         manager = _mk_user(db)
         site = _mk_site(db, "METRIC-INDEPENDENT")

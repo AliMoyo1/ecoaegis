@@ -199,6 +199,24 @@ def commit_coordinate_import(db, *, import_id: int, org_id: int | None,
     try:
         updated = 0
         for row in rows:
+            # The preview's valid/conflict classification is frozen at preview
+            # time. A row previewed as "valid" (no existing coordinates) can
+            # gain coordinates from a different admin/import while this batch
+            # sits uncommitted (previews have no expiry); re-check the site's
+            # *current* state so that case is treated as an unreviewed
+            # conflict instead of a silent overwrite. A row already flagged
+            # "conflict" at preview time keeps the approval the caller gave.
+            current = db.execute(
+                "SELECT latitude, longitude FROM sites WHERE id = %s AND org_id = %s",
+                (row["site_id"], org_id),
+            ).fetchone()
+            if current is None:
+                raise ValueError("a previewed site is no longer available")
+            now_has_coords = current["latitude"] is not None or current["longitude"] is not None
+            if row["status"] == "valid" and now_has_coords:
+                raise ValueError(
+                    "a previewed site gained coordinates after this preview was "
+                    "taken; generate a new preview before committing")
             applied = data_service.set_site_coords(
                 db, site_id=row["site_id"], latitude=row["latitude"],
                 longitude=row["longitude"], source="imported",
