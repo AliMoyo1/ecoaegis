@@ -230,6 +230,72 @@ class TestCoordinateImportService:
         assert second_now["latitude"] == -1.0
         assert second_now["longitude"] == 1.0
 
+    def test_commit_closes_coordinate_check_update_race(self, db, monkeypatch):
+        manager = _mk_user(db)
+        site = _mk_site(db, "RACE-ATOMIC")
+        preview = coordinate_import_service.preview_coordinate_import(
+            db, file_bytes=_csv("RACE-ATOMIC,-17.8,31.0,"),
+            org_id=1, created_by=manager["id"])
+        original_set_site_coords = data_service.set_site_coords
+        injected = False
+
+        def set_coords_after_commit_check(db, **kwargs):
+            nonlocal injected
+            if kwargs.get("require_unlocated") and not injected:
+                injected = True
+                db.execute(
+                    "UPDATE sites SET latitude = %s, longitude = %s WHERE id = %s",
+                    (-1.0, 1.0, site["id"]),
+                )
+                db.commit()
+            return original_set_site_coords(db, **kwargs)
+
+        monkeypatch.setattr(data_service, "set_site_coords", set_coords_after_commit_check)
+        with pytest.raises(ValueError, match="gained coordinates"):
+            coordinate_import_service.commit_coordinate_import(
+                db, import_id=preview["batch"]["id"], org_id=1,
+                updated_by=manager["id"], overwrite_existing=False)
+        current = db.execute(
+            "SELECT latitude, longitude FROM sites WHERE id = %s", (site["id"],)
+        ).fetchone()
+        assert current["latitude"] == -1.0
+        assert current["longitude"] == 1.0
+        batch = db.execute(
+            "SELECT status FROM site_coordinate_imports WHERE id = %s",
+            (preview["batch"]["id"],),
+        ).fetchone()
+        assert batch["status"] == "previewed"
+
+    def test_stale_concurrent_batch_snapshot_cannot_commit_twice(self, db, monkeypatch):
+        manager = _mk_user(db)
+        site = _mk_site(db, "BATCH-RACE", latitude=-1.0, longitude=1.0)
+        preview = coordinate_import_service.preview_coordinate_import(
+            db, file_bytes=_csv("BATCH-RACE,-17.8,31.0,"),
+            org_id=1, created_by=manager["id"])
+        stale_snapshot = coordinate_import_service._batch_with_rows(
+            db, preview["batch"]["id"], 1)
+        committed = coordinate_import_service.commit_coordinate_import(
+            db, import_id=preview["batch"]["id"], org_id=1,
+            updated_by=manager["id"], overwrite_existing=True)
+        assert committed["ok"] is True
+
+        monkeypatch.setattr(
+            coordinate_import_service, "_batch_with_rows",
+            lambda db, import_id, org_id: stale_snapshot,
+        )
+        with pytest.raises(ValueError, match="already been committed"):
+            coordinate_import_service.commit_coordinate_import(
+                db, import_id=preview["batch"]["id"], org_id=1,
+                updated_by=manager["id"], overwrite_existing=True)
+        actions = db.execute(
+            "SELECT action, COUNT(*) AS c FROM audit_log "
+            "WHERE entity_id IN (%s,%s) GROUP BY action",
+            (site["id"], preview["batch"]["id"]),
+        ).fetchall()
+        counts = {row["action"]: row["c"] for row in actions}
+        assert counts["site.set_coords"] == 1
+        assert counts["site_coords.import_commit"] == 1
+
     def test_metric_failure_never_blocks_preview_or_commit(self, db, monkeypatch):
         manager = _mk_user(db)
         site = _mk_site(db, "METRIC-INDEPENDENT")

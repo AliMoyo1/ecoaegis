@@ -220,7 +220,8 @@ def list_sites_for_coordinate_admin(db, org_id: int | None) -> list[dict]:
 
 def set_site_coords(db, *, site_id: int, latitude: float, longitude: float,
                     source: str, updated_by: int, org_id: int | None,
-                    accuracy_m: float | None = None, commit: bool = True) -> dict:
+                    accuracy_m: float | None = None, commit: bool = True,
+                    require_unlocated: bool = False) -> dict:
     """Set canonical site coordinates with tenant, actor, provenance, and audit."""
     lat, lng = validate_coordinates(latitude, longitude)
     source = (source or "").strip().lower()
@@ -232,13 +233,20 @@ def set_site_coords(db, *, site_id: int, latitude: float, longitude: float,
         return {"ok": False, "message": "site not found"}
     previous = _coordinate_values(row)
     updated_at = datetime.now(timezone.utc).isoformat()
-    db.execute(
+    update_sql = (
         "UPDATE sites SET latitude = %s, longitude = %s, coordinate_source = %s, "
         "coordinate_accuracy_m = %s, coordinates_updated_at = %s, "
         "coordinates_updated_by = %s, geocode_provider = NULL, geocode_place_id = NULL "
-        "WHERE id = %s AND org_id = %s",
+        "WHERE id = %s AND org_id = %s"
+    )
+    if require_unlocated:
+        update_sql += " AND latitude IS NULL AND longitude IS NULL"
+    cursor = db.execute(
+        update_sql,
         (lat, lng, source, accuracy, updated_at, updated_by, site_id, org_id),
     )
+    if require_unlocated and cursor.rowcount != 1:
+        return {"ok": False, "message": "site coordinates changed"}
     current = {
         "latitude": lat,
         "longitude": lng,

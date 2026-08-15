@@ -221,16 +221,24 @@ def commit_coordinate_import(db, *, import_id: int, org_id: int | None,
                 db, site_id=row["site_id"], latitude=row["latitude"],
                 longitude=row["longitude"], source="imported",
                 accuracy_m=row["coordinate_accuracy_m"], updated_by=updated_by,
-                org_id=org_id, commit=False)
+                org_id=org_id, commit=False,
+                require_unlocated=row["status"] == "valid")
             if not applied["ok"]:
+                if applied.get("message") == "site coordinates changed":
+                    raise ValueError(
+                        "a previewed site gained coordinates after this preview was "
+                        "taken; generate a new preview before committing")
                 raise ValueError("a previewed site is no longer available")
             updated += 1
         committed_at = datetime.now(timezone.utc).isoformat()
-        db.execute(
+        claimed = db.execute(
             "UPDATE site_coordinate_imports SET status = 'committed', "
-            "overwrite_approved = %s, committed_at = %s WHERE id = %s AND org_id = %s",
+            "overwrite_approved = %s, committed_at = %s "
+            "WHERE id = %s AND org_id = %s AND status = 'previewed'",
             (bool(overwrite_existing), committed_at, import_id, org_id),
         )
+        if claimed.rowcount != 1:
+            raise ValueError("coordinate import has already been committed")
         log_audit(
             db, updated_by, org_id, "site_coords.import_commit", "site_coordinate_imports",
             import_id, old_value={"status": "previewed"},
