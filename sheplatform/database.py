@@ -1640,12 +1640,20 @@ def _to_sqlite_schema(ddl: str) -> str:
 # ---------------------------------------------------------------------------
 def _connect() -> object:
     if settings.is_postgres():
-        import psycopg2
+        import psycopg2.extras
         from psycopg2.pool import ThreadedConnectionPool
 
         pool = getattr(_local, "pg_pool", None)
         if pool is None:
-            pool = ThreadedConnectionPool(1, 20, settings.DATABASE_URL)
+            # DictCursor (not RealDictCursor): its rows support BOTH integer and
+            # string indexing, matching sqlite3.Row exactly. Every data_service
+            # reads rows as row["col"]/dict(row), and ~19 call sites also do
+            # integer access (fetchone()[0] on COUNT queries); RealDictCursor is
+            # key-only and would KeyError on those. Set on the pool so every
+            # pooled connection's default cursor is a DictCursor.
+            pool = ThreadedConnectionPool(
+                1, 20, settings.DATABASE_URL,
+                cursor_factory=psycopg2.extras.DictCursor)
             _local.pg_pool = pool
         conn = pool.getconn()
         return _PgConn(conn, pool)
