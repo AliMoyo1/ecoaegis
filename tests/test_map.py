@@ -10,6 +10,9 @@ capability/org-guard regression).
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import json
+
+import pytest
 
 from sheplatform.core.auth import hash_password
 from sheplatform.modules.incidents import data_service as incident_service
@@ -102,14 +105,90 @@ class TestSitePoints:
 class TestSetSiteCoords:
     def test_sets_coords(self, db):
         site = _mk_site(db, org_id=1, code="S5")
-        result = data_service.set_site_coords(db, site["id"], -17.82, 31.05, org_id=1)
+        manager = _mk_user(db, "she_manager", "coords1@test.com")
+        result = data_service.set_site_coords(
+            db, site_id=site["id"], latitude=-17.82, longitude=31.05,
+            source="manual", updated_by=manager["id"], org_id=1)
         assert result["ok"] is True
         assert result["site"]["latitude"] == -17.82
+        assert result["site"]["coordinate_source"] == "manual"
+        assert result["site"]["coordinates_updated_by"] == manager["id"]
 
     def test_rejects_unknown_or_other_org_site(self, db):
         site = _mk_site(db, org_id=1, code="S6")
-        result = data_service.set_site_coords(db, site["id"], -17.82, 31.05, org_id=999)
+        manager = _mk_user(db, "she_manager", "coords2@test.com")
+        result = data_service.set_site_coords(
+            db, site_id=site["id"], latitude=-17.82, longitude=31.05,
+            source="manual", updated_by=manager["id"], org_id=999)
         assert result["ok"] is False
+
+    def test_fails_closed_without_org(self, db):
+        site = _mk_site(db, org_id=1, code="S6A")
+        manager = _mk_user(db, "she_manager", "coords3@test.com")
+        result = data_service.set_site_coords(
+            db, site_id=site["id"], latitude=-17.82, longitude=31.05,
+            source="manual", updated_by=manager["id"], org_id=None)
+        assert result["ok"] is False
+
+    def test_records_accuracy_and_previous_new_audit_values(self, db):
+        site = _mk_site(db, org_id=1, code="S6B", latitude=-17.8, longitude=31.0)
+        manager = _mk_user(db, "she_manager", "coords4@test.com")
+        result = data_service.set_site_coords(
+            db, site_id=site["id"], latitude=-17.82, longitude=31.05,
+            source="device_gps", accuracy_m=24.5,
+            updated_by=manager["id"], org_id=1)
+        assert result["site"]["coordinate_accuracy_m"] == 24.5
+        audit = db.execute(
+            "SELECT * FROM audit_log WHERE action = %s AND entity_id = %s ORDER BY id DESC LIMIT 1",
+            ("site.set_coords", site["id"]),
+        ).fetchone()
+        old_value = json.loads(audit["old_value"])
+        new_value = json.loads(audit["new_value"])
+        assert old_value["latitude"] == -17.8
+        assert old_value["longitude"] == 31.0
+        assert new_value["coordinate_source"] == "device_gps"
+        assert new_value["coordinate_accuracy_m"] == 24.5
+        assert audit["user_id"] == manager["id"]
+        assert audit["org_id"] == 1
+
+    @pytest.mark.parametrize("latitude,longitude", [
+        (91, 31), (-91, 31), (-17, 181), (-17, -181), (float("nan"), 31),
+    ])
+    def test_rejects_invalid_coordinates(self, db, latitude, longitude):
+        site = _mk_site(db, org_id=1, code=f"BAD{abs(hash((latitude, longitude)))}")
+        manager = _mk_user(db, "she_manager", f"bad{abs(hash((latitude, longitude)))}@test.com")
+        with pytest.raises(ValueError):
+            data_service.set_site_coords(
+                db, site_id=site["id"], latitude=latitude, longitude=longitude,
+                source="manual", updated_by=manager["id"], org_id=1)
+
+    def test_rejects_invalid_source_and_accuracy(self, db):
+        site = _mk_site(db, org_id=1, code="S6C")
+        manager = _mk_user(db, "she_manager", "coords5@test.com")
+        with pytest.raises(ValueError, match="source"):
+            data_service.set_site_coords(
+                db, site_id=site["id"], latitude=-17.8, longitude=31.0,
+                source="automatic_guess", updated_by=manager["id"], org_id=1)
+        with pytest.raises(ValueError, match="accuracy"):
+            data_service.set_site_coords(
+                db, site_id=site["id"], latitude=-17.8, longitude=31.0,
+                source="device_gps", accuracy_m=-1, updated_by=manager["id"], org_id=1)
+
+    def test_clear_coords_is_audited(self, db):
+        site = _mk_site(db, org_id=1, code="S6D", latitude=-17.8, longitude=31.0)
+        manager = _mk_user(db, "she_manager", "coords6@test.com")
+        result = data_service.clear_site_coords(
+            db, site_id=site["id"], updated_by=manager["id"], org_id=1)
+        assert result["ok"] is True
+        assert result["site"]["latitude"] is None
+        assert result["site"]["coordinates_updated_by"] == manager["id"]
+        assert result["site"]["coordinates_updated_at"] is not None
+        audit = db.execute(
+            "SELECT * FROM audit_log WHERE action = 'site.clear_coords' AND entity_id = %s",
+            (site["id"],),
+        ).fetchone()
+        assert json.loads(audit["old_value"])["latitude"] == -17.8
+        assert json.loads(audit["new_value"])["latitude"] is None
 
 
 class TestMapHttp:
@@ -141,6 +220,7 @@ class TestMapHttp:
         csrf = self._login(client, "http1@test.com")
         resp = client.get("/map/api/points", headers={"X-CSRF-Token": csrf})
         assert resp.status_code == 200, resp.text
+        assert resp.headers["cache-control"] == "private, no-store"
         data = resp.json()
         assert len(data["incidents"]) == 1
         assert len(data["sites"]) == 1
@@ -172,9 +252,13 @@ class TestMapHttp:
         csrf = self._login(client, "http3@test.com")
         resp = client.post(
             f"/map/api/sites/{site['id']}/coords",
-            data={"latitude": "-17.8", "longitude": "31.05"},
+            data={"latitude": "-17.8", "longitude": "31.05",
+                  "source": "device_gps", "accuracy_m": "18.4"},
             headers={"X-CSRF-Token": csrf})
         assert resp.status_code == 200, resp.text
+        assert resp.headers["cache-control"] == "private, no-store"
+        assert resp.json()["site"]["coordinate_source"] == "device_gps"
+        assert resp.json()["site"]["coordinate_accuracy_m"] == 18.4
 
     def test_cannot_set_coords_on_another_orgs_site(self, client):
         from sheplatform.database import get_db
@@ -208,6 +292,76 @@ class TestMapHttp:
             data={"latitude": "999", "longitude": "31.05"},
             headers={"X-CSRF-Token": csrf})
         assert resp.status_code == 400
+
+    def test_invalid_source_rejected(self, client):
+        from sheplatform.database import get_db
+        db = get_db()
+        try:
+            _mk_user(db, "she_manager", "http-source@test.com", org_id=1)
+            site = _mk_site(db, org_id=1, code="S11")
+        finally:
+            db.close()
+        csrf = self._login(client, "http-source@test.com")
+        resp = client.post(
+            f"/map/api/sites/{site['id']}/coords",
+            data={"latitude": "-17.8", "longitude": "31.05", "source": "guess"},
+            headers={"X-CSRF-Token": csrf})
+        assert resp.status_code == 400
+
+    def test_coordinate_site_list_includes_unlocated_sites_and_is_org_scoped(self, client):
+        from sheplatform.database import get_db
+        db = get_db()
+        try:
+            db.execute("INSERT INTO organisations (name, slug) VALUES ('Map Other', 'map-other')")
+            db.commit()
+            other_org = db.execute("SELECT id FROM organisations WHERE slug = 'map-other'").fetchone()["id"]
+            _mk_user(db, "she_manager", "http-sites@test.com", org_id=1)
+            _mk_site(db, org_id=1, code="UNLOCATED")
+            _mk_site(db, org_id=other_org, code="OTHER-UNLOCATED")
+        finally:
+            db.close()
+        csrf = self._login(client, "http-sites@test.com")
+        resp = client.get("/map/api/sites", headers={"X-CSRF-Token": csrf})
+        assert resp.status_code == 200
+        codes = {site["site_code"] for site in resp.json()["sites"]}
+        assert "UNLOCATED" in codes
+        assert "OTHER-UNLOCATED" not in codes
+        assert resp.headers["cache-control"] == "private, no-store"
+
+    def test_manager_can_clear_site_coords(self, client):
+        from sheplatform.database import get_db
+        db = get_db()
+        try:
+            _mk_user(db, "she_manager", "http-clear@test.com", org_id=1)
+            site = _mk_site(db, org_id=1, code="CLEAR", latitude=-17.8, longitude=31.05)
+        finally:
+            db.close()
+        csrf = self._login(client, "http-clear@test.com")
+        resp = client.delete(
+            f"/map/api/sites/{site['id']}/coords",
+            headers={"X-CSRF-Token": csrf})
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["site"]["latitude"] is None
+
+    def test_map_operates_without_basemap_and_editor_is_role_gated(self, client):
+        from sheplatform.database import get_db
+        db = get_db()
+        try:
+            _mk_user(db, "she_manager", "http-shell-manager@test.com", org_id=1)
+            _mk_user(db, "she_officer", "http-shell-officer@test.com", org_id=1)
+        finally:
+            db.close()
+        self._login(client, "http-shell-manager@test.com")
+        manager_page = client.get("/map")
+        assert manager_page.status_code == 200
+        assert 'id="map"' in manager_page.text
+        assert 'id="coordinate-editor"' in manager_page.text
+        client.cookies.clear()
+        self._login(client, "http-shell-officer@test.com")
+        officer_page = client.get("/map")
+        assert officer_page.status_code == 200
+        assert 'id="map"' in officer_page.text
+        assert 'id="coordinate-editor"' not in officer_page.text
 
 
 class TestIncidentCreateWithCoords:

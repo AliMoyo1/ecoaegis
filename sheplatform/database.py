@@ -1177,6 +1177,12 @@ SCHEMA = [
         status          TEXT DEFAULT 'active' CHECK (status IN ('active','inactive')),
         latitude        NUMERIC,
         longitude       NUMERIC,
+        coordinate_source TEXT CHECK (coordinate_source IN ('manual','device_gps','imported','geocoder')),
+        coordinate_accuracy_m NUMERIC,
+        coordinates_updated_at TIMESTAMPTZ,
+        coordinates_updated_by INTEGER REFERENCES users(id),
+        geocode_provider TEXT,
+        geocode_place_id TEXT,
         org_id          INTEGER REFERENCES organisations(id),
         created_at      TIMESTAMPTZ DEFAULT NOW()
     )""",
@@ -1507,6 +1513,12 @@ INCIDENT_DEPTH_COLUMNS = [
 SITE_COORD_COLUMNS = [
     "ALTER TABLE sites ADD COLUMN IF NOT EXISTS latitude NUMERIC",
     "ALTER TABLE sites ADD COLUMN IF NOT EXISTS longitude NUMERIC",
+    "ALTER TABLE sites ADD COLUMN IF NOT EXISTS coordinate_source TEXT",
+    "ALTER TABLE sites ADD COLUMN IF NOT EXISTS coordinate_accuracy_m NUMERIC",
+    "ALTER TABLE sites ADD COLUMN IF NOT EXISTS coordinates_updated_at TIMESTAMPTZ",
+    "ALTER TABLE sites ADD COLUMN IF NOT EXISTS coordinates_updated_by INTEGER REFERENCES users(id)",
+    "ALTER TABLE sites ADD COLUMN IF NOT EXISTS geocode_provider TEXT",
+    "ALTER TABLE sites ADD COLUMN IF NOT EXISTS geocode_place_id TEXT",
 ]
 
 # Column-level additions required by C3 document Q&A
@@ -1762,6 +1774,18 @@ def init_db() -> None:
                     db.execute("ALTER TABLE sites ADD COLUMN latitude REAL")
                 if "longitude" not in cols_sites:
                     db.execute("ALTER TABLE sites ADD COLUMN longitude REAL")
+                if "coordinate_source" not in cols_sites:
+                    db.execute("ALTER TABLE sites ADD COLUMN coordinate_source TEXT")
+                if "coordinate_accuracy_m" not in cols_sites:
+                    db.execute("ALTER TABLE sites ADD COLUMN coordinate_accuracy_m REAL")
+                if "coordinates_updated_at" not in cols_sites:
+                    db.execute("ALTER TABLE sites ADD COLUMN coordinates_updated_at TEXT")
+                if "coordinates_updated_by" not in cols_sites:
+                    db.execute("ALTER TABLE sites ADD COLUMN coordinates_updated_by INTEGER REFERENCES users(id)")
+                if "geocode_provider" not in cols_sites:
+                    db.execute("ALTER TABLE sites ADD COLUMN geocode_provider TEXT")
+                if "geocode_place_id" not in cols_sites:
+                    db.execute("ALTER TABLE sites ADD COLUMN geocode_place_id TEXT")
         for col in DOCUMENT_CONTENT_COLUMNS:
             if settings.is_postgres():
                 db.execute(col)

@@ -6,20 +6,19 @@
   Incidents and sites with recorded coordinates. Clustered when zoomed out, click a marker to open the record.
 </div>
 
-{% if not tile_url %}
-<div class="card">
-  <h2>Map tile provider not configured</h2>
-  <p style="font-size:13px;color:var(--muted)">
-    Set <code>MAP_TILE_URL_TEMPLATE</code> (and optionally <code>MAP_TILE_ATTRIBUTION</code>) in the
-    server's environment to enable the map. See <code>.env.example</code> for MapTiler, Stadia Maps,
-    and Geoapify free-tier examples. <code>tile.openstreetmap.org</code> cannot be used here, its usage
-    policy forbids production traffic.
-  </p>
-</div>
-{% else %}
 <link rel="stylesheet" href="/static/css/leaflet.css">
 <link rel="stylesheet" href="/static/css/MarkerCluster.css">
 <link rel="stylesheet" href="/static/css/MarkerCluster.Default.css">
+
+<div id="map-provider-status" class="card" role="status"
+     style="display:{% if tile_url %}none{% else %}block{% endif %};margin-bottom:14px">
+  <h2 style="margin-bottom:6px">Basemap not configured</h2>
+  <p style="font-size:13px;color:var(--muted);margin:0">
+    Operational markers and coordinate editing remain available on a blank map. Set
+    <code>MAP_TILE_URL_TEMPLATE</code> and <code>MAP_TILE_ATTRIBUTION</code> to add an approved public
+    basemap; no external geocoder is required.
+  </p>
+</div>
 
 <div class="card" style="margin-bottom:14px">
   <div class="filters">
@@ -48,11 +47,54 @@
   </div>
 </div>
 
-<div id="map" data-tile-url="{{ tile_url }}" data-tile-attribution="{{ tile_attribution }}"
+{% if can_edit_coordinates %}
+<div id="coordinate-editor" class="card" style="margin-bottom:14px">
+  <h2>Site coordinates</h2>
+  <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
+    Set authoritative site coordinates manually, from this map, or from this device. Existing
+    coordinates are never replaced without confirmation.
+  </p>
+  <form id="coordinate-form">
+    <div class="filters" style="align-items:flex-end">
+      <label style="min-width:240px;flex:1">Site
+        <select id="coordinate-site" required style="display:block;width:100%">
+          <option value="">Loading sites...</option>
+        </select>
+      </label>
+      <label>Latitude
+        <input id="coordinate-latitude" name="latitude" type="number" inputmode="decimal"
+               min="-90" max="90" step="any" required style="display:block">
+      </label>
+      <label>Longitude
+        <input id="coordinate-longitude" name="longitude" type="number" inputmode="decimal"
+               min="-180" max="180" step="any" required style="display:block">
+      </label>
+      <label>Accuracy (m)
+        <input id="coordinate-accuracy" name="accuracy_m" type="number" inputmode="decimal"
+               min="0" step="any" style="display:block">
+      </label>
+      <input id="coordinate-source" name="source" type="hidden" value="manual">
+    </div>
+    <div class="filters" style="margin-top:12px">
+      <button id="coordinate-device" class="btn btn-secondary" type="button">Use device location</button>
+      <button id="coordinate-map-select" class="btn btn-secondary" type="button">Select on map</button>
+      <button id="coordinate-save" class="btn btn-primary" type="submit">Save location</button>
+      <button id="coordinate-clear" class="btn btn-danger" type="button">Clear location</button>
+      <span id="coordinate-status" role="status" aria-live="polite"
+            style="font-size:12px;color:var(--muted)">Choose a site to begin.</span>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+<div id="map" data-engine="{{ map_engine }}"
+     data-tile-url="{{ tile_url }}" data-tile-attribution="{{ tile_attribution }}"
+     data-center-lat="{{ map_center_lat }}" data-center-lng="{{ map_center_lng }}"
+     data-default-zoom="{{ map_default_zoom }}" data-min-zoom="{{ map_min_zoom }}"
+     data-max-zoom="{{ map_max_zoom }}" data-debounce-ms="{{ map_request_debounce_ms }}"
      style="height:600px;border-radius:var(--radius);overflow:hidden"></div>
 
 <script src="/static/js/leaflet.js"></script>
 <script src="/static/js/leaflet.markercluster.js"></script>
 <script src="/static/js/map.js"></script>
-{% endif %}
 {% endblock %}
