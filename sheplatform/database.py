@@ -952,6 +952,70 @@ SCHEMA = [
         created_by      INTEGER REFERENCES users(id),
         created_at      TIMESTAMPTZ DEFAULT NOW()
     )""",
+    # ---- Asset register + telemetry (guide C4) ----
+    """
+    CREATE TABLE IF NOT EXISTS assets (
+        id                      SERIAL PRIMARY KEY,
+        asset_ref               TEXT UNIQUE NOT NULL,
+        name                    TEXT NOT NULL,
+        asset_type              TEXT NOT NULL CHECK (asset_type IN ('generator','vehicle','tower_equipment','other')),
+        site_id                 INTEGER REFERENCES sites(id),
+        install_date            TIMESTAMPTZ,
+        service_interval_hours  NUMERIC,
+        total_run_hours         NUMERIC DEFAULT 0,
+        hours_at_last_service   NUMERIC DEFAULT 0,
+        last_serviced_at        TIMESTAMPTZ,
+        esg_kpi_code            TEXT,
+        status                  TEXT DEFAULT 'active' CHECK (status IN ('active','maintenance','decommissioned')),
+        org_id                  INTEGER REFERENCES organisations(id),
+        created_by              INTEGER REFERENCES users(id),
+        created_at              TIMESTAMPTZ DEFAULT NOW()
+    )""",
+    """
+    CREATE INDEX IF NOT EXISTS idx_assets_org ON assets(org_id)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS asset_readings (
+        id              SERIAL PRIMARY KEY,
+        asset_id        INTEGER REFERENCES assets(id) ON DELETE CASCADE,
+        run_hours       NUMERIC,
+        fuel_level_pct  NUMERIC,
+        recorded_at     TIMESTAMPTZ NOT NULL,
+        is_anomaly      BOOLEAN DEFAULT FALSE,
+        anomaly_reason  TEXT,
+        org_id          INTEGER REFERENCES organisations(id),
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+    )""",
+    """
+    CREATE INDEX IF NOT EXISTS idx_asset_readings_asset ON asset_readings(asset_id, recorded_at)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS asset_maintenance_tasks (
+        id              SERIAL PRIMARY KEY,
+        asset_id        INTEGER REFERENCES assets(id) ON DELETE CASCADE,
+        title           TEXT NOT NULL,
+        reason          TEXT,
+        status          TEXT DEFAULT 'open' CHECK (status IN ('open','completed')),
+        completed_at    TIMESTAMPTZ,
+        completed_by    INTEGER REFERENCES users(id),
+        org_id          INTEGER REFERENCES organisations(id),
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+    )""",
+    """
+    CREATE INDEX IF NOT EXISTS idx_asset_maintenance_asset ON asset_maintenance_tasks(asset_id, status)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS asset_api_keys (
+        id              SERIAL PRIMARY KEY,
+        name            TEXT NOT NULL,
+        key_hash        TEXT UNIQUE NOT NULL,
+        scopes          JSONB DEFAULT '["assets.telemetry"]',
+        is_active       BOOLEAN DEFAULT TRUE,
+        last_used_at    TIMESTAMPTZ,
+        org_id          INTEGER REFERENCES organisations(id),
+        created_by      INTEGER REFERENCES users(id),
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+    )""",
     # ---- Stakeholder (4.12) ----
     """
     CREATE TABLE IF NOT EXISTS stakeholders (

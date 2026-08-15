@@ -58,6 +58,8 @@ CAPABILITIES = {
     "contractors.manage": {"super_admin", "she_manager", "she_officer"},
     "module.chemicals.access": {"super_admin", "she_manager", "she_officer"},
     "chemicals.manage": {"super_admin", "she_manager", "she_officer"},
+    "module.assets.access": {"super_admin", "she_manager", "she_officer", "line_manager"},
+    "assets.manage": {"super_admin", "she_manager", "she_officer"},
     "module.benchmark.access": {"super_admin", "she_manager", "she_officer", "cro", "coo"},
     "module.leading_indicators.access": {"super_admin", "she_manager", "she_officer", "cro", "coo"},
     "module.comms.access": {"super_admin", "she_manager", "she_officer", "she_hod"},

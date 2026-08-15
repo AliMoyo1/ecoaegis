@@ -38,6 +38,7 @@ _SIDEBAR_MODULES = {
     "statutory": "statutory",
     "integrations": "integrations",
     "leading_indicators": "leading_indicators",
+    "assets": "assets",
 }
 
 
@@ -49,6 +50,7 @@ def with_nav_flags(user: dict) -> dict:
         user[f"can_{flag}"] = has_capability(user, f"module.{module}.access")
     user["can_admin"] = has_capability(user, "admin.users.manage")
     user["can_documents_manage"] = has_capability(user, "documents.manage")
+    user["can_assets_manage"] = has_capability(user, "assets.manage")
     return user
 
 
@@ -158,6 +160,7 @@ def make_csrf_token() -> str:
 CSRF_EXEMPT_PREFIXES = (
     "/static", "/login", "/mfa/challenge", "/mfa/api/verify",
     "/channels/whatsapp", "/channels/twilio", "/esg/api/ingest",
+    "/assets/api/telemetry",
     "/webhooks/",
 )
 
