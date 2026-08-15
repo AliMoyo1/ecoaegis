@@ -117,7 +117,7 @@ def create_api_key(db, *, name: str, org_id: int, created_by: int | None = None)
 
 def verify_api_key(db, key: str) -> dict | None:
     row = db.execute(
-        "SELECT * FROM asset_api_keys WHERE key_hash = %s AND is_active = 1", (_hash_key(key),)).fetchone()
+        "SELECT * FROM asset_api_keys WHERE key_hash = %s AND is_active = TRUE", (_hash_key(key),)).fetchone()
     return dict(row) if row else None
 
 

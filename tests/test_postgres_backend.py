@@ -84,3 +84,50 @@ def test_fetchall_rows_are_dict_accessible(pg):
     pg.commit()
     slugs = [r["slug"] for r in pg.execute("SELECT slug FROM organisations").fetchall()]
     assert "iter-test" in slugs
+
+
+# --- portable SQL idioms that replaced SQLite-only constructs (layer 2) ---
+
+def test_insert_returning_id(pg):
+    # Replaces last_insert_rowid() (notifications, attachments, esg uploads).
+    new_id = pg.execute(
+        "INSERT INTO organisations (name, slug) VALUES ('ret','returning-test') "
+        "RETURNING id").fetchone()["id"]
+    pg.commit()
+    assert isinstance(new_id, int) and new_id > 0
+
+
+def test_boolean_true_false_round_trip(pg):
+    # Replaces `col = 1` / `col = 0` (breaks on PG as boolean = integer).
+    pg.execute("INSERT INTO organisations (name, slug) VALUES ('b','bool-org') "
+               "ON CONFLICT (slug) DO NOTHING")
+    org = pg.execute("SELECT id FROM organisations WHERE slug = 'bool-org'").fetchone()["id"]
+    pg.execute(
+        "INSERT INTO users (email, password_hash, first_name, last_name, role_key, org_id, is_active) "
+        "VALUES ('boolflag@t.com','x','B','F','she_officer',%s, TRUE)", (org,))
+    pg.execute("UPDATE users SET is_active = FALSE WHERE email = 'boolflag@t.com'")
+    assert pg.execute("SELECT COUNT(*) FROM users WHERE email = 'boolflag@t.com' "
+                      "AND is_active = FALSE").fetchone()[0] == 1
+    assert pg.execute("SELECT COUNT(*) FROM users WHERE email = 'boolflag@t.com' "
+                      "AND is_active = TRUE").fetchone()[0] == 0
+    pg.rollback()
+
+
+def test_on_conflict_do_nothing_is_idempotent(pg):
+    # Replaces INSERT OR IGNORE (documents ack, seeds, conftest).
+    pg.execute("INSERT INTO organisations (name, slug) VALUES ('c1','conflict-test') "
+               "ON CONFLICT (slug) DO NOTHING")
+    pg.execute("INSERT INTO organisations (name, slug) VALUES ('c2','conflict-test') "
+               "ON CONFLICT (slug) DO NOTHING")
+    pg.commit()
+    assert pg.execute("SELECT COUNT(*) FROM organisations WHERE slug = 'conflict-test'"
+                      ).fetchone()[0] == 1
+
+
+def test_rowcount_on_delete(pg):
+    # Replaces SELECT changes() (esg delete_mapping).
+    pg.execute("INSERT INTO organisations (name, slug) VALUES ('d','delete-test') "
+               "ON CONFLICT (slug) DO NOTHING")
+    cur = pg.execute("DELETE FROM organisations WHERE slug = 'delete-test'")
+    assert cur.rowcount == 1
+    pg.rollback()

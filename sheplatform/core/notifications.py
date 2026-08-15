@@ -7,13 +7,13 @@ from datetime import datetime, timedelta, timezone
 
 def notify(db, user_id: int, title: str, body: str, link: str = "",
            channel: str = "in_app") -> int:
-    db.execute(
+    new_id = db.execute(
         "INSERT INTO notifications (user_id, title, body, link, channel, delivery_status) "
-        "VALUES (%s, %s, %s, %s, %s, %s)",
+        "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
         (user_id, title, body, link, channel, "pending"),
-    )
+    ).fetchone()["id"]
     db.commit()
-    return db.execute("SELECT last_insert_rowid() AS id").fetchone()["id"]
+    return new_id
 
 
 def notify_roles(db, roles: list[str], title: str, body: str, link: str = "") -> int:
@@ -21,7 +21,7 @@ def notify_roles(db, roles: list[str], title: str, body: str, link: str = "") ->
     count = 0
     for role in roles:
         rows = db.execute(
-            "SELECT id FROM users WHERE role_key = %s AND is_active = 1", (role,)
+            "SELECT id FROM users WHERE role_key = %s AND is_active = TRUE", (role,)
         ).fetchall()
         for r in rows:
             notify(db, r["id"], title, body, link)
@@ -31,7 +31,7 @@ def notify_roles(db, roles: list[str], title: str, body: str, link: str = "") ->
 
 def unread_count(db, user_id: int) -> int:
     row = db.execute(
-        "SELECT COUNT(*) AS c FROM notifications WHERE user_id = %s AND read = 0",
+        "SELECT COUNT(*) AS c FROM notifications WHERE user_id = %s AND read = FALSE",
         (user_id,),
     ).fetchone()
     return row["c"] if row else 0
@@ -47,7 +47,7 @@ def list_for_user(db, user_id: int, limit: int = 50) -> list[dict]:
 
 def mark_read(db, notification_id: int, user_id: int) -> None:
     db.execute(
-        "UPDATE notifications SET read = 1 WHERE id = %s AND user_id = %s",
+        "UPDATE notifications SET read = TRUE WHERE id = %s AND user_id = %s",
         (notification_id, user_id),
     )
     db.commit()
@@ -68,7 +68,7 @@ def process_email_queue(db, limit: int = 50) -> int:
     """Send due email reminders. Console provider in dev; SMTP in prod."""
     now = datetime.now(timezone.utc).isoformat()
     rows = db.execute(
-        "SELECT * FROM email_reminders WHERE send_at <= %s AND sent = 0 ORDER BY send_at LIMIT %s",
+        "SELECT * FROM email_reminders WHERE send_at <= %s AND sent = FALSE ORDER BY send_at LIMIT %s",
         (now, limit),
     ).fetchall()
     sent = 0
@@ -77,7 +77,7 @@ def process_email_queue(db, limit: int = 50) -> int:
         import logging
         logging.getLogger("sheplatform.email").info(
             "EMAIL to %s subject=%s", r["recipient_email"], r["subject"])
-        db.execute("UPDATE email_reminders SET sent = 1 WHERE id = %s", (r["id"],))
+        db.execute("UPDATE email_reminders SET sent = TRUE WHERE id = %s", (r["id"],))
         sent += 1
     if sent:
         db.commit()

@@ -119,7 +119,7 @@ def create_mapping(db, *, mapping_name: str, mappings: list[dict], org_id: int,
 
 
 def list_mappings(db, mapping_name: str | None = None, org_id: int | None = None) -> list[dict]:
-    sql = "SELECT * FROM esg_csv_mappings WHERE is_active = 1"
+    sql = "SELECT * FROM esg_csv_mappings WHERE is_active = TRUE"
     params: list = []
     if mapping_name:
         sql += " AND mapping_name = %s"
@@ -132,11 +132,13 @@ def list_mappings(db, mapping_name: str | None = None, org_id: int | None = None
 
 
 def delete_mapping(db, mapping_name: str, org_id: int) -> dict:
-    db.execute("DELETE FROM esg_csv_mappings WHERE mapping_name = %s AND org_id = %s",
-               (mapping_name, org_id))
+    # cursor.rowcount is portable (SQLite + psycopg2); SELECT changes() is
+    # SQLite-only and errors on PostgreSQL.
+    cur = db.execute("DELETE FROM esg_csv_mappings WHERE mapping_name = %s AND org_id = %s",
+                     (mapping_name, org_id))
+    deleted = cur.rowcount
     db.commit()
-    return {"ok": True, "deleted": db.execute("SELECT changes()").fetchone()[0]
-            if hasattr(db, "_conn") else 0}
+    return {"ok": True, "deleted": deleted if deleted is not None and deleted >= 0 else 0}
 
 
 def parse_csv_upload(db, file_bytes: bytes, file_name: str, mapping_name: str | None = None,
@@ -157,12 +159,11 @@ def parse_csv_upload(db, file_bytes: bytes, file_name: str, mapping_name: str | 
 
     period_col = _find_column(headers, ["period", "month", "date", "year_month", "reporting_period"])
 
-    db.execute(
+    upload_id = db.execute(
         "INSERT INTO esg_csv_uploads (file_name, mapping_name, rows_total, org_id, created_by) "
-        "VALUES (%s,%s,%s,%s,%s)",
-        (file_name, mapping_name or "", len(rows), org_id, created_by))
+        "VALUES (%s,%s,%s,%s,%s) RETURNING id",
+        (file_name, mapping_name or "", len(rows), org_id, created_by)).fetchone()["id"]
     db.commit()
-    upload_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     preview = []
     for idx, row in enumerate(rows, start=1):
@@ -376,7 +377,7 @@ def create_api_key(db, *, name: str, org_id: int, created_by: int | None = None,
 
 
 def verify_api_key(db, key: str) -> dict | None:
-    row = db.execute("SELECT * FROM esg_api_keys WHERE key_hash = %s AND is_active = 1",
+    row = db.execute("SELECT * FROM esg_api_keys WHERE key_hash = %s AND is_active = TRUE",
                        (_hash_key(key),)).fetchone()
     return dict(row) if row else None
 
@@ -394,12 +395,11 @@ def record_api_kpi_payload(db, *, key_record: dict, payload: dict, created_by: i
     if not entries:
         return {"ok": False, "message": "entries are required"}
 
-    db.execute(
+    upload_id = db.execute(
         "INSERT INTO esg_csv_uploads (file_name, mapping_name, status, rows_total, org_id, created_by) "
-        "VALUES (%s,%s,%s,%s,%s,%s)",
-        ("api_payload", "api", "pending", len(entries), org_id, created_by))
+        "VALUES (%s,%s,%s,%s,%s,%s) RETURNING id",
+        ("api_payload", "api", "pending", len(entries), org_id, created_by)).fetchone()["id"]
     db.commit()
-    upload_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     committed = 0
     skipped = []

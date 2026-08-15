@@ -70,22 +70,16 @@ def save_attachment(db, *, entity_type: str, entity_id: int, file_bytes: bytes,
         f.write(file_bytes)
     file_hash = _sha256(file_bytes)
 
-    db.execute(
+    new_id = db.execute(
         "INSERT INTO attachments (entity_type, entity_id, file_name, original_name, "
         "mime_type, size_bytes, sha256, kind, ai_labels, org_id, uploaded_by, created_at) "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
         (entity_type, entity_id, file_name, original_name or file_name, mime,
          len(file_bytes), file_hash, kind, None, org_id, uploaded_by,
          datetime.now(timezone.utc).isoformat()),
-    )
+    ).fetchone()["id"]
     db.commit()
-    row = db.execute("SELECT * FROM attachments WHERE id = last_insert_rowid()").fetchone()
-    if row is None:
-        # PostgreSQL path
-        row = db.execute(
-            "SELECT * FROM attachments WHERE sha256 = %s AND org_id = %s ORDER BY id DESC LIMIT 1",
-            (file_hash, org_id),
-        ).fetchone()
+    row = db.execute("SELECT * FROM attachments WHERE id = %s", (new_id,)).fetchone()
     return dict(row)
 
 

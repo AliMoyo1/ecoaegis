@@ -108,7 +108,7 @@ def _refresh_vendor_cert_status(db, vendor_id: int) -> str:
         exp = datetime.fromisoformat(c["expiry_date"].replace("Z", "+00:00"))
         if exp < now:
             db.execute(
-                "UPDATE vendors SET certification_status = 'suspended', ptw_eligible = 0 "
+                "UPDATE vendors SET certification_status = 'suspended', ptw_eligible = FALSE "
                 "WHERE id = %s", (vendor_id,))
             db.commit()
             return "suspended"
@@ -117,12 +117,12 @@ def _refresh_vendor_cert_status(db, vendor_id: int) -> str:
         exp = datetime.fromisoformat(c["expiry_date"].replace("Z", "+00:00"))
         if exp < now + timedelta(days=30):
             db.execute(
-                "UPDATE vendors SET certification_status = 'expiring', ptw_eligible = 1 "
+                "UPDATE vendors SET certification_status = 'expiring', ptw_eligible = TRUE "
                 "WHERE id = %s", (vendor_id,))
             db.commit()
             return "expiring"
     db.execute(
-        "UPDATE vendors SET certification_status = 'valid', ptw_eligible = 1 WHERE id = %s",
+        "UPDATE vendors SET certification_status = 'valid', ptw_eligible = TRUE WHERE id = %s",
         (vendor_id,))
     db.commit()
     return "valid"

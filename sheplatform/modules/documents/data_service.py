@@ -124,7 +124,8 @@ def acknowledge_document(db, doc_id: int, user_id: int) -> dict:
     """Staff acknowledge they have read the approved document."""
     _get(db, doc_id, "approved")
     db.execute(
-        "INSERT OR IGNORE INTO document_acknowledgements (document_id, user_id) VALUES (%s, %s)",
+        "INSERT INTO document_acknowledgements (document_id, user_id) VALUES (%s, %s) "
+        "ON CONFLICT DO NOTHING",
         (doc_id, user_id))
     db.commit()
     return {"ok": True, "acknowledged": True}

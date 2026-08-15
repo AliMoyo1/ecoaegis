@@ -121,7 +121,7 @@ def record_notification(db, grievance_id: int, method: str = "phone",
         return {"ok": False, "message": "notified_by is required (attestation must be attributable)"}
     from sheplatform.core.audit import log_audit
     db.execute(
-        "UPDATE grievances SET complainant_notified = 1, complainant_notified_at = %s, "
+        "UPDATE grievances SET complainant_notified = TRUE, complainant_notified_at = %s, "
         "notification_method = %s, notified_by = %s WHERE id = %s",
         (datetime.now(timezone.utc).isoformat(), method, notified_by, grievance_id))
     db.commit()

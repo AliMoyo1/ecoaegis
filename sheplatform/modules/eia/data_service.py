@@ -81,7 +81,7 @@ def complete_screening(db, project_id: int, *, eia_required: bool) -> dict:
     blocked = eia_required  # gate: blocked until EIA approved
     status = "prospectus" if eia_required else "closed"
     db.execute(
-        "UPDATE eia_projects SET eia_required = %s, screening_completed = 1, "
+        "UPDATE eia_projects SET eia_required = %s, screening_completed = TRUE, "
         "screening_result = %s, blocked = %s, status = %s WHERE id = %s",
         (eia_required, screening_result, blocked, status, project_id))
     db.commit()

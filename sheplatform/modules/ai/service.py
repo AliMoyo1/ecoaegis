@@ -279,7 +279,7 @@ async def safe_sql_chat(question: str, org_id: int | None = None) -> dict:
         {
             "id": "overdue_actions",
             "description": "Overdue corrective actions",
-            "sql": "SELECT action_ref, title, priority, due_date FROM corrective_actions WHERE status IN ('open','in_progress','overdue') AND due_date < datetime('now') AND org_id = %s ORDER BY due_date LIMIT 10",
+            "sql": "SELECT action_ref, title, priority, due_date FROM corrective_actions WHERE status IN ('open','in_progress','overdue') AND due_date < CURRENT_TIMESTAMP AND org_id = %s ORDER BY due_date LIMIT 10",
         },
         {
             "id": "recent_observations",

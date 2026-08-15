@@ -11,7 +11,7 @@ def seed() -> None:
     try:
         # Organisation (Econet - single org in dev)
         db.execute(
-            "INSERT OR IGNORE INTO organisations (name, slug) VALUES (%s, %s)",
+            "INSERT INTO organisations (name, slug) VALUES (%s, %s) ON CONFLICT DO NOTHING",
             ("Econet Wireless Zimbabwe", "econet"),
         )
         org = db.execute("SELECT id FROM organisations WHERE slug = 'econet'").fetchone()
@@ -48,8 +48,9 @@ def seed() -> None:
         ]
         for code, name, city, stype in sites:
             db.execute(
-                "INSERT OR IGNORE INTO sites (site_code, site_name, city, site_type, org_id) "
-                "VALUES (%s, %s, %s, %s, %s)", (code, name, city, stype, org_id))
+                "INSERT INTO sites (site_code, site_name, city, site_type, org_id) "
+                "VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
+                (code, name, city, stype, org_id))
         db.commit()
         print("Seeded organisation + users (password for all: ChangeMe!123)")
     finally:

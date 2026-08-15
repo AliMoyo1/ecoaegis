@@ -192,7 +192,7 @@ def issue_site_safe_certificate(db, emergency_id: int, *, she_manager_id: int,
         {"user_id": hod_security_id, "role": "she_hod", "signed_at": datetime.now(timezone.utc).isoformat()},
     ])
     db.execute(
-        "UPDATE emergency_events SET site_safe_certificate = 1, site_certified_by = %s, "
+        "UPDATE emergency_events SET site_safe_certificate = TRUE, site_certified_by = %s, "
         "status = 'contained' WHERE id = %s",
         (certified_by, emergency_id))
     db.commit()
