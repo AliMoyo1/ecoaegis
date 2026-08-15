@@ -372,6 +372,27 @@ SCHEMA = [
         success         BOOLEAN DEFAULT FALSE,
         created_at      TIMESTAMPTZ DEFAULT NOW()
     )""",
+    # ---- Canonical sites (created before operational site relationships) ----
+    """
+    CREATE TABLE IF NOT EXISTS sites (
+        id              SERIAL PRIMARY KEY,
+        site_code       TEXT UNIQUE NOT NULL,
+        site_name       TEXT NOT NULL,
+        city            TEXT,
+        region          TEXT,
+        site_type       TEXT DEFAULT 'facility' CHECK (site_type IN ('facility','tower','retail','warehouse','office')),
+        status          TEXT DEFAULT 'active' CHECK (status IN ('active','inactive')),
+        latitude        NUMERIC,
+        longitude       NUMERIC,
+        coordinate_source TEXT CHECK (coordinate_source IN ('manual','device_gps','imported','geocoder')),
+        coordinate_accuracy_m NUMERIC,
+        coordinates_updated_at TIMESTAMPTZ,
+        coordinates_updated_by INTEGER REFERENCES users(id),
+        geocode_provider TEXT,
+        geocode_place_id TEXT,
+        org_id          INTEGER REFERENCES organisations(id),
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+    )""",
     # ---- Vendor Compliance (4.4, SHECMV) ----
     """
     CREATE TABLE IF NOT EXISTS vendors (
@@ -450,6 +471,7 @@ SCHEMA = [
         vendor_id       INTEGER REFERENCES vendors(id),
         risk_assessment_id INTEGER REFERENCES risk_assessments(id),
         site_location   TEXT,
+        site_id         INTEGER REFERENCES sites(id),
         scope_boundary  TEXT,
         valid_from      TIMESTAMPTZ,
         valid_until     TIMESTAMPTZ,
@@ -549,6 +571,7 @@ SCHEMA = [
         department      TEXT,
         project_type    TEXT,
         location        TEXT,
+        site_id         INTEGER REFERENCES sites(id),
         eia_required    BOOLEAN,
         screening_completed BOOLEAN DEFAULT FALSE,
         screening_result TEXT CHECK (screening_result IN ('required','not_required','pending')),
@@ -658,6 +681,7 @@ SCHEMA = [
         severity        TEXT NOT NULL CHECK (severity IN ('critical','high','medium','low')),
         status          TEXT DEFAULT 'active' CHECK (status IN ('active','contained','post_crisis','closed')),
         site_location   TEXT,
+        site_id         INTEGER REFERENCES sites(id),
         strategic_direction TEXT,
         directing_authority INTEGER REFERENCES users(id),
         site_safe_certificate BOOLEAN DEFAULT FALSE,
@@ -1137,6 +1161,7 @@ SCHEMA = [
         title           TEXT NOT NULL,
         inspection_type TEXT,
         site_location   TEXT,
+        site_id         INTEGER REFERENCES sites(id),
         scheduled_date  TIMESTAMPTZ,
         completed_date  TIMESTAMPTZ,
         status          TEXT DEFAULT 'scheduled' CHECK (status IN ('scheduled','in_progress','completed','overdue')),
@@ -1164,26 +1189,6 @@ SCHEMA = [
         checklist_item  TEXT NOT NULL,
         result          TEXT NOT NULL CHECK (result IN ('pass','fail','na')),
         comment         TEXT,
-        created_at      TIMESTAMPTZ DEFAULT NOW()
-    )""",
-    """
-    CREATE TABLE IF NOT EXISTS sites (
-        id              SERIAL PRIMARY KEY,
-        site_code       TEXT UNIQUE NOT NULL,
-        site_name       TEXT NOT NULL,
-        city            TEXT,
-        region          TEXT,
-        site_type       TEXT DEFAULT 'facility' CHECK (site_type IN ('facility','tower','retail','warehouse','office')),
-        status          TEXT DEFAULT 'active' CHECK (status IN ('active','inactive')),
-        latitude        NUMERIC,
-        longitude       NUMERIC,
-        coordinate_source TEXT CHECK (coordinate_source IN ('manual','device_gps','imported','geocoder')),
-        coordinate_accuracy_m NUMERIC,
-        coordinates_updated_at TIMESTAMPTZ,
-        coordinates_updated_by INTEGER REFERENCES users(id),
-        geocode_provider TEXT,
-        geocode_place_id TEXT,
-        org_id          INTEGER REFERENCES organisations(id),
         created_at      TIMESTAMPTZ DEFAULT NOW()
     )""",
     """
@@ -1579,6 +1584,16 @@ SITE_COORD_COLUMNS = [
     "ALTER TABLE sites ADD COLUMN IF NOT EXISTS geocode_place_id TEXT",
 ]
 
+# Phase 2 canonical-site relationships. These ALTER statements are required
+# even though fresh CREATE TABLE definitions contain the columns: existing
+# deployments keep their old table shape when CREATE TABLE IF NOT EXISTS runs.
+SITE_RELATION_COLUMNS = [
+    ("permits", "ALTER TABLE permits ADD COLUMN IF NOT EXISTS site_id INTEGER REFERENCES sites(id)"),
+    ("inspections", "ALTER TABLE inspections ADD COLUMN IF NOT EXISTS site_id INTEGER REFERENCES sites(id)"),
+    ("eia_projects", "ALTER TABLE eia_projects ADD COLUMN IF NOT EXISTS site_id INTEGER REFERENCES sites(id)"),
+    ("emergency_events", "ALTER TABLE emergency_events ADD COLUMN IF NOT EXISTS site_id INTEGER REFERENCES sites(id)"),
+]
+
 # Column-level additions required by C3 document Q&A
 DOCUMENT_CONTENT_COLUMNS = [
     "ALTER TABLE documents ADD COLUMN IF NOT EXISTS content_text TEXT",
@@ -1844,6 +1859,15 @@ def init_db() -> None:
                     db.execute("ALTER TABLE sites ADD COLUMN geocode_provider TEXT")
                 if "geocode_place_id" not in cols_sites:
                     db.execute("ALTER TABLE sites ADD COLUMN geocode_place_id TEXT")
+        for table, col in SITE_RELATION_COLUMNS:
+            if settings.is_postgres():
+                db.execute(col)
+            else:
+                cols = {r[1] for r in db.execute(f"PRAGMA table_info({table})").fetchall()}
+                if "site_id" not in cols:
+                    db.execute(
+                        f"ALTER TABLE {table} ADD COLUMN site_id INTEGER REFERENCES sites(id)"
+                    )
         for col in DOCUMENT_CONTENT_COLUMNS:
             if settings.is_postgres():
                 db.execute(col)

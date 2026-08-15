@@ -119,17 +119,22 @@ async def api_event_create(request: Request,
                            title: str = Form(...),
                            description: str = Form(""),
                            severity: str = Form("high"),
-                           site_location: str = Form("")):
+                           site_location: str = Form(""),
+                           site_id: int | None = Form(None)):
     db = get_db()
     try:
         event = data_service.create_emergency(
             db, title=title, description=description, severity=severity,
-            site_location=site_location, created_by=request.state.user["id"],
+            site_location=site_location, site_id=site_id,
+            created_by=request.state.user["id"],
             org_id=request.state.user.get("org_id"))
         log_audit(db, request.state.user["id"], request.state.user.get("org_id"),
                   "emergency.create", "emergency_events", event["id"],
-                  new_value={"event_ref": event["event_ref"]})
+                  new_value={"event_ref": event["event_ref"],
+                             "site_id": event.get("site_id")})
         return JSONResponse({"ok": True, "emergency": event}, status_code=201)
+    except ValueError as exc:
+        return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)
     finally:
         db.close()
 

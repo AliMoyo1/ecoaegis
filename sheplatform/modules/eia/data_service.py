@@ -11,7 +11,7 @@ import re
 from datetime import datetime, timezone
 
 from sheplatform.core import events
-from sheplatform.database import resolve_org
+from sheplatform.modules.map.site_relationship_service import prepare_site_assignment
 
 
 def next_project_ref(db) -> str:
@@ -29,14 +29,16 @@ def next_project_ref(db) -> str:
 
 def create_project(db, *, project_name: str, department: str = "", project_type: str = "",
                    location: str = "", created_by: int | None = None,
-                   org_id: int | None = None) -> dict:
-    org_id = resolve_org(db, org_id, created_by)
+                   org_id: int | None = None, site_id: int | None = None) -> dict:
+    org_id, site_id = prepare_site_assignment(
+        db, site_id=site_id, org_id=org_id, user_id=created_by
+    )
     ref = next_project_ref(db)
     db.execute(
         "INSERT INTO eia_projects (project_ref, project_name, department, project_type, "
-        "location, eia_required, screening_completed, screening_result, status, blocked, "
-        "created_by, org_id) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-        (ref, project_name, department, project_type, location,
+        "location, site_id, eia_required, screening_completed, screening_result, status, blocked, "
+        "created_by, org_id) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+        (ref, project_name, department, project_type, location, site_id,
          None, False, "pending", "screening", False, created_by, org_id),
     )
     db.commit()

@@ -48,13 +48,14 @@ async def api_list(request: Request, status: str = ""):
 async def api_create(request: Request, title: str = Form(...),
                      inspection_type: str = Form("safety"),
                      site_location: str = Form(""),
+                     site_id: int | None = Form(None),
                      scheduled_date: str = Form(""),
                      inspector_id: int = Form(0)):
     db = get_db()
     try:
         insp = data_service.schedule_inspection(
             db, title=title, inspection_type=inspection_type, site_location=site_location,
-            scheduled_date=scheduled_date, inspector_id=inspector_id,
+            site_id=site_id, scheduled_date=scheduled_date, inspector_id=inspector_id,
             created_by=request.state.user["id"], org_id=request.state.user.get("org_id"))
         return JSONResponse({"ok": True, "inspection": insp})
     except ValueError as e:

@@ -12,6 +12,7 @@ import re
 from datetime import datetime, timezone
 
 from sheplatform.core import events
+from sheplatform.modules.map.site_relationship_service import prepare_site_assignment
 
 
 # ---- ref generators (audit fix: identifiers hardcoded, no interpolation) ----
@@ -140,12 +141,17 @@ def add_drill_improvement(db, drill_id: int, description: str) -> dict:
 # ---- Emergency events (SHEER) ----
 def create_emergency(db, *, title: str, description: str, severity: str,
                      site_location: str = "", created_by: int | None = None,
-                     org_id: int | None = None) -> dict:
+                     org_id: int | None = None, site_id: int | None = None) -> dict:
+    org_id, site_id = prepare_site_assignment(
+        db, site_id=site_id, org_id=org_id, user_id=created_by
+    )
     ref = _next_event_ref(db)
     db.execute(
         "INSERT INTO emergency_events (event_ref, title, description, severity, "
-        "site_location, status, created_by, org_id) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
-        (ref, title, description, severity, site_location, "active", created_by, org_id))
+        "site_location, site_id, status, created_by, org_id) "
+        "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+        (ref, title, description, severity, site_location, site_id,
+         "active", created_by, org_id))
     db.commit()
     row = db.execute("SELECT * FROM emergency_events WHERE event_ref = %s", (ref,)).fetchone()
     return dict(row)

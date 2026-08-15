@@ -41,17 +41,21 @@ async def api_create(request: Request,
                      project_name: str = Form(...),
                      department: str = Form(""),
                      project_type: str = Form(""),
-                     location: str = Form("")):
+                     location: str = Form(""),
+                     site_id: int | None = Form(None)):
     db = get_db()
     try:
         project = data_service.create_project(
             db, project_name=project_name, department=department,
-            project_type=project_type, location=location,
+            project_type=project_type, location=location, site_id=site_id,
             created_by=request.state.user["id"], org_id=request.state.user.get("org_id"))
         log_audit(db, request.state.user["id"], request.state.user.get("org_id"),
                   "eia.project.create", "eia_projects", project["id"],
-                  new_value={"project_ref": project["project_ref"]})
+                  new_value={"project_ref": project["project_ref"],
+                             "site_id": project.get("site_id")})
         return JSONResponse({"ok": True, "project": project}, status_code=201)
+    except ValueError as exc:
+        return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)
     finally:
         db.close()
 
