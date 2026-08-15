@@ -141,6 +141,32 @@ class TestCompleteMaintenance:
         assert updated["hours_at_last_service"] == 60
 
 
+class TestDashboardSummary:
+    """get_asset_dashboard_summary - the main EcoAegis dashboard's asset tile."""
+
+    def test_fails_closed_without_org(self, db):
+        _mk_asset(db, interval=50)
+        assert data_service.get_asset_dashboard_summary(db, None) == {
+            "assets_tracked": 0, "open_maintenance_tasks": 0}
+
+    def test_counts_active_assets_and_open_maintenance(self, db):
+        _mk_asset(db, ref="GEN-001", interval=50)
+        _mk_asset(db, ref="GEN-002")
+        data_service.record_telemetry(db, asset_ref="GEN-001", run_hours=60, org_id=1)
+        summary = data_service.get_asset_dashboard_summary(db, 1)
+        assert summary["assets_tracked"] == 2
+        assert summary["open_maintenance_tasks"] == 1
+
+    def test_org_isolation(self, db):
+        db.execute("INSERT INTO organisations (name, slug) VALUES ('Other Org4', 'other-assets-4')")
+        db.commit()
+        other_org = db.execute("SELECT id FROM organisations WHERE slug = 'other-assets-4'").fetchone()["id"]
+        _mk_asset(db, org_id=1, ref="MINE-3")
+        _mk_asset(db, org_id=other_org, ref="THEIRS-3")
+        summary = data_service.get_asset_dashboard_summary(db, 1)
+        assert summary["assets_tracked"] == 1
+
+
 class TestTelemetryHttp:
     def _login(self, client, email):
         client.post("/login", data={"email": email, "password": "Test1234!"})

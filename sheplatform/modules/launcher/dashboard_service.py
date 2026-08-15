@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 
 from sheplatform.core.notifications import unread_count
 from sheplatform.database import get_db
+from sheplatform.modules.assets.data_service import get_asset_dashboard_summary
 from sheplatform.modules.incidents.data_service import get_ltifr_stats
 
 
@@ -133,6 +134,9 @@ def dashboard_stats(db, user_id: int | None = None, org_id: int | None = None) -
     # ---- LTIFR (B5): trailing 12 months, ISO 45001 million-hour base ----
     stats["ltifr"] = get_ltifr_stats(db, org_id)
 
+    # ---- Assets (C4): tracked count + open maintenance ----
+    stats["assets"] = get_asset_dashboard_summary(db, org_id)
+
     return stats
 
 
@@ -163,4 +167,5 @@ def _empty_stats() -> dict:
         "esg_rag": {},
         "ltifr": {"lost_time_injuries": 0, "total_lost_days": 0, "hours_worked": None,
                   "ltifr": None, "period_start": None, "period_end": None},
+        "assets": {"assets_tracked": 0, "open_maintenance_tasks": 0},
     }

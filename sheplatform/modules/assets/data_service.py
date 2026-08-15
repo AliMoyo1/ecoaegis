@@ -46,6 +46,17 @@ def get_asset(db, asset_id: int) -> dict | None:
     return dict(row) if row else None
 
 
+def get_asset_dashboard_summary(db, org_id: int | None) -> dict:
+    """Main dashboard tile summary. Fails closed: no org, all zeroes."""
+    if not org_id:
+        return {"assets_tracked": 0, "open_maintenance_tasks": 0}
+    assets_tracked = db.execute(
+        "SELECT COUNT(*) FROM assets WHERE org_id = %s AND status = 'active'", (org_id,)).fetchone()[0]
+    open_maintenance_tasks = db.execute(
+        "SELECT COUNT(*) FROM asset_maintenance_tasks WHERE org_id = %s AND status = 'open'", (org_id,)).fetchone()[0]
+    return {"assets_tracked": assets_tracked, "open_maintenance_tasks": open_maintenance_tasks}
+
+
 def list_readings(db, asset_id: int, limit: int = 50) -> list[dict]:
     rows = db.execute(
         "SELECT * FROM asset_readings WHERE asset_id = %s ORDER BY recorded_at DESC LIMIT %s",

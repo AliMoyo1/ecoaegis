@@ -65,6 +65,10 @@
     <span class="kpi-value">{{ stats.unread }}</span>
     <span class="kpi-label">Unread Notifications</span>
   </a>
+  <a href="/assets" class="kpi-card kpi-link">
+    <span class="kpi-value {{ 'amber' if stats.assets.open_maintenance_tasks > 0 }}">{{ stats.assets.open_maintenance_tasks }}</span>
+    <span class="kpi-label">Open Maintenance ({{ stats.assets.assets_tracked }} assets tracked)</span>
+  </a>
 </div>
 
 <!-- CHARTS ROW -->
