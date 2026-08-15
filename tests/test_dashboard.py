@@ -43,6 +43,8 @@ class TestDashboardService:
         assert "near_miss_ratio" in stats
         assert "ca_closure_rate" in stats
         assert "key_issues" in stats
+        assert "assets" in stats
+        assert "open_maintenance_tasks" in stats["assets"]
 
     def test_heatmap_counts_risks(self, db):
         officer = _mk_user(db, "she_officer", "ds2@test.com")
