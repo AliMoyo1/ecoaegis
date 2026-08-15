@@ -27,7 +27,8 @@ def client(tmp_path, monkeypatch):
     init_db()
     db = get_db()
     db.execute(
-        "INSERT OR IGNORE INTO organisations (name, slug) VALUES ('Test Org', 'test-org')")
+        "INSERT INTO organisations (name, slug) VALUES ('Test Org', 'test-org') "
+        "ON CONFLICT DO NOTHING")
     db.commit()
     db.close()
 
@@ -52,7 +53,8 @@ def db(tmp_path, monkeypatch):
     # Seed a default organisation so users.org_id (now NOT NULL) has a target.
     db = get_db()
     db.execute(
-        "INSERT OR IGNORE INTO organisations (name, slug) VALUES ('Test Org', 'test-org')")
+        "INSERT INTO organisations (name, slug) VALUES ('Test Org', 'test-org') "
+        "ON CONFLICT DO NOTHING")
     db.commit()
     return db
 

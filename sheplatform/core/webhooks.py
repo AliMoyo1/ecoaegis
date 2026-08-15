@@ -36,7 +36,7 @@ def deliver_event_webhooks(db, event_type: str, payload: dict) -> None:
     """Fan out an emitted event to all active webhook subscriptions."""
     try:
         rows = db.execute(
-            "SELECT id, url, secret, event_type FROM webhooks WHERE active = 1 AND event_type = %s",
+            "SELECT id, url, secret, event_type FROM webhooks WHERE active = TRUE AND event_type = %s",
             (event_type,),
         ).fetchall()
     except Exception:

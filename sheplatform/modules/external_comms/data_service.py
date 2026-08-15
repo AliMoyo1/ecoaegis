@@ -75,7 +75,7 @@ def hod_approve(db, comms_id: int, hod_user_id: int, comments: str = "") -> dict
     if hod is None or hod["role_key"] != "she_hod":
         return {"ok": False, "message": "BRN-008: requires HOD approval", "code": "BRN-008"}
     db.execute(
-        "UPDATE external_communications SET status = 'approved', hod_approved = 1, "
+        "UPDATE external_communications SET status = 'approved', hod_approved = TRUE, "
         "hod_approved_by = %s, hod_approved_at = %s, hod_comments = %s WHERE id = %s",
         (hod_user_id, datetime.now(timezone.utc).isoformat(), comments, comms_id))
     db.commit()
@@ -92,7 +92,7 @@ def dispatch(db, comms_id: int, by_user: int) -> dict:
                 "code": "BRN-008"}
     db.execute(
         "UPDATE external_communications SET status = 'dispatched', dispatched_at = %s, "
-        "dispatch_confirmation = 1 WHERE id = %s",
+        "dispatch_confirmation = TRUE WHERE id = %s",
         (datetime.now(timezone.utc).isoformat(), comms_id))
     db.commit()
     events.emit("comms.dispatched", {

@@ -47,7 +47,7 @@ def seed_kpis(db, org_id: int | None = None) -> int:
 
 
 def list_kpis(db, category: str | None = None) -> list[dict]:
-    sql = "SELECT * FROM esg_kpis WHERE is_active = 1"
+    sql = "SELECT * FROM esg_kpis WHERE is_active = TRUE"
     params: list = []
     if category:
         sql += " AND category = %s"

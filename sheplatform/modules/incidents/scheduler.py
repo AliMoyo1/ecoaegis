@@ -19,7 +19,7 @@ def check_statutory_deadlines(db) -> list[dict]:
     rows = db.execute(
         "SELECT * FROM incidents WHERE severity = 'critical' "
         "AND statutory_deadline IS NOT NULL AND statutory_deadline <= %s "
-        "AND statutory_deadline > %s AND nssa_notified = 0",
+        "AND statutory_deadline > %s AND nssa_notified = FALSE",
         (warning_window, now.isoformat()),
     ).fetchall()
     alerts = []
@@ -43,7 +43,7 @@ def check_overdue_deadlines(db) -> list[dict]:
     now = datetime.now(timezone.utc).isoformat()
     rows = db.execute(
         "SELECT * FROM incidents WHERE severity = 'critical' "
-        "AND statutory_deadline IS NOT NULL AND statutory_deadline < %s AND nssa_notified = 0",
+        "AND statutory_deadline IS NOT NULL AND statutory_deadline < %s AND nssa_notified = FALSE",
         (now,),
     ).fetchall()
     alerts = []
