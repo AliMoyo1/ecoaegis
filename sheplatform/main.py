@@ -155,3 +155,27 @@ async def start_scheduler():
     except Exception:
         import logging
         logging.getLogger("sheplatform").exception("scheduler start failed")
+
+
+@app.on_event("shutdown")
+async def shutdown_schedulers():
+    """Stop background schedulers on app exit.
+
+    Found in the C1-C4 test run: schedulers started on startup (incidents,
+    vendor, reporting, chemicals, lone worker, ThemisIQ sync) were never
+    stopped, so a scheduler thread from one TestClient kept firing against
+    other tests' temp DBs (and threw "no such table" noise at interpreter
+    exit). TestClient triggers this handler on context-manager exit.
+    """
+    import logging
+    logger = logging.getLogger("sheplatform")
+    for name in ("inc_scheduler", "vendor_scheduler", "report_scheduler",
+                 "chemicals_scheduler", "lone_worker_scheduler",
+                 "integration_scheduler"):
+        sched = getattr(app.state, name, None)
+        if sched is not None:
+            try:
+                sched.shutdown(wait=False)
+                logger.info("scheduler %s stopped", name)
+            except Exception:
+                logger.exception("failed to stop scheduler %s", name)
