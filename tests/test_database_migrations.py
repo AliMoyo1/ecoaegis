@@ -77,3 +77,22 @@ def test_init_db_is_idempotent_on_a_database_that_already_has_the_columns(old_sh
 
     init_db()
     init_db()  # must not raise
+
+
+def test_init_db_adds_map_measurement_and_import_tables_to_existing_database(old_shaped_db):
+    from sheplatform.database import init_db
+
+    con = sqlite3.connect(old_shaped_db)
+    con.execute("DROP TABLE site_coordinate_import_rows")
+    con.execute("DROP TABLE site_coordinate_imports")
+    con.execute("DROP TABLE map_usage_metrics")
+    con.commit()
+    con.close()
+
+    init_db()
+
+    con = sqlite3.connect(old_shaped_db)
+    tables = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    con.close()
+    assert {"map_usage_metrics", "site_coordinate_imports",
+            "site_coordinate_import_rows"} <= tables

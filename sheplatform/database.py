@@ -1186,6 +1186,64 @@ SCHEMA = [
         org_id          INTEGER REFERENCES organisations(id),
         created_at      TIMESTAMPTZ DEFAULT NOW()
     )""",
+    """
+    CREATE TABLE IF NOT EXISTS map_usage_metrics (
+        id              SERIAL PRIMARY KEY,
+        event_type      TEXT NOT NULL CHECK (event_type IN ('map_session','layer_request','coordinate_save','coordinate_clear','provider_failure','import_preview','import_commit')),
+        layer_name      TEXT CHECK (layer_name IN ('incidents','sites')),
+        feature_count   INTEGER DEFAULT 0,
+        unlocated_count INTEGER,
+        duration_ms     NUMERIC,
+        truncated       BOOLEAN DEFAULT FALSE,
+        coordinate_source TEXT CHECK (coordinate_source IN ('manual','device_gps','imported','geocoder')),
+        org_id          INTEGER NOT NULL REFERENCES organisations(id),
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+    )""",
+    """
+    CREATE INDEX IF NOT EXISTS idx_map_usage_metrics_org_created
+    ON map_usage_metrics(org_id, created_at)
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_map_usage_metrics_event
+    ON map_usage_metrics(event_type, created_at)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS site_coordinate_imports (
+        id                  SERIAL PRIMARY KEY,
+        batch_ref           TEXT UNIQUE NOT NULL,
+        status              TEXT NOT NULL DEFAULT 'previewed' CHECK (status IN ('previewed','committed','cancelled')),
+        total_rows          INTEGER NOT NULL DEFAULT 0,
+        valid_rows          INTEGER NOT NULL DEFAULT 0,
+        invalid_rows        INTEGER NOT NULL DEFAULT 0,
+        conflict_rows       INTEGER NOT NULL DEFAULT 0,
+        overwrite_approved  BOOLEAN DEFAULT FALSE,
+        org_id              INTEGER NOT NULL REFERENCES organisations(id),
+        created_by          INTEGER NOT NULL REFERENCES users(id),
+        created_at          TIMESTAMPTZ DEFAULT NOW(),
+        committed_at        TIMESTAMPTZ
+    )""",
+    """
+    CREATE TABLE IF NOT EXISTS site_coordinate_import_rows (
+        id                    SERIAL PRIMARY KEY,
+        import_id             INTEGER NOT NULL REFERENCES site_coordinate_imports(id) ON DELETE CASCADE,
+        row_number            INTEGER NOT NULL,
+        site_id               INTEGER REFERENCES sites(id),
+        site_code             TEXT,
+        latitude              NUMERIC,
+        longitude             NUMERIC,
+        coordinate_accuracy_m NUMERIC,
+        status                TEXT NOT NULL CHECK (status IN ('valid','invalid','conflict')),
+        error                 TEXT,
+        UNIQUE(import_id, row_number)
+    )""",
+    """
+    CREATE INDEX IF NOT EXISTS idx_site_coordinate_imports_org
+    ON site_coordinate_imports(org_id, created_at)
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_site_coordinate_import_rows_batch
+    ON site_coordinate_import_rows(import_id, row_number)
+    """,
     # ---- Lone worker / man-down (guide C2) ----
     """
     CREATE TABLE IF NOT EXISTS lone_worker_checkins (

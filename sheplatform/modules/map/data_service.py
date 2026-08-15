@@ -14,6 +14,11 @@ from sheplatform.core.audit import log_audit
 
 
 COORDINATE_SOURCES = frozenset({"manual", "device_gps", "imported", "geocoder"})
+MAP_METRIC_EVENTS = frozenset({
+    "map_session", "layer_request", "coordinate_save", "coordinate_clear",
+    "provider_failure", "import_preview", "import_commit",
+})
+MAP_LAYERS = frozenset({"incidents", "sites"})
 
 
 def validate_coordinates(latitude: float, longitude: float) -> tuple[float, float]:
@@ -29,7 +34,7 @@ def validate_coordinates(latitude: float, longitude: float) -> tuple[float, floa
     return lat, lng
 
 
-def _validated_accuracy(accuracy_m: float | None) -> float | None:
+def validate_accuracy(accuracy_m: float | None) -> float | None:
     if accuracy_m is None or accuracy_m == "":
         return None
     try:
@@ -39,6 +44,101 @@ def _validated_accuracy(accuracy_m: float | None) -> float | None:
     if not math.isfinite(accuracy) or accuracy < 0:
         raise ValueError("accuracy_m must be zero or greater")
     return accuracy
+
+
+def count_unlocated_sites(db, org_id: int | None) -> int:
+    """Current active-site count without canonical coordinates."""
+    if not org_id:
+        return 0
+    row = db.execute(
+        "SELECT COUNT(*) AS c FROM sites WHERE org_id = %s AND status = 'active' "
+        "AND (latitude IS NULL OR longitude IS NULL)",
+        (org_id,),
+    ).fetchone()
+    return int(row["c"])
+
+
+def record_map_metric(db, *, event_type: str, org_id: int | None,
+                      layer_name: str | None = None, feature_count: int = 0,
+                      unlocated_count: int | None = None,
+                      duration_ms: float | None = None, truncated: bool = False,
+                      coordinate_source: str | None = None,
+                      commit: bool = True) -> bool:
+    """Persist private aggregate measurements without users, coordinates, or text."""
+    if not org_id:
+        return False
+    if event_type not in MAP_METRIC_EVENTS:
+        raise ValueError("invalid map metric event")
+    if layer_name is not None and layer_name not in MAP_LAYERS:
+        raise ValueError("invalid map metric layer")
+    if coordinate_source is not None and coordinate_source not in COORDINATE_SOURCES:
+        raise ValueError("invalid coordinate source")
+    features = max(0, int(feature_count))
+    unlocated = None if unlocated_count is None else max(0, int(unlocated_count))
+    duration = None if duration_ms is None else max(0.0, float(duration_ms))
+    db.execute(
+        "INSERT INTO map_usage_metrics (event_type, layer_name, feature_count, "
+        "unlocated_count, duration_ms, truncated, coordinate_source, org_id) "
+        "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+        (event_type, layer_name, features, unlocated, duration, bool(truncated),
+         coordinate_source, org_id),
+    )
+    if commit:
+        db.commit()
+    return True
+
+
+def map_metrics_summary(db, org_id: int | None) -> dict:
+    """Return tenant-only operational aggregates; never expose raw metric rows."""
+    empty = {
+        "sessions": 0,
+        "coordinate_saves": 0,
+        "coordinate_clears": 0,
+        "provider_failures": 0,
+        "import_previews": 0,
+        "import_commits": 0,
+        "layers": {},
+        "unlocated_sites": 0,
+    }
+    if not org_id:
+        return empty
+    rows = db.execute(
+        "SELECT event_type, COUNT(*) AS event_count FROM map_usage_metrics "
+        "WHERE org_id = %s GROUP BY event_type",
+        (org_id,),
+    ).fetchall()
+    mapping = {
+        "map_session": "sessions",
+        "coordinate_save": "coordinate_saves",
+        "coordinate_clear": "coordinate_clears",
+        "provider_failure": "provider_failures",
+        "import_preview": "import_previews",
+        "import_commit": "import_commits",
+    }
+    summary = dict(empty)
+    for row in rows:
+        key = mapping.get(row["event_type"])
+        if key:
+            summary[key] = int(row["event_count"])
+    layers = db.execute(
+        "SELECT layer_name, COUNT(*) AS requests, COALESCE(SUM(feature_count), 0) AS features, "
+        "COALESCE(AVG(duration_ms), 0) AS average_duration_ms, "
+        "COALESCE(SUM(CASE WHEN truncated = TRUE THEN 1 ELSE 0 END), 0) AS truncations "
+        "FROM map_usage_metrics WHERE org_id = %s AND event_type = 'layer_request' "
+        "GROUP BY layer_name",
+        (org_id,),
+    ).fetchall()
+    summary["layers"] = {
+        row["layer_name"]: {
+            "requests": int(row["requests"]),
+            "features": int(row["features"]),
+            "average_duration_ms": round(float(row["average_duration_ms"]), 2),
+            "truncations": int(row["truncations"]),
+        }
+        for row in layers
+    }
+    summary["unlocated_sites"] = count_unlocated_sites(db, org_id)
+    return summary
 
 
 def _coordinate_values(row) -> dict:
@@ -120,13 +220,13 @@ def list_sites_for_coordinate_admin(db, org_id: int | None) -> list[dict]:
 
 def set_site_coords(db, *, site_id: int, latitude: float, longitude: float,
                     source: str, updated_by: int, org_id: int | None,
-                    accuracy_m: float | None = None) -> dict:
+                    accuracy_m: float | None = None, commit: bool = True) -> dict:
     """Set canonical site coordinates with tenant, actor, provenance, and audit."""
     lat, lng = validate_coordinates(latitude, longitude)
     source = (source or "").strip().lower()
     if source not in COORDINATE_SOURCES:
         raise ValueError("invalid coordinate source")
-    accuracy = _validated_accuracy(accuracy_m)
+    accuracy = validate_accuracy(accuracy_m)
     row = _editable_site(db, site_id, updated_by, org_id)
     if row is None:
         return {"ok": False, "message": "site not found"}
@@ -148,7 +248,7 @@ def set_site_coords(db, *, site_id: int, latitude: float, longitude: float,
         "coordinates_updated_by": updated_by,
     }
     log_audit(db, updated_by, org_id, "site.set_coords", "sites", site_id,
-              old_value=previous, new_value=current)
+              old_value=previous, new_value=current, commit=commit)
     site = db.execute(
         "SELECT * FROM sites WHERE id = %s AND org_id = %s", (site_id, org_id)
     ).fetchone()

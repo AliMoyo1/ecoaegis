@@ -49,6 +49,7 @@ if (TILE_URL) {
     providerStatus.querySelector("h2").textContent = "Basemap temporarily unavailable";
     providerStatus.querySelector("p").textContent =
       "Operational markers and coordinate editing remain available. Check the configured tile provider and network connection.";
+    fetch("/map/api/metrics/provider-failure", { method: "POST" }).catch(() => {});
   });
 }
 
@@ -294,6 +295,8 @@ if (editor) {
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || "Location could not be saved");
       sites.set(site.id, data.site);
+      siteSelect.options[siteSelect.selectedIndex].textContent =
+        `${data.site.site_name} (${data.site.site_code}) — located`;
       setDraft(data.site.latitude, data.site.longitude, data.site.coordinate_source,
         data.site.coordinate_accuracy_m, false);
       setStatus("Site location saved and audited.");
@@ -316,6 +319,8 @@ if (editor) {
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || "Location could not be cleared");
       sites.set(site.id, data.site);
+      siteSelect.options[siteSelect.selectedIndex].textContent =
+        `${data.site.site_name} (${data.site.site_code}) — unlocated`;
       removeDraftMarker();
       latitudeInput.value = "";
       longitudeInput.value = "";
@@ -333,6 +338,7 @@ if (editor) {
       const response = await fetch("/map/api/sites");
       if (!response.ok) throw new Error("Sites could not be loaded");
       const data = await response.json();
+      sites.clear();
       siteSelect.replaceChildren(new Option("Choose a site", ""));
       for (const site of data.sites) {
         sites.set(site.id, site);
@@ -345,6 +351,94 @@ if (editor) {
       setStatus(error.message || "Sites could not be loaded.");
     }
   }
+
+  const importForm = document.getElementById("coordinate-import-form");
+  const importStatus = document.getElementById("coordinate-import-status");
+  const importResults = document.getElementById("coordinate-import-results");
+  const importSummary = document.getElementById("coordinate-import-summary");
+  const importRows = document.getElementById("coordinate-import-rows");
+  const importControls = document.getElementById("coordinate-import-commit-controls");
+  const overwriteLabel = document.getElementById("coordinate-import-overwrite-label");
+  const overwriteInput = document.getElementById("coordinate-import-overwrite");
+  const importCommitButton = document.getElementById("coordinate-import-commit");
+  let currentImportId = null;
+
+  function addImportCell(row, value) {
+    const cell = document.createElement("td");
+    cell.textContent = value === null || value === undefined ? "" : String(value);
+    row.appendChild(cell);
+  }
+
+  function renderImportPreview(data) {
+    const batch = data.batch;
+    currentImportId = batch.id;
+    importResults.hidden = false;
+    importSummary.textContent =
+      `${batch.total_rows} rows: ${batch.valid_rows} valid, ${batch.conflict_rows} existing-location conflicts, ${batch.invalid_rows} invalid.`;
+    importRows.replaceChildren();
+    for (const item of data.rows) {
+      const row = document.createElement("tr");
+      addImportCell(row, item.row_number);
+      addImportCell(row, item.site_code);
+      addImportCell(row, item.latitude);
+      addImportCell(row, item.longitude);
+      addImportCell(row, item.status);
+      addImportCell(row, item.error || (item.status === "conflict" ? "Existing coordinates require overwrite approval" : ""));
+      importRows.appendChild(row);
+    }
+    const canCommit = batch.invalid_rows === 0;
+    importControls.hidden = !canCommit;
+    overwriteLabel.hidden = batch.conflict_rows === 0;
+    overwriteInput.checked = false;
+    importStatus.textContent = canCommit
+      ? "Preview complete. Review every row before committing."
+      : "Preview contains invalid rows. Correct the CSV and upload a new preview.";
+  }
+
+  importForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!importForm.reportValidity()) return;
+    currentImportId = null;
+    importResults.hidden = true;
+    importStatus.textContent = "Validating CSV without changing sites...";
+    try {
+      const response = await fetch("/map/api/coordinate-imports/preview", {
+        method: "POST",
+        body: new FormData(importForm),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Coordinate import could not be previewed");
+      renderImportPreview(data);
+    } catch (error) {
+      importStatus.textContent = error.message || "Coordinate import could not be previewed.";
+    }
+  });
+
+  importCommitButton.addEventListener("click", async () => {
+    if (!currentImportId) return;
+    if (!overwriteLabel.hidden && !overwriteInput.checked) {
+      importStatus.textContent = "Approve overwriting existing coordinates before committing this batch.";
+      return;
+    }
+    if (!window.confirm("Commit this reviewed coordinate import? Each site change will be audited.")) return;
+    importStatus.textContent = "Committing coordinate import...";
+    const body = new FormData();
+    body.append("overwrite_existing", overwriteInput.checked ? "true" : "false");
+    try {
+      const response = await fetch(`/map/api/coordinate-imports/${currentImportId}/commit`, {
+        method: "POST",
+        body,
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Coordinate import could not be committed");
+      importStatus.textContent = `${data.updated_sites} site locations imported and audited.`;
+      importControls.hidden = true;
+      await loadCoordinateSites();
+      await loadPoints({ fit: false });
+    } catch (error) {
+      importStatus.textContent = error.message || "Coordinate import could not be committed.";
+    }
+  });
 
   loadCoordinateSites();
 }

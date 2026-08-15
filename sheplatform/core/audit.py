@@ -7,7 +7,7 @@ import json
 def log_audit(db, user_id: int | None, org_id: int | None, action: str,
               entity_type: str, entity_id: int | None = None,
               old_value: dict | None = None, new_value: dict | None = None,
-              ip_address: str | None = None) -> None:
+              ip_address: str | None = None, commit: bool = True) -> None:
     db.execute(
         "INSERT INTO audit_log (user_id, org_id, action, entity_type, entity_id, "
         "old_value, new_value, ip_address) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
@@ -16,7 +16,8 @@ def log_audit(db, user_id: int | None, org_id: int | None, action: str,
          json.dumps(new_value) if new_value is not None else None,
          ip_address),
     )
-    db.commit()
+    if commit:
+        db.commit()
 
 
 def list_audit(db, entity_type: str | None = None, entity_id: int | None = None, limit: int = 100) -> list[dict]:
