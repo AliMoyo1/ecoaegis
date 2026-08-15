@@ -17,9 +17,29 @@ migration path before, this test exists so it stays exercised.
 """
 from __future__ import annotations
 
+import re
 import sqlite3
 
 import pytest
+
+
+SITE_RELATION_TABLES = ("permits", "inspections", "eia_projects", "emergency_events")
+
+
+def _rebuild_without_site_id(con: sqlite3.Connection, table: str) -> None:
+    """Recreate an empty current table in its pre-Phase-2 shape."""
+    create_sql = con.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?", (table,)
+    ).fetchone()[0]
+    old_sql = re.sub(
+        r"\n\s*site_id\s+INTEGER\s+REFERENCES\s+sites\(id\),?",
+        "",
+        create_sql,
+        flags=re.IGNORECASE,
+    )
+    assert old_sql != create_sql
+    con.execute(f'DROP TABLE "{table}"')
+    con.execute(old_sql)
 
 
 @pytest.fixture
@@ -47,6 +67,11 @@ def old_shaped_db(tmp_path, monkeypatch):
     ):
         con.execute(f"ALTER TABLE sites DROP COLUMN {column}")
     con.commit()
+    con.execute("PRAGMA foreign_keys=OFF")
+    for table in SITE_RELATION_TABLES:
+        _rebuild_without_site_id(con, table)
+    con.commit()
+    con.execute("PRAGMA foreign_keys=ON")
     con.close()
     return db_path
 
@@ -67,6 +92,31 @@ def test_init_db_retrofits_missing_columns_on_an_existing_database(old_shaped_db
         "geocode_place_id",
     } <= site_cols
     assert {"immediate_actions", "estimated_cost", "witnesses"} <= incident_cols
+
+
+@pytest.mark.parametrize("table", SITE_RELATION_TABLES)
+def test_fresh_schema_has_site_relationship_foreign_keys(db, table):
+    columns = {row[1] for row in db.execute(f"PRAGMA table_info({table})").fetchall()}
+    foreign_keys = db.execute(f"PRAGMA foreign_key_list({table})").fetchall()
+
+    assert "site_id" in columns
+    assert any(row[2] == "sites" and row[3] == "site_id" and row[4] == "id"
+               for row in foreign_keys)
+
+
+def test_init_db_retrofits_site_relationships_on_existing_tables(old_shaped_db):
+    from sheplatform.database import init_db
+
+    init_db()
+
+    con = sqlite3.connect(old_shaped_db)
+    for table in SITE_RELATION_TABLES:
+        columns = {row[1] for row in con.execute(f"PRAGMA table_info({table})")}
+        foreign_keys = con.execute(f"PRAGMA foreign_key_list({table})").fetchall()
+        assert "site_id" in columns
+        assert any(row[2] == "sites" and row[3] == "site_id" and row[4] == "id"
+                   for row in foreign_keys)
+    con.close()
 
 
 def test_init_db_is_idempotent_on_a_database_that_already_has_the_columns(old_shaped_db):

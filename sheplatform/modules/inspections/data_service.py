@@ -8,6 +8,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from sheplatform.core.audit import log_audit
+from sheplatform.modules.map.site_relationship_service import prepare_site_assignment
 
 TYPES = ("safety", "health", "environmental", "fire", "housekeeping", "electrical")
 DEFAULT_CHECKLIST = {
@@ -44,18 +45,23 @@ def get_checklist(inspection_type: str) -> list[str]:
 
 def schedule_inspection(db, *, title: str, inspection_type: str, site_location: str,
                         scheduled_date: str, inspector_id: int, created_by: int,
-                        org_id: int | None = None) -> dict:
+                        org_id: int | None = None, site_id: int | None = None) -> dict:
     if inspection_type not in TYPES:
         raise ValueError("invalid inspection_type")
+    org_id, site_id = prepare_site_assignment(
+        db, site_id=site_id, org_id=org_id, user_id=created_by
+    )
     ref = _next_ref(db)
     db.execute(
-        "INSERT INTO inspections (inspection_ref, title, inspection_type, site_location, "
+        "INSERT INTO inspections (inspection_ref, title, inspection_type, site_location, site_id, "
         "scheduled_date, status, inspector_id, org_id, created_by) "
-        "VALUES (%s, %s, %s, %s, %s, 'scheduled', %s, %s, %s)",
-        (ref, title, inspection_type, site_location, scheduled_date, inspector_id, org_id, created_by))
+        "VALUES (%s, %s, %s, %s, %s, %s, 'scheduled', %s, %s, %s)",
+        (ref, title, inspection_type, site_location, site_id, scheduled_date,
+         inspector_id, org_id, created_by))
     db.commit()
     log_audit(db, created_by, org_id, "inspection.scheduled", "inspections", ref,
-              new_value={"title": title, "inspection_type": inspection_type})
+              new_value={"title": title, "inspection_type": inspection_type,
+                         "site_id": site_id})
     return dict(db.execute("SELECT * FROM inspections WHERE inspection_ref = %s", (ref,)).fetchone())
 
 

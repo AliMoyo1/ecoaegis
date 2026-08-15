@@ -10,6 +10,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from sheplatform.core import events
+from sheplatform.modules.map.site_relationship_service import prepare_site_assignment
 
 
 def next_permit_ref(db) -> str:
@@ -24,7 +25,8 @@ def next_permit_ref(db) -> str:
 
 def create_permit(db, *, permit_type: str, title: str, description: str,
                   vendor_id: int, risk_assessment_id: int,
-                  site_location: str = "", scope_boundary: str = "",
+                  site_location: str = "", site_id: int | None = None,
+                  scope_boundary: str = "",
                   valid_from: str = "", valid_until: str = "",
                   created_by: int | None = None, org_id: int | None = None) -> dict:
     """Create a PTW. BRN-001: reject if the referenced risk assessment is not approved."""
@@ -35,13 +37,16 @@ def create_permit(db, *, permit_type: str, title: str, description: str,
         return {"ok": False, "message": "BRN-001: PTW requires an APPROVED risk assessment",
                 "code": "BRN-001"}
 
+    org_id, site_id = prepare_site_assignment(
+        db, site_id=site_id, org_id=org_id, user_id=created_by
+    )
     ref = next_permit_ref(db)
     db.execute(
         "INSERT INTO permits (permit_ref, permit_type, title, description, vendor_id, "
-        "risk_assessment_id, site_location, scope_boundary, valid_from, valid_until, "
-        "status, created_by, org_id) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+        "risk_assessment_id, site_location, site_id, scope_boundary, valid_from, valid_until, "
+        "status, created_by, org_id) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
         (ref, permit_type, title, description, vendor_id, risk_assessment_id,
-         site_location, scope_boundary, valid_from or None, valid_until or None,
+         site_location, site_id, scope_boundary, valid_from or None, valid_until or None,
          "pending_approval", created_by, org_id),
     )
     db.commit()

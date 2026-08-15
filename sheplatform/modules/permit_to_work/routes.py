@@ -47,6 +47,7 @@ async def api_create(request: Request,
                      vendor_id: int = Form(...),
                      risk_assessment_id: int = Form(...),
                      site_location: str = Form(""),
+                     site_id: int | None = Form(None),
                      scope_boundary: str = Form(""),
                      valid_from: str = Form(""),
                      valid_until: str = Form("")):
@@ -57,7 +58,7 @@ async def api_create(request: Request,
         result = data_service.create_permit(
             db, permit_type=permit_type, title=title, description=description,
             vendor_id=vendor_id, risk_assessment_id=risk_assessment_id,
-            site_location=site_location, scope_boundary=scope_boundary,
+            site_location=site_location, site_id=site_id, scope_boundary=scope_boundary,
             valid_from=valid_from, valid_until=valid_until,
             created_by=request.state.user["id"], org_id=request.state.user.get("org_id"))
         if not result["ok"]:
@@ -65,8 +66,11 @@ async def api_create(request: Request,
             return JSONResponse(result, status_code=code)
         log_audit(db, request.state.user["id"], request.state.user.get("org_id"),
                   "permit.create", "permits", result["permit"]["id"],
-                  new_value={"permit_ref": result["permit"]["permit_ref"]})
+                  new_value={"permit_ref": result["permit"]["permit_ref"],
+                             "site_id": result["permit"].get("site_id")})
         return JSONResponse(result, status_code=201)
+    except ValueError as exc:
+        return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)
     finally:
         db.close()
 
