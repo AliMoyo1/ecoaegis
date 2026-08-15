@@ -34,8 +34,10 @@ def create_obligation(db, *, regulation: str, obligation: str, regulator: str,
         (ref, regulation, obligation, regulator, owner_id, frequency,
          next_due_date or None, org_id, created_by))
     db.commit()
-    log_audit(db, created_by, org_id, "obligation.created", "compliance", ref,
-              new_value={"regulation": regulation, "regulator": regulator})
+    created = db.execute("SELECT * FROM compliance_obligations WHERE obligation_ref = %s",
+                         (ref,)).fetchone()
+    log_audit(db, created_by, org_id, "obligation.created", "compliance", created["id"],
+              new_value={"obligation_ref": ref, "regulation": regulation, "regulator": regulator})
     return dict(db.execute("SELECT * FROM compliance_obligations WHERE obligation_ref = %s",
                            (ref,)).fetchone())
 
@@ -69,7 +71,7 @@ def mark_compliant(db, ob_id: int, user_id: int, evidence: str = "") -> dict:
     db.execute("UPDATE compliance_obligations SET status = 'compliant', evidence_path = %s, "
                "updated_at = %s WHERE id = %s", (evidence or row["evidence_path"], now, ob_id))
     db.commit()
-    log_audit(db, user_id, None, "obligation.compliant", "compliance", row["obligation_ref"])
+    log_audit(db, user_id, None, "obligation.compliant", "compliance", ob_id)
     return dict(db.execute("SELECT * FROM compliance_obligations WHERE id = %s", (ob_id,)).fetchone())
 
 

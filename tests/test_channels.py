@@ -25,8 +25,9 @@ def channel_env(client, monkeypatch):
     db = get_db()
     try:
         db.execute(
-            "INSERT OR IGNORE INTO users (email, password_hash, first_name, last_name, role_key, org_id, phone) "
-            "VALUES ('field@test.com', %s, 'Field', 'Worker', 'employee', 1, '+263783047375')",
+            "INSERT INTO users (email, password_hash, first_name, last_name, role_key, org_id, phone) "
+            "VALUES ('field@test.com', %s, 'Field', 'Worker', 'employee', 1, '+263783047375') "
+            "ON CONFLICT DO NOTHING",
             (hash_password("password"),))
         db.commit()
     finally:

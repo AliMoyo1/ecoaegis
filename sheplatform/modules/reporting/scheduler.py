@@ -33,7 +33,7 @@ def age_key_issues(db) -> list[dict]:
         db.execute(
             "UPDATE key_issues SET age_days = %s, escalated = %s, status = CASE WHEN %s "
             "THEN 'escalated' ELSE status END WHERE id = %s",
-            (new_age, 1 if should_escalate else 0, 1 if should_escalate else 0, issue["id"]))
+            (new_age, should_escalate, should_escalate, issue["id"]))
         if should_escalate:
             notify_roles(db, ["she_manager", "cro"],
                          f"Key issue escalated: {issue['title']}",

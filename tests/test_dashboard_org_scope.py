@@ -26,7 +26,7 @@ def _mk_incident(db, by_user, severity="high", incident_type="environmental", or
 class TestDashboardOrgScope:
     def test_org_a_excludes_org_b(self, db):
         # Ensure org 2 exists
-        db.execute("INSERT OR IGNORE INTO organisations (id, name, slug) VALUES (2, 'Org 2', 'org-2')")
+        db.execute("INSERT INTO organisations (id, name, slug) VALUES (2, 'Org 2', 'org-2') ON CONFLICT DO NOTHING")
         db.commit()
 
         user_a = _mk_user(db, "she_officer", "ds_org_a@test.com", org_id=1)

@@ -67,7 +67,7 @@ def dashboard_stats(db, user_id: int | None = None, org_id: int | None = None) -
     trend = []
     for m in months:
         trend.append(_scalar(
-            db, "SELECT COUNT(*) FROM incidents WHERE substr(reported_at, 1, 7) = %s AND org_id = %s", (m, org_id)))
+            db, "SELECT COUNT(*) FROM incidents WHERE substr(CAST(reported_at AS TEXT), 1, 7) = %s AND org_id = %s", (m, org_id)))
     stats["incident_trend"] = {"labels": [m[2:] + "/" + m[:4] for m in months], "values": trend}
 
     # ---- severity distribution ----
@@ -123,7 +123,7 @@ def dashboard_stats(db, user_id: int | None = None, org_id: int | None = None) -
     g_trend = []
     for m in g_months:
         g_trend.append(_scalar(
-            db, "SELECT COUNT(*) FROM grievances WHERE substr(created_at, 1, 7) = %s AND org_id = %s", (m, org_id)))
+            db, "SELECT COUNT(*) FROM grievances WHERE substr(CAST(created_at AS TEXT), 1, 7) = %s AND org_id = %s", (m, org_id)))
     stats["grievance_trend"] = {"labels": [m[2:] + "/" + m[:4] for m in g_months], "values": g_trend}
 
     # ---- ESG RAG summary ----

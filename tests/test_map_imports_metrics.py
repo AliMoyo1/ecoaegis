@@ -6,7 +6,18 @@ import json
 import pytest
 
 from sheplatform.core.auth import hash_password
+from sheplatform.config import settings
 from sheplatform.modules.map import coordinate_import_service, data_service
+
+
+def _table_columns(db, table: str) -> set[str]:
+    """Column names for a table, portable across SQLite and PostgreSQL."""
+    if settings.is_postgres():
+        rows = db.execute(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = %s",
+            (table,)).fetchall()
+        return {r["column_name"] for r in rows}
+    return {row["name"] for row in db.execute(f"PRAGMA table_info({table})")}
 
 
 def _mk_user(db, email="map-import@test.com", role="she_manager", org_id=1):
@@ -35,7 +46,7 @@ def _csv(*rows, header="site_code,latitude,longitude,accuracy_m"):
 
 class TestPrivateMapMetrics:
     def test_metric_schema_excludes_users_coordinates_and_text(self, db):
-        columns = {row["name"] for row in db.execute("PRAGMA table_info(map_usage_metrics)")}
+        columns = _table_columns(db, "map_usage_metrics")
         assert "org_id" in columns
         assert not {"user_id", "latitude", "longitude", "narrative", "query"} & columns
 

@@ -14,9 +14,9 @@ def investigator_client(client):
     db = get_db()
     try:
         db.execute(
-            "INSERT OR IGNORE INTO users "
+            "INSERT INTO users "
             "(email, password_hash, first_name, last_name, role_key, org_id, is_active) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            "VALUES (%s, %s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
             ("mgr@test.com", hash_password("Test1234!"), "Test", "Manager", "she_manager", 1, True),
         )
         db.commit()
@@ -105,7 +105,7 @@ def test_incident_copilot_cross_org_not_found(investigator_client):
 
     db = get_db()
     try:
-        db.execute("INSERT OR IGNORE INTO organisations (name, slug) VALUES ('Org 2', 'org-2')")
+        db.execute("INSERT INTO organisations (name, slug) VALUES ('Org 2', 'org-2') ON CONFLICT DO NOTHING")
         db.execute("UPDATE users SET org_id = 2 WHERE email = 'mgr@test.com'")
         db.commit()
         resp = investigator_client.post(f"/ai/api/incident-copilot/{inc_id}", headers=csrf_header(investigator_client))

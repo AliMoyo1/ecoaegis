@@ -70,9 +70,10 @@ def create_document(db, *, title: str, doc_type: str, description: str = "",
         db.execute("UPDATE documents SET status = 'superseded', updated_at = %s WHERE id = %s",
                    (datetime.now(timezone.utc).isoformat(), supersedes))
     db.commit()
-    log_audit(db, created_by, org_id, "document.created", "documents", ref,
-              new_value={"title": title, "doc_type": doc_type, "version": version})
-    return dict(db.execute("SELECT * FROM documents WHERE doc_ref = %s", (ref,)).fetchone())
+    row = db.execute("SELECT * FROM documents WHERE doc_ref = %s", (ref,)).fetchone()
+    log_audit(db, created_by, org_id, "document.created", "documents", row["id"],
+              new_value={"doc_ref": ref, "title": title, "doc_type": doc_type, "version": version})
+    return dict(row)
 
 
 def list_documents(db, doc_type: str | None = None, status: str | None = None,
@@ -113,8 +114,7 @@ def approve_document(db, doc_id: int, user_id: int) -> dict:
                "updated_at = %s, content_text = %s WHERE id = %s",
                (user_id, now, now, content_text or None, doc_id))
     db.commit()
-    log_audit(db, user_id, None, "document.approved", "documents",
-              db.execute("SELECT doc_ref FROM documents WHERE id = %s", (doc_id,)).fetchone()["doc_ref"])
+    log_audit(db, user_id, None, "document.approved", "documents", doc_id)
     updated = dict(db.execute("SELECT * FROM documents WHERE id = %s", (doc_id,)).fetchone())
     retrieval.index_document(db, doc_id, updated["title"], updated["description"] or "", content_text)
     return updated

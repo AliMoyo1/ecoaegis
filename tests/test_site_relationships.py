@@ -1,6 +1,7 @@
 """Phase 2 canonical-site relationship and tenant-boundary coverage."""
 from __future__ import annotations
 
+import os
 import sqlite3
 
 import pytest
@@ -174,6 +175,11 @@ def test_actor_cannot_spoof_another_tenant_assignment(db):
     assert count == 0
 
 
+@pytest.mark.skipif(
+    bool(os.getenv("TEST_DATABASE_URL")),
+    reason="SQLite-specific: opens a raw sqlite3 connection and asserts SQLite's "
+           "'database is locked'. On PostgreSQL prepare_site_assignment locks via "
+           "SELECT ... FOR SHARE, which this mechanism cannot exercise.")
 def test_site_lock_blocks_status_change_until_creation_transaction_finishes(db):
     from sheplatform.config import settings
     from sheplatform.modules.map.site_relationship_service import prepare_site_assignment

@@ -98,7 +98,7 @@ def _training_summary(db) -> list[dict]:
 def _monthly_trend(db, months: int = 12, org_id: int | None = None) -> list[dict]:
     frag, params = _org_cond(org_id)
     rows = db.execute(
-        "SELECT substr(reported_at, 1, 7) AS month, COUNT(*) AS n, "
+        "SELECT substr(CAST(reported_at AS TEXT), 1, 7) AS month, COUNT(*) AS n, "
         "SUM(CASE WHEN severity = 'critical' THEN 1 ELSE 0 END) AS critical "
         f"FROM incidents WHERE 1=1{frag} GROUP BY month ORDER BY month DESC LIMIT %s",
         params + [months]).fetchall()

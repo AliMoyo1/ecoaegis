@@ -20,7 +20,7 @@ def reporter_client(client):
     db = get_db()
     try:
         db.execute(
-            "INSERT OR IGNORE INTO organisations (id, name, slug) VALUES (1, 'Omni', 'omni')")
+            "INSERT INTO organisations (id, name, slug) VALUES (1, 'Omni', 'omni') ON CONFLICT DO NOTHING")
         pw = hash_password("password")
         db.execute(
             "INSERT INTO users (email, password_hash, first_name, last_name, role_key, org_id) "

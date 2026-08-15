@@ -1638,11 +1638,53 @@ def _to_sqlite_schema(ddl: str) -> str:
 # ---------------------------------------------------------------------------
 # Connections
 # ---------------------------------------------------------------------------
+_PG_CASTERS_REGISTERED = False
+
+
+def _register_pg_casters() -> None:
+    """Make psycopg2 return SQLite-compatible Python types (process-global).
+
+    The whole app was written against SQLite semantics: timestamp columns are
+    ISO strings and NUMERIC is float. Postgres would instead hand back
+    datetime and Decimal objects, breaking shared data-service code that does
+    datetime.fromisoformat(row[...]), json.dumps(dict(row)), and float maths.
+    Registering two type casters at the driver boundary fixes all of that in
+    one place, so module code stays backend-agnostic.
+    """
+    global _PG_CASTERS_REGISTERED
+    if _PG_CASTERS_REGISTERED:
+        return
+    import psycopg2.extras
+    from psycopg2 import extensions
+
+    # JSONB/JSON columns are declared as JSONB on Postgres but the app treats
+    # them as TEXT everywhere (json.dumps on write, json.loads on read, which
+    # is what SQLite requires). psycopg2 would otherwise auto-parse JSONB into
+    # dict/list on read, breaking those json.loads() calls. loads=identity
+    # makes the driver hand back the raw JSON string, matching the TEXT path.
+    psycopg2.extras.register_default_jsonb(loads=lambda s: s, globally=True)
+    psycopg2.extras.register_default_json(loads=lambda s: s, globally=True)
+
+    dec2float = extensions.new_type(
+        extensions.DECIMAL.values, "DEC2FLOAT",
+        lambda v, cur: float(v) if v is not None else None)
+    extensions.register_type(dec2float)
+    # timestamp (OID 1114) and timestamptz (OID 1184) -> ISO-ish string, with
+    # the space separator normalised to 'T' so it matches Python isoformat
+    # (what the app writes) and datetime.fromisoformat() parses it back.
+    ts2str = extensions.new_type(
+        (1114, 1184), "TS2STR",
+        lambda v, cur: v.replace(" ", "T") if v is not None else None)
+    extensions.register_type(ts2str)
+    _PG_CASTERS_REGISTERED = True
+
+
 def _connect() -> object:
     if settings.is_postgres():
         import psycopg2.extras
         from psycopg2.pool import ThreadedConnectionPool
 
+        _register_pg_casters()
         pool = getattr(_local, "pg_pool", None)
         if pool is None:
             # DictCursor (not RealDictCursor): its rows support BOTH integer and

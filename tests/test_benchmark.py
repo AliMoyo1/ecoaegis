@@ -99,7 +99,7 @@ class TestBenchmarkOrgIsolationHTTP:
 
     def test_org_1_never_sees_org_2_sites_or_counts(self, db):
         db.execute(
-            "INSERT OR IGNORE INTO organisations (id, name, slug) VALUES (2, 'Org 2', 'org-2')")
+            "INSERT INTO organisations (id, name, slug) VALUES (2, 'Org 2', 'org-2') ON CONFLICT DO NOTHING")
         db.commit()
 
         user_a = _mk_user(db, "she_officer", "http-bm-a@test.com", org_id=1)
