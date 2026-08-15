@@ -70,12 +70,39 @@ class Settings:
     TWILIO_FROM_NUMBER: str = os.getenv("TWILIO_FROM_NUMBER", "")
     SMS_DEFAULT_ORG_ID: int = int(os.getenv("SMS_DEFAULT_ORG_ID", "1"))
 
-    # Map (guide C1) - full Leaflet XYZ URL template incl. key, e.g. a MapTiler/
-    # Stadia/Geoapify free-tier URL. No default: tile.openstreetmap.org is not
-    # licensed for production use, so an unset value means "not configured yet"
-    # rather than silently falling back to a policy-violating tile source.
+    # Map (guide C1) - provider-neutral operational data with a configurable
+    # Leaflet raster basemap. No tile default: an unset value deliberately
+    # renders an honest no-basemap state instead of silently using a public
+    # service whose production-use policy may not fit EcoAegis.
+    MAP_ENGINE: str = os.getenv("MAP_ENGINE", "leaflet").strip().lower()
     MAP_TILE_URL_TEMPLATE: str = os.getenv("MAP_TILE_URL_TEMPLATE", "")
     MAP_TILE_ATTRIBUTION: str = os.getenv("MAP_TILE_ATTRIBUTION", "")
+    MAP_CENTER_LAT: float = float(os.getenv("MAP_CENTER_LAT", "-19.0154"))
+    MAP_CENTER_LNG: float = float(os.getenv("MAP_CENTER_LNG", "29.1549"))
+    MAP_DEFAULT_ZOOM: int = int(os.getenv("MAP_DEFAULT_ZOOM", "6"))
+    MAP_MIN_ZOOM: int = int(os.getenv("MAP_MIN_ZOOM", "5"))
+    MAP_MAX_ZOOM: int = int(os.getenv("MAP_MAX_ZOOM", "18"))
+    MAP_MAX_FEATURES_PER_LAYER: int = int(os.getenv("MAP_MAX_FEATURES_PER_LAYER", "2000"))
+    MAP_REQUEST_DEBOUNCE_MS: int = int(os.getenv("MAP_REQUEST_DEBOUNCE_MS", "300"))
+    GEOCODER_PROVIDER: str = os.getenv("GEOCODER_PROVIDER", "none").strip().lower()
+
+    def __post_init__(self) -> None:
+        if self.MAP_ENGINE != "leaflet":
+            raise ValueError("MAP_ENGINE must be 'leaflet' for release 1")
+        if not -90 <= self.MAP_CENTER_LAT <= 90:
+            raise ValueError("MAP_CENTER_LAT must be between -90 and 90")
+        if not -180 <= self.MAP_CENTER_LNG <= 180:
+            raise ValueError("MAP_CENTER_LNG must be between -180 and 180")
+        if not self.MAP_MIN_ZOOM <= self.MAP_DEFAULT_ZOOM <= self.MAP_MAX_ZOOM:
+            raise ValueError("map zooms must satisfy MAP_MIN_ZOOM <= MAP_DEFAULT_ZOOM <= MAP_MAX_ZOOM")
+        if not 100 <= self.MAP_MAX_FEATURES_PER_LAYER <= 5000:
+            raise ValueError("MAP_MAX_FEATURES_PER_LAYER must be between 100 and 5000")
+        if not 100 <= self.MAP_REQUEST_DEBOUNCE_MS <= 2000:
+            raise ValueError("MAP_REQUEST_DEBOUNCE_MS must be between 100 and 2000")
+        if self.MAP_TILE_URL_TEMPLATE and not self.MAP_TILE_ATTRIBUTION.strip():
+            raise ValueError("MAP_TILE_ATTRIBUTION is required when MAP_TILE_URL_TEMPLATE is set")
+        if self.GEOCODER_PROVIDER != "none":
+            raise ValueError("GEOCODER_PROVIDER must be 'none' until an approved provider is implemented")
 
     def is_postgres(self) -> bool:
         return bool(self.DATABASE_URL)
