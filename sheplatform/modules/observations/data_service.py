@@ -43,9 +43,10 @@ def create_observation(db, *, obs_type: str, title: str, description: str,
                 (ref, idempotency_key, obs_type, title, description, location, photo_path or "",
                  severity, reported_by, org_id, json.dumps(ai_metadata or {})))
     db.commit()
-    log_audit(db, reported_by, org_id, "observation.created", "observations", ref,
-              new_value={"obs_type": obs_type, "severity": severity})
-    return dict(db.execute("SELECT * FROM observations WHERE obs_ref = %s", (ref,)).fetchone())
+    row = db.execute("SELECT * FROM observations WHERE obs_ref = %s", (ref,)).fetchone()
+    log_audit(db, reported_by, org_id, "observation.created", "observations", row["id"],
+              new_value={"obs_ref": ref, "obs_type": obs_type, "severity": severity})
+    return dict(row)
 
 
 def list_observations(db, status: str | None = None, severity: str | None = None,
@@ -116,5 +117,5 @@ def close_observation(db, obs_id: int, user_id: int, resolution: str = "") -> di
     db.execute("UPDATE observations SET status = 'closed', description = %s, updated_at = %s "
                "WHERE id = %s", (new_desc, now, obs_id))
     db.commit()
-    log_audit(db, user_id, None, "observation.closed", "observations", row["obs_ref"])
+    log_audit(db, user_id, None, "observation.closed", "observations", obs_id)
     return dict(db.execute("SELECT * FROM observations WHERE id = %s", (obs_id,)).fetchone())

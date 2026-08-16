@@ -46,9 +46,10 @@ def create_chemical(db, *, name: str, cas_number: str = "", supplier: str = "",
          json.dumps(sds_extracted or {}), quantity_units or None,
          storage_location or None, site_id, org_id, created_by))
     db.commit()
-    log_audit(db, created_by, org_id, "chemical.created", "chemicals", ref,
-              new_value={"name": name, "hazard_class": hazard_class})
-    return dict(db.execute("SELECT * FROM chemicals WHERE chem_ref = %s", (ref,)).fetchone())
+    row = db.execute("SELECT * FROM chemicals WHERE chem_ref = %s", (ref,)).fetchone()
+    log_audit(db, created_by, org_id, "chemical.created", "chemicals", row["id"],
+              new_value={"chem_ref": ref, "name": name, "hazard_class": hazard_class})
+    return dict(row)
 
 
 def list_chemicals(db, hazard_class: str | None = None, site_id: int | None = None,
@@ -115,7 +116,7 @@ def update_chemical(db, chemical_id: int, *, org_id: int, user_id: int,
     row = db.execute("SELECT * FROM chemicals WHERE id = %s AND org_id = %s",
                      (chemical_id, org_id)).fetchone()
     if row:
-        log_audit(db, user_id, org_id, "chemical.updated", "chemicals", row["chem_ref"],
+        log_audit(db, user_id, org_id, "chemical.updated", "chemicals", row["id"],
                   new_value={k: v for k, v in updates.items() if k != "updated_at"})
     return dict(row) if row else None
 

@@ -17,10 +17,19 @@ migration path before, this test exists so it stays exercised.
 """
 from __future__ import annotations
 
+import os
 import re
 import sqlite3
 
 import pytest
+
+# This module tests the SQLite retrofit path specifically: it builds a real
+# SQLite file, DROP COLUMNs to simulate an old deploy, and inspects results
+# with PRAGMA. None of that applies to PostgreSQL (whose ALTER TABLE ADD
+# COLUMN IF NOT EXISTS branch runs directly), so skip the module under PG.
+pytestmark = pytest.mark.skipif(
+    bool(os.getenv("TEST_DATABASE_URL")),
+    reason="SQLite-specific migration mechanics (sqlite3.connect + PRAGMA + DROP COLUMN)")
 
 
 SITE_RELATION_TABLES = ("permits", "inspections", "eia_projects", "emergency_events")

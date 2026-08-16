@@ -101,7 +101,7 @@ def register_consultant(db, *, name: str, company: str = "",
         "INSERT INTO eia_consultants (name, company, ema_accreditation_number, "
         "ema_accreditation_verified, procurement_ref, status, org_id) "
         "VALUES (%s,%s,%s,%s,%s,%s,%s)",
-        (name, company, ema_accreditation_number, 0,
+        (name, company, ema_accreditation_number, False,
          f"PRC-EIA-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{name[:4].upper()}",
          "pending", org_id),
     )
@@ -129,7 +129,7 @@ def verify_consultant_accreditation(db, consultant_id: int, verified_by: int,
         "UPDATE eia_consultants SET ema_accreditation_verified = %s, "
         "accreditation_verified_by = %s, accreditation_verified_at = %s, status = %s "
         "WHERE id = %s",
-        (1 if verified else 0, verified_by, datetime.now(timezone.utc).isoformat(),
+        (verified, verified_by, datetime.now(timezone.utc).isoformat(),
          "verified" if verified else "rejected", consultant_id))
     db.commit()
     log_audit(db, verified_by, None, "consultant.accreditation", "eia_consultants",

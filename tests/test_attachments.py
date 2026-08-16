@@ -168,7 +168,7 @@ class TestAttachmentHTTP:
     def test_cross_org_returns_404(self, client, db, tmp_path, monkeypatch):
         monkeypatch.setattr(attachments_service, "ATTACHMENTS_DIR", tmp_path / "attachments")
         # Ensure org 2 exists so FK does not fail
-        db.execute("INSERT OR IGNORE INTO organisations (id, name, slug) VALUES (2, 'Other Org', 'other-org')")
+        db.execute("INSERT INTO organisations (id, name, slug) VALUES (2, 'Other Org', 'other-org') ON CONFLICT DO NOTHING")
         db.commit()
 
         officer = _mk_user(db, "she_officer", "att_http2@test.com")

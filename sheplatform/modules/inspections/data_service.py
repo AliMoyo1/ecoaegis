@@ -59,10 +59,11 @@ def schedule_inspection(db, *, title: str, inspection_type: str, site_location: 
         (ref, title, inspection_type, site_location, site_id, scheduled_date,
          inspector_id, org_id, created_by))
     db.commit()
-    log_audit(db, created_by, org_id, "inspection.scheduled", "inspections", ref,
-              new_value={"title": title, "inspection_type": inspection_type,
-                         "site_id": site_id})
-    return dict(db.execute("SELECT * FROM inspections WHERE inspection_ref = %s", (ref,)).fetchone())
+    row = db.execute("SELECT * FROM inspections WHERE inspection_ref = %s", (ref,)).fetchone()
+    log_audit(db, created_by, org_id, "inspection.scheduled", "inspections", row["id"],
+              new_value={"inspection_ref": ref, "title": title,
+                         "inspection_type": inspection_type, "site_id": site_id})
+    return dict(row)
 
 
 def list_inspections(db, status: str | None = None, org_id: int | None = None) -> list[dict]:
@@ -117,7 +118,7 @@ def complete_inspection(db, inspection_id: int, user_id: int, findings: str,
                    "VALUES (%s, %s, %s, %s)",
                    (inspection_id, r.get("item", ""), r.get("result", "na"), r.get("comment", "")))
     db.commit()
-    log_audit(db, user_id, org_id, "inspection.completed", "inspections", row["inspection_ref"],
+    log_audit(db, user_id, org_id, "inspection.completed", "inspections", inspection_id,
               new_value={"findings": findings, "fails": sum(1 for r in results if r.get("result") == "fail")})
 
     # auto-create CAPA for failed items

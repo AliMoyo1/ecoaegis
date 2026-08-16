@@ -13,9 +13,9 @@ def ai_user_client(client):
     db = get_db()
     try:
         db.execute(
-            "INSERT OR IGNORE INTO users "
+            "INSERT INTO users "
             "(email, password_hash, first_name, last_name, role_key, org_id, is_active) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            "VALUES (%s, %s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
             ("ai_user@test.com", hash_password("Test1234!"), "AI", "User", "she_manager", 1, True))
         db.commit()
     finally:

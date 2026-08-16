@@ -58,7 +58,7 @@ def test_create_report_autofills(client):
     try:
         org = db.execute("SELECT id FROM organisations WHERE slug = %s", ("test-org",)).fetchone()
         db.execute(
-            "INSERT OR REPLACE INTO incidents (id, incident_ref, title, severity, status, "
+            "INSERT INTO incidents (id, incident_ref, title, severity, status, "
             "location, occurred_at, description, immediate_cause, org_id, created_by) "
             "VALUES (990, 'INC-2026-999', 'Test critical', 'critical', 'open', 'Plant A', "
             "'2026-08-10T08:00:00', 'Desc', 'Isolation', %s, 1)", (org["id"],))

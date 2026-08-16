@@ -36,11 +36,12 @@ def create_action(db, *, title: str, description: str, source_type: str,
         "description, priority, status, assigned_to, due_date, org_id, created_by) "
         "VALUES (%s, %s, %s, %s, %s, %s, 'open', %s, %s, %s, %s)",
         (ref, source_type, source_id, title, description, priority, assigned_to,
-         due_date, org_id, created_by))
+         due_date or None, org_id, created_by))
     db.commit()
     row = db.execute("SELECT * FROM corrective_actions WHERE action_ref = %s", (ref,)).fetchone()
-    log_audit(db, created_by, org_id, "capa.action_created", "capa", ref,
-              new_value={"title": title, "priority": priority, "assigned_to": assigned_to})
+    log_audit(db, created_by, org_id, "capa.action_created", "capa", row["id"],
+              new_value={"action_ref": ref, "title": title, "priority": priority,
+                         "assigned_to": assigned_to})
     return dict(row)
 
 
@@ -83,9 +84,7 @@ def complete_action(db, action_id: int, user_id: int, completion_note: str = "")
                "description = %s, updated_at = %s WHERE id = %s",
                (now, new_desc, now, action_id))
     db.commit()
-    log_audit(db, user_id, None, "capa.action_completed", "capa",
-              db.execute("SELECT action_ref FROM corrective_actions WHERE id = %s",
-                         (action_id,)).fetchone()["action_ref"])
+    log_audit(db, user_id, None, "capa.action_completed", "capa", action_id)
     return dict(db.execute("SELECT * FROM corrective_actions WHERE id = %s", (action_id,)).fetchone())
 
 
@@ -106,8 +105,8 @@ def verify_action(db, action_id: int, user_id: int, verification_note: str = "")
                "verified_at = %s, description = %s, updated_at = %s WHERE id = %s",
                (user_id, now, new_desc, now, action_id))
     db.commit()
-    log_audit(db, user_id, None, "capa.action_verified", "capa",
-              row["action_ref"], new_value={"verified_by": user_id})
+    log_audit(db, user_id, None, "capa.action_verified", "capa", action_id,
+              new_value={"action_ref": row["action_ref"], "verified_by": user_id})
     return dict(db.execute("SELECT * FROM corrective_actions WHERE id = %s", (action_id,)).fetchone())
 
 

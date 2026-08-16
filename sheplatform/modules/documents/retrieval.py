@@ -24,6 +24,11 @@ def _tokenize(text: str) -> list[str]:
 
 
 def _fts_available(db) -> bool:
+    # FTS5 MATCH is SQLite-only. On PostgreSQL documents_fts is a plain table,
+    # so a MATCH query would error AND poison the transaction (aborting the
+    # LIKE fallback on the same connection). Force the LIKE path on PG.
+    if settings.is_postgres():
+        return False
     try:
         db.execute("SELECT * FROM documents_fts WHERE 1=0")
         return True
@@ -66,9 +71,13 @@ def _fts_search(db, terms: list[str], org_id: int | None, limit: int) -> list[di
 
 
 def _like_search(db, terms: list[str], org_id: int | None, limit: int) -> list[dict]:
+    # LOWER() both sides: SQLite LIKE is case-insensitive by default but
+    # PostgreSQL LIKE is case-sensitive. terms are already lowercased by
+    # _tokenize(), so LOWER(col) LIKE %term% matches on both engines.
     term_conds, params = [], []
     for term in terms:
-        term_conds.append("(title LIKE %s OR description LIKE %s OR content_text LIKE %s)")
+        term_conds.append(
+            "(LOWER(title) LIKE %s OR LOWER(description) LIKE %s OR LOWER(content_text) LIKE %s)")
         params.extend([f"%{term}%", f"%{term}%", f"%{term}%"])
     sql = "SELECT * FROM documents WHERE status = 'approved' AND (" + " OR ".join(term_conds) + ")"
     if org_id:

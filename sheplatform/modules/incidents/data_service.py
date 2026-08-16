@@ -422,7 +422,7 @@ def set_statutory_notified(db, incident_id: int, body: str, notified: bool = Tru
         "ema_notified_at = CASE WHEN %s = 'ema' THEN %s ELSE ema_notified_at END, "
         "zrp_notified_at = CASE WHEN %s = 'zrp' THEN %s ELSE zrp_notified_at END "
         "WHERE id = %s",
-        (body, 1 if notified else 0, body, 1 if notified else 0, body, 1 if notified else 0,
+        (body, notified, body, notified, body, notified,
          body, datetime.now(timezone.utc).isoformat() if notified else None,
          body, datetime.now(timezone.utc).isoformat() if notified else None,
          body, datetime.now(timezone.utc).isoformat() if notified else None,
