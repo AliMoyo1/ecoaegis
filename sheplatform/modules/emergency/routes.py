@@ -8,6 +8,7 @@ from sheplatform.core.audit import log_audit
 from sheplatform.core.middleware import require_auth, require_capability
 from sheplatform.database import get_db
 from sheplatform.modules.emergency import data_service
+from sheplatform.modules.map.site_relationship_service import list_active_sites
 from sheplatform.templating import templates
 
 router = APIRouter(prefix="/emergency")
@@ -17,8 +18,15 @@ router = APIRouter(prefix="/emergency")
 @require_auth
 @require_capability("module.emergency.access")
 async def emergency_shell(request: Request):
-    return templates.TemplateResponse(request, "emergency/templates/index.html",
-                                      {"user": request.state.user})
+    db = get_db()
+    try:
+        sites = list_active_sites(db, request.state.user.get("org_id"))
+        return templates.TemplateResponse(
+            request, "emergency/templates/index.html",
+            {"user": request.state.user, "sites": sites},
+        )
+    finally:
+        db.close()
 
 
 # ---- Plans ----

@@ -16,7 +16,19 @@
         <option value="critical">Critical</option>
       </select>
     </label>
-    <label>Site location <input type="text" name="site_location"></label>
+    <label>Canonical site
+      <select name="site_id" aria-describedby="emergency-site-help">
+        <option value="">Not linked / site not yet identified</option>
+        {% for site in sites %}
+        <option value="{{ site.id }}">{{ site.site_code }} — {{ site.site_name }}{% if site.city %} ({{ site.city }}){% endif %}</option>
+        {% endfor %}
+      </select>
+      <small id="emergency-site-help" style="display:block;color:var(--muted);margin-top:4px">Only active sites in your organisation are shown. This link supplies the map location.</small>
+    </label>
+    <label>Location details (optional)
+      <input type="text" name="site_location" placeholder="e.g. generator room, east entrance">
+      <small style="display:block;color:var(--muted);margin-top:4px">Description only; it does not set map coordinates.</small>
+    </label>
     <button class="btn btn-primary" type="submit">Log emergency</button>
   </form>
 </div>
@@ -24,7 +36,7 @@
 <div class="card">
   <h2>Emergency events</h2>
   <table class="data-table" id="emergency-table">
-    <thead><tr><th>Ref</th><th>Title</th><th>Severity</th><th>Status</th><th>Site safe</th></tr></thead>
+    <thead><tr><th>Ref</th><th>Title</th><th>Site</th><th>Location details</th><th>Severity</th><th>Status</th><th>Site safe</th></tr></thead>
     <tbody></tbody>
   </table>
 </div>

@@ -57,18 +57,21 @@ def get_project_by_ref(db, ref: str) -> dict | None:
 
 
 def list_projects(db, status: str | None = None, org_id: int | None = None) -> list[dict]:
-    sql = "SELECT * FROM eia_projects"
+    sql = (
+        "SELECT e.*, s.site_code, s.site_name FROM eia_projects e "
+        "LEFT JOIN sites s ON s.id = e.site_id AND s.org_id = e.org_id"
+    )
     conds, params = [], []
     if status:
-        conds.append("status = %s")
+        conds.append("e.status = %s")
         params.append(status)
     if not org_id:
         return []  # fail closed: no tenant scope -> no data (audit S5)
-    conds.append("org_id = %s")
+    conds.append("e.org_id = %s")
     params.append(org_id)
     if conds:
         sql += " WHERE " + " AND ".join(conds)
-    sql += " ORDER BY id DESC"
+    sql += " ORDER BY e.id DESC"
     return [dict(r) for r in db.execute(sql, params).fetchall()]
 
 

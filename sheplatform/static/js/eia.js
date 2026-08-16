@@ -12,10 +12,15 @@ async function loadProjects() {
     tr.innerHTML = `
       <td>${p.project_ref}</td>
       <td>${p.project_name}</td>
+      <td class="site-cell"></td>
+      <td>${p.location || "-"}</td>
       <td>${p.status}</td>
       <td>${p.eia_required === null ? "-" : (p.eia_required ? "Yes" : "No")}</td>
       <td>${blocked}</td>
       <td>${p.ema_decision || "-"}</td>`;
+    tr.querySelector(".site-cell").textContent = p.site_name
+      ? `${p.site_code} — ${p.site_name}`
+      : "Unlinked";
     tbody.appendChild(tr);
   }
 }

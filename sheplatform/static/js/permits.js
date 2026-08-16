@@ -19,10 +19,15 @@ async function loadPermits() {
       <td>${p.permit_ref}</td>
       <td>${p.title}</td>
       <td>${p.permit_type}</td>
+      <td class="site-cell"></td>
+      <td>${p.site_location || "-"}</td>
       <td>${p.vendor_id || "-"}</td>
       <td><strong>${p.status}</strong></td>
       <td>${p.valid_until ? p.valid_until.slice(0, 10) : "-"}</td>
       <td>${actions}</td>`;
+    tr.querySelector(".site-cell").textContent = p.site_name
+      ? `${p.site_code} — ${p.site_name}`
+      : "Unlinked";
     tbody.appendChild(tr);
   }
 }

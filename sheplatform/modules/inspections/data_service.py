@@ -67,8 +67,12 @@ def schedule_inspection(db, *, title: str, inspection_type: str, site_location: 
 
 
 def list_inspections(db, status: str | None = None, org_id: int | None = None) -> list[dict]:
-    sql = ("SELECT i.*, u.email AS inspector_email FROM inspections i "
-           "LEFT JOIN users u ON u.id = i.inspector_id")
+    sql = (
+        "SELECT i.*, u.email AS inspector_email, s.site_code, s.site_name "
+        "FROM inspections i "
+        "LEFT JOIN users u ON u.id = i.inspector_id "
+        "LEFT JOIN sites s ON s.id = i.site_id AND s.org_id = i.org_id"
+    )
     conds, params = [], []
     if status:
         conds.append("i.status = %s")

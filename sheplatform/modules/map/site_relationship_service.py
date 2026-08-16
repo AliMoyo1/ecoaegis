@@ -14,6 +14,19 @@ from sheplatform.database import resolve_org
 SITE_UNAVAILABLE_MESSAGE = "site is not active for this organisation"
 
 
+def list_active_sites(db, org_id: int | None) -> list[dict]:
+    """Return safe picker fields for active sites in one organisation."""
+    if not org_id:
+        return []
+    rows = db.execute(
+        "SELECT id, site_code, site_name, city, region FROM sites "
+        "WHERE org_id = %s AND status = 'active' "
+        "ORDER BY site_name, site_code",
+        (org_id,),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
 def prepare_site_assignment(
     db,
     *,

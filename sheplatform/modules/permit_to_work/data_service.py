@@ -74,18 +74,21 @@ def get_permit_by_ref(db, ref: str) -> dict | None:
 
 
 def list_permits(db, status: str | None = None, org_id: int | None = None) -> list[dict]:
-    sql = "SELECT * FROM permits"
+    sql = (
+        "SELECT p.*, s.site_code, s.site_name FROM permits p "
+        "LEFT JOIN sites s ON s.id = p.site_id AND s.org_id = p.org_id"
+    )
     conds, params = [], []
     if status:
-        conds.append("status = %s")
+        conds.append("p.status = %s")
         params.append(status)
     if not org_id:
         return []  # fail closed: no tenant scope -> no data (audit S5)
-    conds.append("org_id = %s")
+    conds.append("p.org_id = %s")
     params.append(org_id)
     if conds:
         sql += " WHERE " + " AND ".join(conds)
-    sql += " ORDER BY id DESC"
+    sql += " ORDER BY p.id DESC"
     return [dict(r) for r in db.execute(sql, params).fetchall()]
 
 

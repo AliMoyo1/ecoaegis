@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from sheplatform.core.middleware import require_auth, require_capability
 from sheplatform.database import get_db
 from sheplatform.modules.inspections import data_service
+from sheplatform.modules.map.site_relationship_service import list_active_sites
 from sheplatform.templating import templates
 
 router = APIRouter(prefix="/inspections", tags=["inspections"])
@@ -18,8 +19,15 @@ router = APIRouter(prefix="/inspections", tags=["inspections"])
 @require_auth
 @require_capability("module.inspections.access")
 async def inspections_shell(request: Request):
-    return templates.TemplateResponse(request, "inspections/templates/index.html",
-                                      {"user": request.state.user})
+    db = get_db()
+    try:
+        sites = list_active_sites(db, request.state.user.get("org_id"))
+        return templates.TemplateResponse(
+            request, "inspections/templates/index.html",
+            {"user": request.state.user, "sites": sites},
+        )
+    finally:
+        db.close()
 
 
 @router.get("/api/checklist")

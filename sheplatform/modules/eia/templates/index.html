@@ -9,7 +9,19 @@
     <label>Project name <input type="text" name="project_name" required></label>
     <label>Department <input type="text" name="department"></label>
     <label>Type <input type="text" name="project_type"></label>
-    <label>Location <input type="text" name="location"></label>
+    <label>Canonical site
+      <select name="site_id" aria-describedby="eia-site-help">
+        <option value="">Not linked / site not yet identified</option>
+        {% for site in sites %}
+        <option value="{{ site.id }}">{{ site.site_code }} — {{ site.site_name }}{% if site.city %} ({{ site.city }}){% endif %}</option>
+        {% endfor %}
+      </select>
+      <small id="eia-site-help" style="display:block;color:var(--muted);margin-top:4px">Only active sites in your organisation are shown. This link supplies the map location.</small>
+    </label>
+    <label>Location details (optional)
+      <input type="text" name="location" placeholder="e.g. proposed substation footprint">
+      <small style="display:block;color:var(--muted);margin-top:4px">Description only; it does not set map coordinates.</small>
+    </label>
     <button class="btn btn-primary" type="submit">Register project</button>
   </form>
 </div>
@@ -17,7 +29,7 @@
 <div class="card">
   <h2>Project list</h2>
   <table class="data-table" id="eia-table">
-    <thead><tr><th>Ref</th><th>Project</th><th>Status</th><th>EIA req</th><th>Blocked</th><th>EMA decision</th></tr></thead>
+    <thead><tr><th>Ref</th><th>Project</th><th>Site</th><th>Location details</th><th>Status</th><th>EIA req</th><th>Blocked</th><th>EMA decision</th></tr></thead>
     <tbody></tbody>
   </table>
 </div>

@@ -21,7 +21,19 @@
           <option value="housekeeping">Housekeeping</option>
         </select>
       </label>
-      <label>Location <input type="text" name="site_location"></label>
+      <label>Canonical site
+        <select name="site_id" aria-describedby="inspection-site-help">
+          <option value="">Not linked / site not yet identified</option>
+          {% for site in sites %}
+          <option value="{{ site.id }}">{{ site.site_code }} — {{ site.site_name }}{% if site.city %} ({{ site.city }}){% endif %}</option>
+          {% endfor %}
+        </select>
+        <small id="inspection-site-help" style="display:block;color:var(--muted);margin-top:4px">Only active sites in your organisation are shown.</small>
+      </label>
+      <label>Location details
+        <input type="text" name="site_location" placeholder="e.g. warehouse aisle 4">
+        <small style="display:block;color:var(--muted);margin-top:4px">Description only; map coordinates come from the canonical site.</small>
+      </label>
       <label>Scheduled date <input type="date" name="scheduled_date"></label>
       <label>Inspector
         <select name="inspector_id" id="inspector-select"></select>
@@ -43,7 +55,7 @@
     </select>
   </div>
   <table class="data-table" id="insp-table">
-    <thead><tr><th>Ref</th><th>Title</th><th>Type</th><th>Location</th><th>Scheduled</th><th>Inspector</th><th>Status</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Ref</th><th>Title</th><th>Type</th><th>Site</th><th>Location details</th><th>Scheduled</th><th>Inspector</th><th>Status</th><th>Actions</th></tr></thead>
     <tbody></tbody>
   </table>
 </div>

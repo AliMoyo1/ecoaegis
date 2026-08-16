@@ -166,7 +166,9 @@ def list_emergencies(db, org_id: int | None = None) -> list[dict]:
     if not org_id:
         return []  # fail closed: no tenant scope -> no data (audit S5)
     return [dict(r) for r in db.execute(
-        "SELECT * FROM emergency_events WHERE org_id = %s ORDER BY id DESC",
+        "SELECT e.*, s.site_code, s.site_name FROM emergency_events e "
+        "LEFT JOIN sites s ON s.id = e.site_id AND s.org_id = e.org_id "
+        "WHERE e.org_id = %s ORDER BY e.id DESC",
         (org_id,)).fetchall()]
 
 

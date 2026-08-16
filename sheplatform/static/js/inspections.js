@@ -36,11 +36,15 @@ async function loadInspections() {
       <td>${i.inspection_ref}</td>
       <td>${i.title}</td>
       <td>${i.inspection_type}</td>
+      <td class="site-cell"></td>
       <td>${i.site_location || "-"}</td>
       <td style="font-family:var(--mono);font-size:12px">${i.scheduled_date ? i.scheduled_date.slice(0, 10) : "-"}</td>
       <td>${i.inspector_email || "-"}</td>
       <td><strong>${i.status}</strong></td>
       <td>${btns || "-"}</td>`;
+    tr.querySelector(".site-cell").textContent = i.site_name
+      ? `${i.site_code} — ${i.site_name}`
+      : "Unlinked";
     tbody.appendChild(tr);
   }
 }

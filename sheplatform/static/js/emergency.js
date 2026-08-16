@@ -12,9 +12,14 @@ async function loadEvents() {
     tr.innerHTML = `
       <td>${e.event_ref}</td>
       <td>${e.title}</td>
+      <td class="site-cell"></td>
+      <td>${e.site_location || "-"}</td>
       <td>${e.severity}</td>
       <td>${e.status}</td>
       <td>${safe}</td>`;
+    tr.querySelector(".site-cell").textContent = e.site_name
+      ? `${e.site_code} — ${e.site_name}`
+      : "Unlinked";
     tbody.appendChild(tr);
   }
 }

@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from sheplatform.core.audit import log_audit
 from sheplatform.core.middleware import require_auth, require_capability
 from sheplatform.database import get_db
+from sheplatform.modules.map.site_relationship_service import list_active_sites
 from sheplatform.modules.permit_to_work import data_service
 from sheplatform.templating import templates
 
@@ -17,8 +18,15 @@ router = APIRouter(prefix="/permits")
 @require_auth
 @require_capability("module.permits.access")
 async def permits_shell(request: Request):
-    return templates.TemplateResponse(request, "permit_to_work/templates/index.html",
-                                      {"user": request.state.user})
+    db = get_db()
+    try:
+        sites = list_active_sites(db, request.state.user.get("org_id"))
+        return templates.TemplateResponse(
+            request, "permit_to_work/templates/index.html",
+            {"user": request.state.user, "sites": sites},
+        )
+    finally:
+        db.close()
 
 
 @router.get("/api/list")

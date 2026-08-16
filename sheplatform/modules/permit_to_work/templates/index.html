@@ -20,7 +20,19 @@
     </label>
     <label>Vendor ID <input type="number" name="vendor_id" required></label>
     <label>Risk assessment ID (must be approved) <input type="number" name="risk_assessment_id" required></label>
-    <label>Site location <input type="text" name="site_location"></label>
+    <label>Canonical site
+      <select name="site_id" aria-describedby="permit-site-help">
+        <option value="">Not linked / site not yet identified</option>
+        {% for site in sites %}
+        <option value="{{ site.id }}">{{ site.site_code }} — {{ site.site_name }}{% if site.city %} ({{ site.city }}){% endif %}</option>
+        {% endfor %}
+      </select>
+      <small id="permit-site-help" style="display:block;color:var(--muted);margin-top:4px">Only active sites in your organisation are shown. This link supplies the map location.</small>
+    </label>
+    <label>Location details (optional)
+      <input type="text" name="site_location" placeholder="e.g. north loading bay, level 2">
+      <small style="display:block;color:var(--muted);margin-top:4px">Description only; it does not set map coordinates.</small>
+    </label>
     <label>Valid from <input type="datetime-local" name="valid_from"></label>
     <label>Valid until <input type="datetime-local" name="valid_until"></label>
     <button class="btn btn-primary" type="submit">Submit for approval</button>
@@ -30,7 +42,7 @@
 <div class="card">
   <h2>Permit list</h2>
   <table class="data-table" id="permit-table">
-    <thead><tr><th>Ref</th><th>Title</th><th>Type</th><th>Vendor</th><th>Status</th><th>Valid until</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Ref</th><th>Title</th><th>Type</th><th>Site</th><th>Location details</th><th>Vendor</th><th>Status</th><th>Valid until</th><th>Actions</th></tr></thead>
     <tbody></tbody>
   </table>
 </div>
