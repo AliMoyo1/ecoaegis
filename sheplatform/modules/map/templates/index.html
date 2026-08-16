@@ -48,6 +48,69 @@
 </div>
 
 {% if can_edit_coordinates %}
+<div id="site-resolution-review" class="card" style="margin-bottom:14px">
+  <h2>Historical site resolution</h2>
+  <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
+    Review historical permits, inspections, EIA projects, and emergencies that are not linked to
+    a canonical site. Exact code or name matches are suggestions only; nothing is linked until you
+    apply a decision. Original location text is always preserved.
+  </p>
+  <div class="filters" style="align-items:flex-end;margin-bottom:12px">
+    <label>Queue
+      <select id="site-resolution-filter" style="display:block">
+        <option value="pending">Pending review</option>
+        <option value="skipped">Skipped</option>
+        <option value="resolved">Linked records</option>
+        <option value="all">All records</option>
+      </select>
+    </label>
+    <button id="site-resolution-refresh" class="btn btn-secondary" type="button">Refresh</button>
+    <span id="site-resolution-counts" style="font-size:12px;color:var(--muted)"></span>
+    <span id="site-resolution-status" role="status" aria-live="polite"
+          style="font-size:12px;color:var(--muted);margin-left:auto"></span>
+  </div>
+  <div style="overflow:auto;max-height:420px">
+    <table style="width:100%;font-size:12px" id="site-resolution-table">
+      <thead>
+        <tr><th>Record</th><th>Original text</th><th>Exact resolver</th><th>Current link</th><th>Review action</th></tr>
+      </thead>
+      <tbody id="site-resolution-rows"></tbody>
+    </table>
+  </div>
+  <form id="site-resolution-create-form" hidden style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+    <input id="site-resolution-create-record-type" type="hidden">
+    <input id="site-resolution-create-record-id" type="hidden">
+    <strong id="site-resolution-create-context">Create and link a canonical site</strong>
+    <div class="filters" style="align-items:flex-end;margin-top:10px">
+      <label>Site code
+        <input id="site-resolution-create-code" type="text" maxlength="80" required style="display:block">
+      </label>
+      <label style="min-width:220px;flex:1">Site name
+        <input id="site-resolution-create-name" type="text" maxlength="200" required style="display:block;width:100%">
+      </label>
+      <label>City
+        <input id="site-resolution-create-city" type="text" maxlength="120" style="display:block">
+      </label>
+      <label>Region
+        <input id="site-resolution-create-region" type="text" maxlength="120" style="display:block">
+      </label>
+      <label>Type
+        <select id="site-resolution-create-type" style="display:block">
+          <option value="facility">Facility</option>
+          <option value="tower">Tower</option>
+          <option value="retail">Retail</option>
+          <option value="warehouse">Warehouse</option>
+          <option value="office">Office</option>
+        </select>
+      </label>
+    </div>
+    <div class="filters" style="margin-top:10px">
+      <button class="btn btn-primary" type="submit">Create site and link</button>
+      <button id="site-resolution-create-cancel" class="btn btn-secondary" type="button">Cancel</button>
+    </div>
+  </form>
+</div>
+
 <div id="coordinate-editor" class="card" style="margin-bottom:14px">
   <h2>Site coordinates</h2>
   <p style="font-size:13px;color:var(--muted);margin-bottom:12px">

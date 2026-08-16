@@ -1249,6 +1249,25 @@ SCHEMA = [
     CREATE INDEX IF NOT EXISTS idx_site_coordinate_import_rows_batch
     ON site_coordinate_import_rows(import_id, row_number)
     """,
+    """
+    CREATE TABLE IF NOT EXISTS site_resolution_decisions (
+        id                    SERIAL PRIMARY KEY,
+        record_type           TEXT NOT NULL CHECK (record_type IN ('permit','inspection','eia','emergency')),
+        record_id             INTEGER NOT NULL,
+        original_text         TEXT,
+        decision              TEXT NOT NULL CHECK (decision IN ('resolved','skipped','site_created')),
+        resolved_site_id      INTEGER REFERENCES sites(id),
+        decision_note         TEXT,
+        org_id                INTEGER NOT NULL REFERENCES organisations(id),
+        reviewed_by           INTEGER NOT NULL REFERENCES users(id),
+        reviewed_at           TIMESTAMPTZ NOT NULL,
+        created_at            TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (org_id, record_type, record_id)
+    )""",
+    """
+    CREATE INDEX IF NOT EXISTS idx_site_resolution_decisions_queue
+    ON site_resolution_decisions(org_id, decision, reviewed_at)
+    """,
     # ---- Lone worker / man-down (guide C2) ----
     """
     CREATE TABLE IF NOT EXISTS lone_worker_checkins (

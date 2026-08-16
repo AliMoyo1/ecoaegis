@@ -138,6 +138,235 @@ function reportMapError(error) {
   providerStatus.querySelector("p").textContent = error.message || "Map data could not be loaded.";
 }
 
+const resolutionReview = document.getElementById("site-resolution-review");
+if (resolutionReview) {
+  const resolutionFilter = document.getElementById("site-resolution-filter");
+  const resolutionRefresh = document.getElementById("site-resolution-refresh");
+  const resolutionCounts = document.getElementById("site-resolution-counts");
+  const resolutionStatus = document.getElementById("site-resolution-status");
+  const resolutionRows = document.getElementById("site-resolution-rows");
+  const createForm = document.getElementById("site-resolution-create-form");
+  const createRecordType = document.getElementById("site-resolution-create-record-type");
+  const createRecordId = document.getElementById("site-resolution-create-record-id");
+  const createContext = document.getElementById("site-resolution-create-context");
+  const createCode = document.getElementById("site-resolution-create-code");
+  const createName = document.getElementById("site-resolution-create-name");
+  const createCity = document.getElementById("site-resolution-create-city");
+  const createRegion = document.getElementById("site-resolution-create-region");
+  const createType = document.getElementById("site-resolution-create-type");
+  const createCancel = document.getElementById("site-resolution-create-cancel");
+  let resolutionSites = [];
+
+  function setResolutionStatus(message) {
+    resolutionStatus.textContent = message;
+  }
+
+  function resolutionSiteLabel(site) {
+    if (!site) return "Unlinked";
+    return `${site.site_code} - ${site.site_name}`;
+  }
+
+  function appendResolutionCell(row, value) {
+    const cell = document.createElement("td");
+    if (arguments.length > 1) {
+      cell.textContent = value === null || value === undefined || value === "" ? "-" : String(value);
+    }
+    row.appendChild(cell);
+    return cell;
+  }
+
+  async function resolutionPost(url, body) {
+    const response = await fetch(url, { method: "POST", body });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Site resolution could not be completed");
+    return data;
+  }
+
+  function openCreateSite(record) {
+    createForm.reset();
+    createRecordType.value = record.record_type;
+    createRecordId.value = String(record.id);
+    createContext.textContent = `Create and link a canonical site for ${record.record_type_label} ${record.record_ref}`;
+    createName.value = record.original_text || "";
+    createForm.hidden = false;
+    createCode.focus();
+  }
+
+  function closeCreateSite() {
+    createForm.reset();
+    createRecordType.value = "";
+    createRecordId.value = "";
+    createForm.hidden = true;
+  }
+
+  function renderResolutionRecord(record) {
+    const row = document.createElement("tr");
+    appendResolutionCell(row, `${record.record_type_label} ${record.record_ref}`);
+    appendResolutionCell(row, record.original_text || "No location details");
+
+    const resolverCell = appendResolutionCell(row);
+    const resolverLabel = document.createElement("strong");
+    resolverLabel.textContent = record.resolver.status.replace(/_/g, " ");
+    resolverCell.appendChild(resolverLabel);
+    if (record.resolver.candidates.length) {
+      const candidateText = document.createElement("div");
+      candidateText.style.marginTop = "4px";
+      candidateText.style.color = "var(--muted)";
+      candidateText.textContent = record.resolver.candidates
+        .map((site) => resolutionSiteLabel(site)).join("; ");
+      resolverCell.appendChild(candidateText);
+    }
+
+    const currentCell = appendResolutionCell(row, resolutionSiteLabel(record.current_site));
+    if (record.decision === "skipped") {
+      const skipped = document.createElement("div");
+      skipped.style.color = "var(--muted)";
+      skipped.textContent = record.decision_note ? `Skipped: ${record.decision_note}` : "Skipped";
+      currentCell.appendChild(skipped);
+    }
+
+    const actionCell = appendResolutionCell(row);
+    if (record.current_site) {
+      actionCell.textContent = "Linked";
+      return row;
+    }
+
+    const siteSelect = document.createElement("select");
+    siteSelect.setAttribute("aria-label", `Canonical site for ${record.record_ref}`);
+    siteSelect.add(new Option("Choose a site", ""));
+    for (const site of resolutionSites) {
+      siteSelect.add(new Option(resolutionSiteLabel(site), String(site.id)));
+    }
+    if (record.resolver.status === "matched" && record.resolver.candidates.length === 1) {
+      siteSelect.value = String(record.resolver.candidates[0].id);
+    }
+    actionCell.appendChild(siteSelect);
+
+    const controls = document.createElement("div");
+    controls.className = "filters";
+    controls.style.marginTop = "6px";
+    const resolveButton = document.createElement("button");
+    resolveButton.type = "button";
+    resolveButton.className = "btn btn-primary";
+    resolveButton.textContent = record.resolver.status === "matched" ? "Apply exact match" : "Link selected";
+    resolveButton.addEventListener("click", async () => {
+      if (!siteSelect.value) {
+        setResolutionStatus("Choose a canonical site before linking this record.");
+        siteSelect.focus();
+        return;
+      }
+      resolveButton.disabled = true;
+      setResolutionStatus(`Linking ${record.record_ref}...`);
+      const body = new FormData();
+      body.append("site_id", siteSelect.value);
+      try {
+        await resolutionPost(
+          `/map/api/site-resolution/${encodeURIComponent(record.record_type)}/${record.id}/resolve`,
+          body,
+        );
+        setResolutionStatus(`${record.record_ref} linked and audited.`);
+        document.dispatchEvent(new CustomEvent("site-resolution-updated"));
+        await loadResolutionQueue();
+      } catch (error) {
+        setResolutionStatus(error.message || "Record could not be linked.");
+        resolveButton.disabled = false;
+      }
+    });
+    controls.appendChild(resolveButton);
+
+    const skipButton = document.createElement("button");
+    skipButton.type = "button";
+    skipButton.className = "btn btn-secondary";
+    skipButton.textContent = "Skip";
+    skipButton.addEventListener("click", async () => {
+      if (!window.confirm(`Skip ${record.record_ref} for now? The record remains unlinked.`)) return;
+      skipButton.disabled = true;
+      setResolutionStatus(`Skipping ${record.record_ref}...`);
+      try {
+        await resolutionPost(
+          `/map/api/site-resolution/${encodeURIComponent(record.record_type)}/${record.id}/skip`,
+          new FormData(),
+        );
+        setResolutionStatus(`${record.record_ref} skipped and audited.`);
+        await loadResolutionQueue();
+      } catch (error) {
+        setResolutionStatus(error.message || "Record could not be skipped.");
+        skipButton.disabled = false;
+      }
+    });
+    controls.appendChild(skipButton);
+
+    const createButton = document.createElement("button");
+    createButton.type = "button";
+    createButton.className = "btn btn-secondary";
+    createButton.textContent = "Create site";
+    createButton.addEventListener("click", () => openCreateSite(record));
+    controls.appendChild(createButton);
+    actionCell.appendChild(controls);
+    return row;
+  }
+
+  async function loadResolutionQueue() {
+    setResolutionStatus("Loading review queue...");
+    try {
+      const query = new URLSearchParams({ status: resolutionFilter.value, limit: "100" });
+      const response = await fetch(`/map/api/site-resolution?${query}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Review queue could not be loaded");
+      resolutionSites = data.available_sites;
+      resolutionRows.replaceChildren();
+      for (const record of data.records) resolutionRows.appendChild(renderResolutionRecord(record));
+      if (!data.records.length) {
+        const row = document.createElement("tr");
+        const cell = appendResolutionCell(row, "No records in this queue.");
+        cell.colSpan = 5;
+        resolutionRows.appendChild(row);
+      }
+      const counts = data.counts;
+      resolutionCounts.textContent =
+        `${counts.pending} pending · ${counts.unlinked} unlinked · ${counts.linked} linked · ${counts.skipped} skipped`;
+      setResolutionStatus(data.truncated
+        ? `Showing the first ${data.records.length} records.`
+        : `${data.records.length} records shown.`);
+    } catch (error) {
+      resolutionRows.replaceChildren();
+      setResolutionStatus(error.message || "Review queue could not be loaded.");
+    }
+  }
+
+  resolutionFilter.addEventListener("change", loadResolutionQueue);
+  resolutionRefresh.addEventListener("click", loadResolutionQueue);
+  createCancel.addEventListener("click", closeCreateSite);
+  createForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!createForm.reportValidity()) return;
+    const recordType = createRecordType.value;
+    const recordId = createRecordId.value;
+    if (!recordType || !recordId) return;
+    const body = new FormData();
+    body.append("site_code", createCode.value);
+    body.append("site_name", createName.value);
+    body.append("city", createCity.value);
+    body.append("region", createRegion.value);
+    body.append("site_type", createType.value);
+    setResolutionStatus("Creating the canonical site and linking the record...");
+    try {
+      const data = await resolutionPost(
+        `/map/api/site-resolution/${encodeURIComponent(recordType)}/${recordId}/create-site`,
+        body,
+      );
+      closeCreateSite();
+      setResolutionStatus(`${data.site.site_code} created, linked, and audited.`);
+      document.dispatchEvent(new CustomEvent("site-resolution-updated"));
+      await loadResolutionQueue();
+    } catch (error) {
+      setResolutionStatus(error.message || "Site could not be created.");
+    }
+  });
+
+  loadResolutionQueue();
+}
+
 const editor = document.getElementById("coordinate-editor");
 if (editor) {
   const form = document.getElementById("coordinate-form");
@@ -351,6 +580,8 @@ if (editor) {
       setStatus(error.message || "Sites could not be loaded.");
     }
   }
+
+  document.addEventListener("site-resolution-updated", loadCoordinateSites);
 
   const importForm = document.getElementById("coordinate-import-form");
   const importStatus = document.getElementById("coordinate-import-status");

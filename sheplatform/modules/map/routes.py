@@ -11,7 +11,11 @@ from sheplatform.config import settings
 from sheplatform.core.middleware import require_auth, require_capability
 from sheplatform.core.rbac import has_capability
 from sheplatform.database import get_db
-from sheplatform.modules.map import coordinate_import_service, data_service
+from sheplatform.modules.map import (
+    coordinate_import_service,
+    data_service,
+    site_resolution_service,
+)
 from sheplatform.templating import templates
 
 router = APIRouter(prefix="/map")
@@ -97,6 +101,108 @@ async def api_coordinate_sites(request: Request):
         sites = data_service.list_sites_for_coordinate_admin(
             db, request.state.user.get("org_id"))
         return _json({"sites": sites})
+    finally:
+        db.close()
+
+
+def _resolution_write_response(result: dict) -> JSONResponse:
+    if result.get("ok"):
+        return _json(result)
+    message = result.get("message", "site resolution could not be completed")
+    if message == site_resolution_service.RECORD_NOT_FOUND_MESSAGE:
+        status_code = 404
+    elif message == site_resolution_service.RECORD_ALREADY_LINKED_MESSAGE:
+        status_code = 409
+    else:
+        status_code = 400
+    return _json(result, status_code=status_code)
+
+
+@router.get("/api/site-resolution")
+@require_auth
+@require_capability("module.settings.access")
+async def api_site_resolution_queue(request: Request, status: str = "pending",
+                                    limit: int = 100):
+    db = get_db()
+    try:
+        try:
+            result = site_resolution_service.list_resolution_queue(
+                db, org_id=request.state.user.get("org_id"),
+                review_status=status, limit=limit,
+            )
+        except ValueError as exc:
+            return _json({"ok": False, "message": str(exc)}, status_code=400)
+        return _json(result)
+    finally:
+        db.close()
+
+
+@router.post("/api/site-resolution/{record_type}/{record_id}/resolve")
+@require_auth
+@require_capability("module.settings.access")
+async def api_site_resolution_apply(request: Request, record_type: str, record_id: int,
+                                    site_id: int = Form(...),
+                                    decision_note: str = Form("")):
+    db = get_db()
+    try:
+        try:
+            result = site_resolution_service.resolve_record(
+                db, record_type=record_type, record_id=record_id, site_id=site_id,
+                org_id=request.state.user.get("org_id"),
+                reviewed_by=request.state.user["id"], decision_note=decision_note,
+            )
+        except ValueError as exc:
+            return _json({"ok": False, "message": str(exc)}, status_code=400)
+        return _resolution_write_response(result)
+    finally:
+        db.close()
+
+
+@router.post("/api/site-resolution/{record_type}/{record_id}/skip")
+@require_auth
+@require_capability("module.settings.access")
+async def api_site_resolution_skip(request: Request, record_type: str, record_id: int,
+                                   decision_note: str = Form("")):
+    db = get_db()
+    try:
+        try:
+            result = site_resolution_service.skip_record(
+                db, record_type=record_type, record_id=record_id,
+                org_id=request.state.user.get("org_id"),
+                reviewed_by=request.state.user["id"], decision_note=decision_note,
+            )
+        except ValueError as exc:
+            return _json({"ok": False, "message": str(exc)}, status_code=400)
+        return _resolution_write_response(result)
+    finally:
+        db.close()
+
+
+@router.post("/api/site-resolution/{record_type}/{record_id}/create-site")
+@require_auth
+@require_capability("module.settings.access")
+async def api_site_resolution_create_site(
+    request: Request,
+    record_type: str,
+    record_id: int,
+    site_code: str = Form(...),
+    site_name: str = Form(...),
+    city: str = Form(""),
+    region: str = Form(""),
+    site_type: str = Form("facility"),
+):
+    db = get_db()
+    try:
+        try:
+            result = site_resolution_service.create_site_and_resolve(
+                db, record_type=record_type, record_id=record_id,
+                site_code=site_code, site_name=site_name, city=city, region=region,
+                site_type=site_type, org_id=request.state.user.get("org_id"),
+                reviewed_by=request.state.user["id"],
+            )
+        except ValueError as exc:
+            return _json({"ok": False, "message": str(exc)}, status_code=400)
+        return _resolution_write_response(result)
     finally:
         db.close()
 
