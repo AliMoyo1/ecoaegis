@@ -8,13 +8,14 @@ from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from sheplatform.config import settings
-from sheplatform.core.middleware import require_auth, require_capability
+from sheplatform.core.middleware import SESSION_COOKIE, require_auth, require_capability
 from sheplatform.core.rbac import has_capability
 from sheplatform.database import get_db
 from sheplatform.modules.map import (
     coordinate_import_service,
     data_service,
     layer_service,
+    provider_admission_service,
     site_resolution_service,
 )
 from sheplatform.templating import templates
@@ -51,6 +52,16 @@ async def map_shell(request: Request):
         }])
     finally:
         db.close()
+    page_nonce = ""
+    if settings.MAP_ENGINE == "mapbox":
+        try:
+            page_nonce = provider_admission_service.issue_page_nonce(
+                user_id=request.state.user.get("id"),
+                org_id=request.state.user.get("org_id"),
+                session_token=request.cookies.get(SESSION_COOKIE, ""),
+            )
+        except provider_admission_service.InvalidProviderNonce:
+            logger.warning("Mapbox page nonce was not issued for an invalid tenant session")
     return templates.TemplateResponse(request, "map/templates/index.html", {
         "user": request.state.user,
         "can_edit_coordinates": has_capability(request.state.user, "module.settings.access"),
@@ -63,7 +74,63 @@ async def map_shell(request: Request):
         "map_min_zoom": settings.MAP_MIN_ZOOM,
         "map_max_zoom": settings.MAP_MAX_ZOOM,
         "map_request_debounce_ms": settings.MAP_REQUEST_DEBOUNCE_MS,
+        "map_provider_page_nonce": page_nonce,
+        "can_view_map_budget": has_capability(
+            request.state.user, "module.settings.access"),
     })
+
+
+@router.post("/api/provider-session")
+@require_auth
+@require_capability("module.map.access")
+async def api_provider_session(request: Request, page_nonce: str = Form("")):
+    """Admit one billable Mapbox construction without exposing budget totals."""
+    if settings.MAP_ENGINE != "mapbox":
+        return _json({"decision": "unavailable", "detail": "Mapbox is disabled"}, 409)
+    if not settings.MAPBOX_PUBLIC_TOKEN:
+        return _json({"decision": "unavailable", "detail": "Mapbox is not configured"}, 503)
+    db = get_db()
+    try:
+        try:
+            decision = provider_admission_service.admit_provider_session(
+                db,
+                nonce=page_nonce,
+                user_id=request.state.user.get("id"),
+                org_id=request.state.user.get("org_id"),
+                session_token=request.cookies.get(SESSION_COOKIE, ""),
+            )
+        except provider_admission_service.InvalidProviderNonce as exc:
+            return _json({"decision": "invalid", "detail": str(exc)}, 400)
+        except Exception:
+            logger.exception("Map provider admission failed closed")
+            return _json({"decision": "unavailable", "detail": "Mapbox is temporarily unavailable"}, 503)
+        if not decision.admitted:
+            return _json({
+                "decision": "denied",
+                "detail": "The monthly basemap safety limit has been reached",
+            }, 429)
+        return _json({
+            "decision": "admitted",
+            "token": settings.MAPBOX_PUBLIC_TOKEN,
+            "version": settings.MAPBOX_GL_VERSION,
+            "style": settings.MAPBOX_STYLE_STANDARD,
+            "satellite_style": settings.MAPBOX_STYLE_SATELLITE,
+            "worker_url": f"/static/vendor/mapbox-gl/{settings.MAPBOX_GL_VERSION}/mapbox-gl-csp-worker.js",
+        })
+    finally:
+        db.close()
+
+
+@router.get("/api/provider-budget")
+@require_auth
+@require_capability("module.settings.access")
+async def api_provider_budget(request: Request):
+    """Provider-account aggregate for designated administrators only."""
+    db = get_db()
+    try:
+        return _json(provider_admission_service.provider_budget_summary(db))
+    finally:
+        db.close()
 
 
 @router.get("/api/points")

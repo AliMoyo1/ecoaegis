@@ -1213,6 +1213,30 @@ SCHEMA = [
     ON map_usage_metrics(event_type, created_at)
     """,
     """
+    CREATE TABLE IF NOT EXISTS map_provider_monthly_usage (
+        provider            TEXT NOT NULL,
+        billing_month_utc   TEXT NOT NULL,
+        admitted_loads      INTEGER NOT NULL DEFAULT 0 CHECK (admitted_loads >= 0),
+        warning_recorded_at TIMESTAMPTZ,
+        critical_recorded_at TIMESTAMPTZ,
+        blocked_recorded_at TIMESTAMPTZ,
+        updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (provider, billing_month_utc)
+    )""",
+    """
+    CREATE TABLE IF NOT EXISTS map_provider_admissions (
+        admission_id        TEXT PRIMARY KEY,
+        provider            TEXT NOT NULL,
+        billing_month_utc   TEXT NOT NULL,
+        org_id              INTEGER NOT NULL REFERENCES organisations(id),
+        decision            TEXT NOT NULL CHECK (decision IN ('admitted','denied')),
+        created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )""",
+    """
+    CREATE INDEX IF NOT EXISTS idx_map_provider_admissions_month
+    ON map_provider_admissions(provider, billing_month_utc, created_at)
+    """,
+    """
     CREATE TABLE IF NOT EXISTS site_coordinate_imports (
         id                  SERIAL PRIMARY KEY,
         batch_ref           TEXT UNIQUE NOT NULL,

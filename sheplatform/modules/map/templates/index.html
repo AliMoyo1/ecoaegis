@@ -6,17 +6,26 @@
   Incidents and sites with recorded coordinates. Clustered when zoomed out, click a marker to open the record.
 </div>
 
+{% if map_engine == "mapbox" %}
+<link rel="stylesheet" href="/static/vendor/mapbox-gl/3.28.1/mapbox-gl.css">
+{% else %}
 <link rel="stylesheet" href="/static/css/leaflet.css">
 <link rel="stylesheet" href="/static/css/MarkerCluster.css">
 <link rel="stylesheet" href="/static/css/MarkerCluster.Default.css">
+{% endif %}
 
 <div id="map-provider-status" class="card" role="status"
-     style="display:{% if tile_url %}none{% else %}block{% endif %};margin-bottom:14px">
-  <h2 style="margin-bottom:6px">Basemap not configured</h2>
+     style="display:{% if map_engine == 'mapbox' or not tile_url %}block{% else %}none{% endif %};margin-bottom:14px">
+  <h2 style="margin-bottom:6px">{% if map_engine == "mapbox" %}Preparing secure basemap{% else %}Basemap not configured{% endif %}</h2>
   <p style="font-size:13px;color:var(--muted);margin:0">
+    {% if map_engine == "mapbox" %}
+    Checking browser support and the monthly provider safety limit. Operational data remains
+    available if the basemap cannot start.
+    {% else %}
     Operational markers and coordinate editing remain available on a blank map. Set
     <code>MAP_TILE_URL_TEMPLATE</code> and <code>MAP_TILE_ATTRIBUTION</code> to add an approved public
     basemap; no external geocoder is required.
+    {% endif %}
   </p>
 </div>
 
@@ -184,14 +193,64 @@
 </div>
 {% endif %}
 
+{% if map_engine == "mapbox" %}
+<section class="map-command-bar card" aria-labelledby="map-command-heading">
+  <div>
+    <h2 id="map-command-heading">Operational layers</h2>
+    <p id="map-data-status" class="map-muted-status" role="status" aria-live="polite">
+      Waiting for secure map admission.
+    </p>
+    {% if can_view_map_budget %}
+    <p id="map-budget-admin" class="map-muted-status" role="status" aria-live="polite">
+      Loading provider budget status...
+    </p>
+    {% endif %}
+  </div>
+  <fieldset class="map-style-control">
+    <legend>Basemap view</legend>
+    <label><input type="radio" name="map-style" value="standard" checked> Standard</label>
+    <label><input type="radio" name="map-style" value="satellite"> Satellite</label>
+  </fieldset>
+  <fieldset class="map-layer-control">
+    <legend>Visible data</legend>
+    <div id="map-layer-options" class="map-layer-options" aria-live="polite">
+      <span class="map-muted-status">Loading authorized layers...</span>
+    </div>
+  </fieldset>
+</section>
+{% endif %}
+
 <div id="map" data-engine="{{ map_engine }}"
      data-tile-url="{{ tile_url }}" data-tile-attribution="{{ tile_attribution }}"
      data-center-lat="{{ map_center_lat }}" data-center-lng="{{ map_center_lng }}"
      data-default-zoom="{{ map_default_zoom }}" data-min-zoom="{{ map_min_zoom }}"
      data-max-zoom="{{ map_max_zoom }}" data-debounce-ms="{{ map_request_debounce_ms }}"
+     data-provider-page-nonce="{{ map_provider_page_nonce }}"
      style="height:600px;border-radius:var(--radius);overflow:hidden"></div>
 
+{% if map_engine == "mapbox" %}
+<section id="map-continuity" class="card map-continuity" hidden aria-labelledby="map-continuity-heading">
+  <h2 id="map-continuity-heading">Operational data without basemap</h2>
+  <p id="map-continuity-message" class="map-muted-status"></p>
+  <ul id="map-continuity-list" class="map-continuity-list"></ul>
+</section>
+<aside id="map-feature-detail" class="card map-feature-detail" hidden aria-labelledby="map-feature-heading">
+  <div class="map-detail-heading">
+    <h2 id="map-feature-heading">Record details</h2>
+    <button id="map-feature-close" class="btn btn-sm" type="button">Close</button>
+  </div>
+  <dl id="map-feature-properties"></dl>
+  <a id="map-feature-link" class="btn btn-primary" href="/map">Open record</a>
+</aside>
+{% endif %}
+
+{% if map_engine == "mapbox" %}
+<script src="/static/vendor/mapbox-gl/3.28.1/mapbox-gl-csp.js"></script>
+<script src="/static/js/mapbox-command-map.js"></script>
+<script src="/static/js/mapbox-map-admin.js"></script>
+{% else %}
 <script src="/static/js/leaflet.js"></script>
 <script src="/static/js/leaflet.markercluster.js"></script>
 <script src="/static/js/map.js"></script>
+{% endif %}
 {% endblock %}

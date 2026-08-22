@@ -146,6 +146,24 @@ async def security_headers_middleware(request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    if request.url.path == "/map" or request.url.path.startswith("/map/"):
+        response.headers["Content-Security-Policy"] = "; ".join((
+            "default-src 'self'",
+            "base-uri 'self'",
+            "object-src 'none'",
+            "frame-ancestors 'none'",
+            "frame-src 'none'",
+            "form-action 'self'",
+            "script-src 'self' 'wasm-unsafe-eval'",
+            "script-src-attr 'none'",
+            "style-src 'self' 'unsafe-inline'",
+            "img-src 'self' data: blob:",
+            "font-src 'self'",
+            "connect-src 'self' https://api.mapbox.com https://events.mapbox.com",
+            "worker-src 'self'",
+            "child-src 'self'",
+            "manifest-src 'self'",
+        ))
     if request.url.scheme == "https":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response

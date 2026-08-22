@@ -1,14 +1,10 @@
-/* EcoAegis service worker - caches shell assets and lets offline queue handle API fallback. */
-const CACHE_NAME = 'ecoAegis-shell-v1';
+/* EcoAegis service worker - caches public shell assets without persisting tenant pages. */
+const CACHE_NAME = 'ecoAegis-shell-v2';
 const SHELL_ASSETS = [
-  '/',
-  '/dashboard',
-  '/static/css/main.css',
-  '/static/js/main.js',
+  '/static/css/app.css',
+  '/static/js/shell.js',
   '/static/js/offline.js',
   '/static/manifest.json',
-  '/incidents',
-  '/observations',
 ];
 
 self.addEventListener('install', (event) => {
@@ -29,12 +25,30 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // API writes: let offline.js queue handle retries; do not cache.
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/incidents/api/') || url.pathname.startsWith('/observations/api/')) {
-    return; // browser default fetch
+  if (request.method !== 'GET') {
+    return;
   }
 
-  // Static / page assets: cache-first with network fallback.
+  // Authenticated pages can contain tenant data. Keep them network-only and use
+  // a generic offline response so one user's page is never replayed to another.
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request).catch(() => new Response(
+        'EcoAegis is offline. Reconnect to access your organization data.',
+        {
+          status: 503,
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        },
+      )),
+    );
+    return;
+  }
+
+  if (url.origin !== self.location.origin || !url.pathname.startsWith('/static/')) {
+    return;
+  }
+
+  // Public same-origin static assets are safe to serve cache-first.
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) return cached;
@@ -44,10 +58,6 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         }
         return resp;
-      }).catch(() => {
-        if (request.mode === 'navigate') {
-          return caches.match('/dashboard') || caches.match('/');
-        }
       });
     })
   );
