@@ -165,6 +165,8 @@ def test_init_db_adds_map_measurement_and_import_tables_to_existing_database(old
     con.execute("DROP TABLE site_coordinate_imports")
     con.execute("DROP TABLE site_resolution_decisions")
     con.execute("DROP TABLE map_usage_metrics")
+    con.execute("DROP TABLE map_provider_admissions")
+    con.execute("DROP TABLE map_provider_monthly_usage")
     con.commit()
     con.close()
 
@@ -174,4 +176,5 @@ def test_init_db_adds_map_measurement_and_import_tables_to_existing_database(old
     tables = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
     con.close()
     assert {"map_usage_metrics", "site_coordinate_imports",
-            "site_coordinate_import_rows", "site_resolution_decisions"} <= tables
+            "site_coordinate_import_rows", "site_resolution_decisions",
+            "map_provider_monthly_usage", "map_provider_admissions"} <= tables

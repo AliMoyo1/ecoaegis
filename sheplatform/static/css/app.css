@@ -419,3 +419,32 @@ input:focus, select:focus, textarea:focus {
   .user-box span { display: none; }
   .card { padding: 18px; }
 }
+/* Phase 4 desktop command map. */
+.map-command-bar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto minmax(320px, 2fr);
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 14px;
+}
+.map-command-bar h2,
+.map-command-bar p { margin: 0; }
+.map-command-bar fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.map-command-bar legend { font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+.map-style-control label,
+.map-layer-options label { display: inline-flex; align-items: center; gap: 5px; margin: 0 12px 6px 0; font-size: 13px; }
+.map-layer-options { display: flex; flex-wrap: wrap; }
+.map-muted-status { color: var(--muted); font-size: 12px; }
+.map-continuity,
+.map-feature-detail { margin-top: 14px; }
+.map-continuity-list { columns: 2; column-gap: 24px; margin: 12px 0 0; padding-left: 20px; }
+.map-continuity-list li { break-inside: avoid; margin-bottom: 7px; font-size: 13px; }
+.map-detail-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.map-feature-detail dl { display: grid; grid-template-columns: minmax(110px, 180px) 1fr; gap: 7px 14px; }
+.map-feature-detail dt { color: var(--muted); font-size: 12px; text-transform: capitalize; }
+.map-feature-detail dd { margin: 0; overflow-wrap: anywhere; }
+.mapboxgl-canvas:focus-visible { outline: 3px solid #1d9bf0; outline-offset: -3px; }
+@media (max-width: 1050px) {
+  .map-command-bar { grid-template-columns: 1fr; }
+  .map-continuity-list { columns: 1; }
+}

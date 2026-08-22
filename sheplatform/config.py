@@ -1,6 +1,6 @@
 """SHE Platform configuration. Pattern from ThemisIQ config.py (guide 5.1)."""
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from dotenv import load_dotenv
 
@@ -84,11 +84,22 @@ class Settings:
     MAP_MAX_ZOOM: int = int(os.getenv("MAP_MAX_ZOOM", "18"))
     MAP_MAX_FEATURES_PER_LAYER: int = int(os.getenv("MAP_MAX_FEATURES_PER_LAYER", "2000"))
     MAP_REQUEST_DEBOUNCE_MS: int = int(os.getenv("MAP_REQUEST_DEBOUNCE_MS", "300"))
+    MAPBOX_PUBLIC_TOKEN: str = field(
+        default_factory=lambda: os.getenv("MAPBOX_PUBLIC_TOKEN", "").strip(), repr=False)
+    MAPBOX_GL_VERSION: str = os.getenv("MAPBOX_GL_VERSION", "3.28.1").strip()
+    MAPBOX_STYLE_STANDARD: str = os.getenv(
+        "MAPBOX_STYLE_STANDARD", "mapbox://styles/mapbox/standard").strip()
+    MAPBOX_STYLE_SATELLITE: str = os.getenv(
+        "MAPBOX_STYLE_SATELLITE", "mapbox://styles/mapbox/standard-satellite").strip()
+    MAP_PROVIDER_WARNING_LOADS: int = int(os.getenv("MAP_PROVIDER_WARNING_LOADS", "150000"))
+    MAP_PROVIDER_CRITICAL_LOADS: int = int(os.getenv("MAP_PROVIDER_CRITICAL_LOADS", "175000"))
+    MAP_PROVIDER_MONTHLY_LIMIT: int = int(os.getenv("MAP_PROVIDER_MONTHLY_LIMIT", "180000"))
+    MAP_PROVIDER_NONCE_TTL_SECONDS: int = int(os.getenv("MAP_PROVIDER_NONCE_TTL_SECONDS", "300"))
     GEOCODER_PROVIDER: str = os.getenv("GEOCODER_PROVIDER", "none").strip().lower()
 
     def __post_init__(self) -> None:
-        if self.MAP_ENGINE != "leaflet":
-            raise ValueError("MAP_ENGINE must be 'leaflet' for release 1")
+        if self.MAP_ENGINE not in {"leaflet", "mapbox"}:
+            raise ValueError("MAP_ENGINE must be 'leaflet' or 'mapbox'")
         if not -90 <= self.MAP_CENTER_LAT <= 90:
             raise ValueError("MAP_CENTER_LAT must be between -90 and 90")
         if not -180 <= self.MAP_CENTER_LNG <= 180:
@@ -101,6 +112,22 @@ class Settings:
             raise ValueError("MAP_REQUEST_DEBOUNCE_MS must be between 100 and 2000")
         if self.MAP_TILE_URL_TEMPLATE and not self.MAP_TILE_ATTRIBUTION.strip():
             raise ValueError("MAP_TILE_ATTRIBUTION is required when MAP_TILE_URL_TEMPLATE is set")
+        if self.MAPBOX_PUBLIC_TOKEN and not self.MAPBOX_PUBLIC_TOKEN.startswith("pk."):
+            raise ValueError("MAPBOX_PUBLIC_TOKEN must be a public token beginning with 'pk.'")
+        if self.MAPBOX_GL_VERSION != "3.28.1":
+            raise ValueError("MAPBOX_GL_VERSION must match the reviewed vendored version 3.28.1")
+        for name, style in (
+            ("MAPBOX_STYLE_STANDARD", self.MAPBOX_STYLE_STANDARD),
+            ("MAPBOX_STYLE_SATELLITE", self.MAPBOX_STYLE_SATELLITE),
+        ):
+            if not style.startswith("mapbox://styles/"):
+                raise ValueError(f"{name} must be a mapbox://styles/ URI")
+        if not (0 <= self.MAP_PROVIDER_WARNING_LOADS < self.MAP_PROVIDER_CRITICAL_LOADS
+                < self.MAP_PROVIDER_MONTHLY_LIMIT <= 200000):
+            raise ValueError(
+                "map provider thresholds must satisfy 0 <= warning < critical < limit <= 200000")
+        if not 60 <= self.MAP_PROVIDER_NONCE_TTL_SECONDS <= 900:
+            raise ValueError("MAP_PROVIDER_NONCE_TTL_SECONDS must be between 60 and 900")
         if self.GEOCODER_PROVIDER != "none":
             raise ValueError("GEOCODER_PROVIDER must be 'none' until an approved provider is implemented")
 

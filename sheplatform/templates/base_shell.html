@@ -123,71 +123,8 @@
   </div>
 </div>
 
-<script>
-  // CSRF: auto-attach the double-submit token to every state-changing fetch
-  // (audit fix: CSRF was never enforced - the header is now sent everywhere).
-  (function () {
-    function csrfToken() {
-      var m = document.cookie.match(/(?:^|;\s*)she_csrf=([^;]+)/);
-      return m ? decodeURIComponent(m[1]) : "";
-    }
-    var originalFetch = window.fetch;
-    window.fetch = function (url, opts) {
-      opts = opts || {};
-      var method = (opts.method || "GET").toUpperCase();
-      if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
-        var token = csrfToken();
-        if (token && !(opts.headers && opts.headers["X-CSRF-Token"])) {
-          opts.headers = Object.assign({}, opts.headers, { "X-CSRF-Token": token });
-        }
-      }
-      return originalFetch(url, opts);
-    };
-  })();
-
-  // Theme toggle with persistence
-  (function () {
-    function applyTheme(theme) {
-      document.documentElement.setAttribute("data-theme", theme);
-      document.body.setAttribute("data-theme", theme);
-    }
-    var stored = localStorage.getItem("she-theme");
-    var initial = (stored === "dark" || (!stored && window.matchMedia("(prefers-color-scheme: dark)").matches))
-      ? "dark" : "light";
-    applyTheme(initial);
-    var btn = document.getElementById("theme-toggle");
-    if (btn) btn.addEventListener("click", function () {
-      var next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
-      applyTheme(next);
-      localStorage.setItem("she-theme", next);
-    });
-  })();
-
-  // Mobile drawer
-  var toggle = document.getElementById("nav-toggle");
-  if (toggle) toggle.addEventListener("click", function () {
-    document.getElementById("sidebar").classList.toggle("open");
-  });
-
-  // Active nav highlighting
-  (function () {
-    var path = window.location.pathname;
-    var links = document.querySelectorAll(".side-nav a[data-nav]");
-    links.forEach(function (a) {
-      var nav = a.getAttribute("data-nav");
-      if (nav !== "/" && path.indexOf(nav) === 0) a.classList.add("active");
-      if (nav === "/" && path === "/") a.classList.add("active");
-    });
-  })();
-</script>
+<script src="/static/js/shell.js"></script>
 <script src="/static/js/particles.js"></script>
 <script src="/static/js/offline.js"></script>
-<script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/static/js/sw.js')
-      .then(function (reg) { console.log('SW registered', reg.scope); })
-      .catch(function (err) { console.warn('SW registration failed', err); });
-  }
-</script>
 </body>
 </html>
