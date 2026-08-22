@@ -67,6 +67,10 @@ def old_shaped_db(tmp_path, monkeypatch):
     init_db()
 
     con = sqlite3.connect(db_path)
+    for index in (
+        "idx_sites_org_lat_lng", "idx_incidents_org_lat_lng", "idx_incidents_org_site",
+    ):
+        con.execute(f'DROP INDEX IF EXISTS "{index}"')
     for column in ("immediate_actions", "estimated_cost", "witnesses"):
         con.execute(f"ALTER TABLE incidents DROP COLUMN {column}")
     for column in (
@@ -136,6 +140,21 @@ def test_init_db_is_idempotent_on_a_database_that_already_has_the_columns(old_sh
 
     init_db()
     init_db()  # must not raise
+
+
+def test_init_db_creates_geospatial_indexes_after_retrofit(old_shaped_db):
+    from sheplatform.database import init_db
+
+    init_db()
+    con = sqlite3.connect(old_shaped_db)
+    indexes = {row[0] for row in con.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'index'")}
+    con.close()
+    assert {
+        "idx_sites_org_lat_lng", "idx_incidents_org_lat_lng", "idx_incidents_org_site",
+        "idx_permits_org_site", "idx_inspections_org_site", "idx_eia_projects_org_site",
+        "idx_emergency_events_org_site", "idx_assets_org_site", "idx_observations_org_site",
+    } <= indexes
 
 
 def test_init_db_adds_map_measurement_and_import_tables_to_existing_database(old_shaped_db):

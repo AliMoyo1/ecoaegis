@@ -14,6 +14,7 @@ from sheplatform.database import get_db
 from sheplatform.modules.map import (
     coordinate_import_service,
     data_service,
+    layer_service,
     site_resolution_service,
 )
 from sheplatform.templating import templates
@@ -88,6 +89,114 @@ async def api_points(request: Request, severity: str = "", type: str = "", since
              "duration_ms": duration_ms, "org_id": org_id},
         ])
         return _json({"incidents": incidents, "sites": sites})
+    finally:
+        db.close()
+
+
+def _authorized_layer_keys(user: dict) -> list[str]:
+    return [
+        key for key, spec in layer_service.LAYER_REGISTRY.items()
+        if has_capability(user, spec.capability)
+    ]
+
+
+def _layer_filters(*, status: str = "", type: str = "", severity: str = "",
+                   since: str = "") -> dict[str, str | None]:
+    return {
+        "status": status or None,
+        "type": type or None,
+        "severity": severity or None,
+        "since": since or None,
+    }
+
+
+@router.get("/api/manifest")
+@require_auth
+@require_capability("module.map.access")
+async def api_layer_manifest(request: Request, bbox: str = ""):
+    try:
+        bounds = layer_service.parse_bbox(bbox)
+    except ValueError as exc:
+        return _json({"detail": str(exc)}, status_code=400)
+    return _json(layer_service.manifest_for(
+        _authorized_layer_keys(request.state.user), bounds))
+
+
+@router.get("/api/layer/{layer_key}")
+@require_auth
+@require_capability("module.map.access")
+async def api_layer(request: Request, layer_key: str, bbox: str = "", limit: int = 500,
+                    min_lng: str = "", min_lat: str = "", max_lng: str = "",
+                    max_lat: str = "",
+                    status: str = "", type: str = "", severity: str = "",
+                    since: str = ""):
+    spec = layer_service.LAYER_REGISTRY.get(layer_key)
+    if spec is None:
+        return _json({"detail": "Layer not found"}, status_code=404)
+    if not has_capability(request.state.user, spec.capability):
+        return _json({"detail": "Forbidden"}, status_code=403)
+    try:
+        bounds = (layer_service.parse_bbox(bbox) if bbox else
+                  layer_service.parse_bbox_values(min_lng, min_lat, max_lng, max_lat))
+    except ValueError as exc:
+        return _json({"detail": str(exc)}, status_code=400)
+    db = get_db()
+    try:
+        try:
+            result = layer_service.get_layer_collection(
+                db, layer_key=layer_key,
+                org_id=request.state.user.get("org_id"), bbox=bounds, limit=limit,
+                filters=_layer_filters(status=status, type=type, severity=severity, since=since),
+            )
+        except ValueError as exc:
+            return _json({"detail": str(exc)}, status_code=400)
+        return _json(result)
+    finally:
+        db.close()
+
+
+@router.get("/api/facility/{site_id}")
+@require_auth
+@require_capability("module.map.access")
+async def api_facility(request: Request, site_id: int):
+    db = get_db()
+    try:
+        count_layers = [
+            key for key, spec in layer_service.LAYER_REGISTRY.items()
+            if key != "facilities" and has_capability(request.state.user, spec.capability)
+        ]
+        result = layer_service.get_facility_detail(
+            db, site_id=site_id, org_id=request.state.user.get("org_id"),
+            count_layers=count_layers)
+        if result is None:
+            return _json({"detail": "Facility not found"}, status_code=404)
+        return _json(result)
+    finally:
+        db.close()
+
+
+@router.get("/api/unlocated/{layer_key}")
+@require_auth
+@require_capability("module.map.access")
+async def api_unlocated(request: Request, layer_key: str, limit: int = 100,
+                        status: str = "", type: str = "", severity: str = "",
+                        since: str = ""):
+    spec = layer_service.LAYER_REGISTRY.get(layer_key)
+    if spec is None:
+        return _json({"detail": "Layer not found"}, status_code=404)
+    if not has_capability(request.state.user, spec.capability):
+        return _json({"detail": "Forbidden"}, status_code=403)
+    db = get_db()
+    try:
+        try:
+            result = layer_service.get_unlocated_records(
+                db, layer_key=layer_key, org_id=request.state.user.get("org_id"),
+                limit=limit,
+                filters=_layer_filters(status=status, type=type, severity=severity, since=since),
+            )
+        except ValueError as exc:
+            return _json({"detail": str(exc)}, status_code=400)
+        return _json(result)
     finally:
         db.close()
 
