@@ -1613,6 +1613,23 @@ SITE_RELATION_COLUMNS = [
     ("emergency_events", "ALTER TABLE emergency_events ADD COLUMN IF NOT EXISTS site_id INTEGER REFERENCES sites(id)"),
 ]
 
+# Created after retrofit columns so upgrading a pre-map database cannot fail
+# by trying to index columns that init_db() has not added yet.
+GEOSPATIAL_INDEXES = [
+    "CREATE INDEX IF NOT EXISTS idx_sites_org_lat_lng ON sites(org_id, latitude, longitude)",
+    "CREATE INDEX IF NOT EXISTS idx_incidents_org_lat_lng ON incidents(org_id, latitude, longitude)",
+    "CREATE INDEX IF NOT EXISTS idx_incidents_org_site ON incidents(org_id, site_id)",
+    # PostgreSQL 16 evidence with 20,000 source rows showed the linked-source
+    # side scanning all rows for a six-site BBOX. These matching relationships
+    # share that query shape and also back facility intelligence counts.
+    "CREATE INDEX IF NOT EXISTS idx_permits_org_site ON permits(org_id, site_id)",
+    "CREATE INDEX IF NOT EXISTS idx_inspections_org_site ON inspections(org_id, site_id)",
+    "CREATE INDEX IF NOT EXISTS idx_eia_projects_org_site ON eia_projects(org_id, site_id)",
+    "CREATE INDEX IF NOT EXISTS idx_emergency_events_org_site ON emergency_events(org_id, site_id)",
+    "CREATE INDEX IF NOT EXISTS idx_assets_org_site ON assets(org_id, site_id)",
+    "CREATE INDEX IF NOT EXISTS idx_observations_org_site ON observations(org_id, site_id)",
+]
+
 # Column-level additions required by C3 document Q&A
 DOCUMENT_CONTENT_COLUMNS = [
     "ALTER TABLE documents ADD COLUMN IF NOT EXISTS content_text TEXT",
@@ -1937,6 +1954,8 @@ def init_db() -> None:
                     db.execute(
                         f"ALTER TABLE {table} ADD COLUMN site_id INTEGER REFERENCES sites(id)"
                     )
+        for index in GEOSPATIAL_INDEXES:
+            db.execute(index)
         for col in DOCUMENT_CONTENT_COLUMNS:
             if settings.is_postgres():
                 db.execute(col)
