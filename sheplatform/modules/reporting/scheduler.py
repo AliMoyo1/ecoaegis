@@ -14,8 +14,11 @@ logger = logging.getLogger("sheplatform.scheduler")
 
 
 def check_report_deadlines(db) -> list[dict]:
-    from sheplatform.modules.reporting.data_service import check_overdue_reports
-    return check_overdue_reports(db)
+    from sheplatform.modules.reporting.data_service import (
+        check_overdue_reports, check_report_milestones)
+    # Pre-deadline milestone reminders (7/3/1 days) + post-deadline overdue flags.
+    milestones = check_report_milestones(db)
+    return check_overdue_reports(db) + milestones
 
 
 def age_key_issues(db) -> list[dict]:

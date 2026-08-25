@@ -167,6 +167,114 @@ def list_key_issues(db, status: str | None = None) -> list[dict]:
     return [dict(r) for r in db.execute(sql, params).fetchall()]
 
 
+def compile_annual_sustainability(db, report_id: int, org_id: int | None) -> dict:
+    """SS14/AR-FR-005/010, FNR-SHE-062: auto-insert the ESG KPI summary into an
+    annual sustainability report draft.
+
+    Pulls the org's ESG KPI entries for the report's reporting year and writes a
+    structured summary (per-KPI actual/target/variance/RAG, category rollups,
+    overall RAG counts) into she_reports.content. Reused by the reporting UI and
+    exportable via the report itself. Org-scoped and fails closed.
+    """
+    import json
+
+    if not org_id:
+        return {"ok": False, "message": "organisation scope required"}
+    report = get_report(db, report_id)
+    if report is None or report.get("org_id") != org_id:
+        return {"ok": False, "message": "report not found"}
+    if report["report_type"] != "annual_sustainability":
+        return {"ok": False, "message": "only annual_sustainability reports can be compiled"}
+    if report["status"] not in ("draft", "review"):
+        return {"ok": False, "message": "report is locked (already approved/submitted)"}
+
+    # Reporting year: from period_start, else period_end, else current year.
+    year = str((report.get("period_start") or report.get("period_end")
+                or datetime.now(timezone.utc).isoformat()))[:4]
+
+    # Latest entry per KPI for that year, org-scoped (entries + KPI metadata).
+    rows = db.execute(
+        "SELECT k.kpi_code, k.name, k.unit, k.category, "
+        "e.actual_value, e.target_value, e.variance, e.rag_status, e.period "
+        "FROM esg_kpi_entries e JOIN esg_kpis k ON k.id = e.kpi_id "
+        "WHERE e.org_id = %s AND e.period LIKE %s "
+        "ORDER BY k.category, k.kpi_code, e.period DESC",
+        (org_id, f"{year}%"),
+    ).fetchall()
+
+    kpis: dict[str, dict] = {}
+    rag_counts = {"red": 0, "amber": 0, "green": 0}
+    for r in rows:
+        row = dict(r)
+        code = row["kpi_code"]
+        if code in kpis:  # already have the latest period (ORDER BY period DESC)
+            continue
+        kpis[code] = {
+            "kpi_code": code, "name": row["name"], "unit": row["unit"],
+            "category": row["category"], "actual": row["actual_value"],
+            "target": row["target_value"], "variance": row["variance"],
+            "rag": row["rag_status"], "period": row["period"],
+        }
+        if row["rag_status"] in rag_counts:
+            rag_counts[row["rag_status"]] += 1
+
+    by_category: dict[str, list] = {}
+    for kpi in kpis.values():
+        by_category.setdefault(kpi["category"] or "other", []).append(kpi)
+
+    # content is TEXT/JSONB; the app stores JSON text and reads it back as a
+    # string on both backends (SQLite TEXT + the PG JSONB->str caster).
+    raw = report.get("content")
+    if isinstance(raw, str):
+        content = json.loads(raw or "{}")
+    elif isinstance(raw, dict):
+        content = dict(raw)
+    else:
+        content = {}
+    content["esg_kpi_summary"] = {
+        "reporting_year": year,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "kpi_count": len(kpis),
+        "rag_counts": rag_counts,
+        "by_category": by_category,
+    }
+    db.execute(
+        "UPDATE she_reports SET content = %s, updated_at = %s WHERE id = %s AND org_id = %s",
+        (json.dumps(content), datetime.now(timezone.utc).isoformat(), report_id, org_id))
+    db.commit()
+    return {"ok": True, "summary": content["esg_kpi_summary"]}
+
+
+def check_report_milestones(db) -> list[dict]:
+    """SS14/AR-FR-001: reporting-calendar milestone alerts BEFORE the deadline.
+
+    Notifies the SHE Manager when a draft/review report's submission deadline is
+    7, 3, or 1 days away. Run daily, days-remaining lands on each milestone
+    exactly once, so no per-milestone sent-tracking column is needed.
+    """
+    from sheplatform.core.notifications import notify_roles
+
+    now = datetime.now(timezone.utc)
+    rows = db.execute(
+        "SELECT * FROM she_reports WHERE submission_deadline IS NOT NULL "
+        "AND status IN ('draft','review')").fetchall()
+    alerts = []
+    for r in rows:
+        report = dict(r)
+        try:
+            deadline = datetime.fromisoformat(str(report["submission_deadline"]))
+        except (TypeError, ValueError):
+            continue
+        days_left = (deadline - now).days
+        if days_left in (7, 3, 1):
+            notify_roles(db, ["she_manager"],
+                         f"Report due in {days_left} day(s): {report['report_ref']}",
+                         f"{report['title']} is due {report['submission_deadline']}.",
+                         link=f"/reports/api/{report['id']}")
+            alerts.append({**report, "days_left": days_left})
+    return alerts
+
+
 def check_overdue_reports(db) -> list[dict]:
     """BRN-SHE-012: overdue reports -> flag + notify; persistent -> COO escalation."""
     from sheplatform.core.notifications import notify_roles

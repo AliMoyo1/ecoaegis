@@ -66,6 +66,20 @@ async def api_submit(request: Request, report_id: int):
         db.close()
 
 
+@router.post("/api/{report_id}/compile-esg")
+@require_auth
+@require_capability("module.reports.access")
+async def api_compile_esg(request: Request, report_id: int):
+    """SS14: auto-insert the ESG KPI summary into an annual sustainability draft."""
+    db = get_db()
+    try:
+        result = data_service.compile_annual_sustainability(
+            db, report_id, request.state.user.get("org_id"))
+        return JSONResponse(result, status_code=200 if result["ok"] else 400)
+    finally:
+        db.close()
+
+
 @router.post("/api/{report_id}/approve-step")
 @require_auth
 @require_capability("module.reports.approve")
