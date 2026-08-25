@@ -8,7 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from sheplatform.config import settings
-from sheplatform.core.middleware import security_headers_middleware, csrf_middleware
+from sheplatform.core.middleware import (
+    security_headers_middleware, csrf_middleware, integration_ip_middleware)
 from sheplatform.database import init_db
 
 logging.basicConfig(level=logging.INFO)
@@ -17,6 +18,7 @@ app = FastAPI(title="SHE Management Platform", version="0.1.0")
 
 app.middleware("http")(security_headers_middleware)
 app.middleware("http")(csrf_middleware)
+app.middleware("http")(integration_ip_middleware)  # SEC-006: runs outermost, before CSRF/handler
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[] if not settings.DEBUG else ["*"],

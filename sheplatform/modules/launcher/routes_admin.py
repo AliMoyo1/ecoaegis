@@ -5,13 +5,62 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from sheplatform.core import auth
-from sheplatform.core.audit import log_audit
+from sheplatform.core.audit import log_audit, verify_audit_chain
 from sheplatform.core.middleware import require_capability
+from sheplatform.core.retention import retention_report, set_retention_policy
 from sheplatform.core.rbac import ROLES
 from sheplatform.database import get_db
 from sheplatform.templating import templates
 
 router = APIRouter(prefix="/admin")
+
+
+@router.get("/api/audit/verify")
+@require_capability("admin.settings.manage")
+async def audit_verify(request: Request):
+    """NFR-SHE-004: report audit-log integrity (tamper-evident hash chain).
+
+    super_admin only. Returns {ok, checked, first_break} - first_break names
+    the earliest tampered/deleted row when the chain is broken.
+    """
+    db = get_db()
+    try:
+        return JSONResponse(verify_audit_chain(db))
+    finally:
+        db.close()
+
+
+@router.get("/api/retention")
+@require_capability("admin.settings.manage")
+async def retention_report_api(request: Request):
+    """NFR-SHE-003: per-record-type retention report (super_admin)."""
+    db = get_db()
+    try:
+        return JSONResponse({"retention": retention_report(db)})
+    finally:
+        db.close()
+
+
+@router.post("/api/retention")
+@require_capability("admin.settings.manage")
+async def retention_set_api(request: Request,
+                            record_type: str = Form(...),
+                            retention_years: int = Form(...),
+                            description: str = Form("")):
+    """NFR-SHE-003: configure a record type's minimum retention (super_admin)."""
+    db = get_db()
+    try:
+        result = set_retention_policy(
+            db, record_type, retention_years,
+            updated_by=request.state.user["id"], description=description)
+        if not result["ok"]:
+            return JSONResponse(result, status_code=400)
+        log_audit(db, request.state.user["id"], request.state.user.get("org_id"),
+                  "retention.policy.set", "retention_policies", None,
+                  new_value={"record_type": record_type, "retention_years": retention_years})
+        return JSONResponse(result)
+    finally:
+        db.close()
 
 
 @router.get("/api/users")

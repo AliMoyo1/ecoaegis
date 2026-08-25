@@ -157,6 +157,25 @@ def test_init_db_creates_geospatial_indexes_after_retrofit(old_shaped_db):
     } <= indexes
 
 
+def test_init_db_retrofits_audit_hash_columns_on_existing_database(old_shaped_db):
+    """NFR-SHE-004: the tamper-evidence columns are added to audit_log even on a
+    deployment that predates them (audit_log is an existing table)."""
+    from sheplatform.database import init_db
+
+    con = sqlite3.connect(old_shaped_db)
+    for column in ("chain_ts", "prev_hash", "record_hash"):
+        con.execute(f"ALTER TABLE audit_log DROP COLUMN {column}")
+    con.commit()
+    con.close()
+
+    init_db()
+
+    con = sqlite3.connect(old_shaped_db)
+    cols = {r[1] for r in con.execute("PRAGMA table_info(audit_log)")}
+    con.close()
+    assert {"chain_ts", "prev_hash", "record_hash"} <= cols
+
+
 def test_init_db_adds_map_measurement_and_import_tables_to_existing_database(old_shaped_db):
     from sheplatform.database import init_db
 

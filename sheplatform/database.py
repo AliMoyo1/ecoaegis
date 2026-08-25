@@ -88,7 +88,20 @@ SCHEMA = [
         old_value       JSONB,
         new_value       JSONB,
         ip_address      TEXT,
-        created_at      TIMESTAMPTZ DEFAULT NOW()
+        created_at      TIMESTAMPTZ DEFAULT NOW(),
+        chain_ts        TEXT,
+        prev_hash       TEXT,
+        record_hash     TEXT
+    )""",
+    # NFR-SHE-003: configurable per-record-type minimum retention (years).
+    """
+    CREATE TABLE IF NOT EXISTS retention_policies (
+        id              SERIAL PRIMARY KEY,
+        record_type     TEXT UNIQUE NOT NULL,
+        retention_years INTEGER NOT NULL,
+        description     TEXT,
+        updated_by      INTEGER REFERENCES users(id),
+        updated_at      TIMESTAMPTZ DEFAULT NOW()
     )""",
     """
     CREATE TABLE IF NOT EXISTS events (
@@ -1571,6 +1584,15 @@ SCHEMA = [
 ]
 
 # Column-level additions required by B2 SDS extraction
+# Tamper-evidence hash chain on the audit log (NFR-SHE-004). Existing table,
+# so retrofit onto upgraded deployments (legacy rows keep NULL hashes and sit
+# before the chain's genesis; new rows chain from the last hashed row).
+AUDIT_HASH_COLUMNS = [
+    "ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS chain_ts TEXT",
+    "ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS prev_hash TEXT",
+    "ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS record_hash TEXT",
+]
+
 SDS_COLUMNS = [
     "ALTER TABLE chemicals ADD COLUMN IF NOT EXISTS sds_attachment_id INTEGER REFERENCES attachments(id)",
     "ALTER TABLE chemicals ADD COLUMN IF NOT EXISTS sds_review_date TIMESTAMPTZ",
@@ -1873,6 +1895,14 @@ def init_db() -> None:
         for ddl in SCHEMA:
             stmt = ddl if settings.is_postgres() else _to_sqlite_schema(ddl)
             db.execute(stmt)
+        for col in AUDIT_HASH_COLUMNS:
+            if settings.is_postgres():
+                db.execute(col)
+            else:
+                cols_audit = {r[1] for r in db.execute("PRAGMA table_info(audit_log)").fetchall()}
+                for name in ("chain_ts", "prev_hash", "record_hash"):
+                    if name not in cols_audit:
+                        db.execute(f"ALTER TABLE audit_log ADD COLUMN {name} TEXT")
         for col in RISK_ORIGIN_COLUMNS:
             if settings.is_postgres():
                 db.execute(col)
