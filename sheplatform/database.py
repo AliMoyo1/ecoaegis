@@ -93,6 +93,16 @@ SCHEMA = [
         prev_hash       TEXT,
         record_hash     TEXT
     )""",
+    # NFR-SHE-003: configurable per-record-type minimum retention (years).
+    """
+    CREATE TABLE IF NOT EXISTS retention_policies (
+        id              SERIAL PRIMARY KEY,
+        record_type     TEXT UNIQUE NOT NULL,
+        retention_years INTEGER NOT NULL,
+        description     TEXT,
+        updated_by      INTEGER REFERENCES users(id),
+        updated_at      TIMESTAMPTZ DEFAULT NOW()
+    )""",
     """
     CREATE TABLE IF NOT EXISTS events (
         id              SERIAL PRIMARY KEY,
