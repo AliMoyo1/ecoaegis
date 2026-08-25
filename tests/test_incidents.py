@@ -297,3 +297,41 @@ class TestRiskScoring:
         s1 = int(r1["risk_ref"].split("-")[-1])
         s2 = int(r2["risk_ref"].split("-")[-1])
         assert s2 == s1 + 1
+
+
+class TestTrainingAlignmentOnClose:
+    """BRN-SHE-009: closing a MAJOR incident must prompt training alignment -
+    a training need traceable to the incident + a Key Issue that stays visible
+    until resolved. Minor incidents must not."""
+
+    def test_major_incident_close_creates_need_and_key_issue(self, db):
+        from sheplatform.core import event_handlers  # noqa: F401  (register handlers)
+        from sheplatform.modules.incidents import data_service
+        mgr = _mk_user(db, "she_manager", "ta-mgr@test.com")
+        inc = _mk_incident(db, mgr["id"], severity="critical", title="Confined space entry")
+        _notify_all_statutory(db, inc["id"])
+        res = data_service.close_incident(db, inc["id"], mgr["id"])
+        assert res["ok"], res
+
+        need = db.execute(
+            "SELECT * FROM training_needs WHERE source_trigger = 'incident' AND source_id = %s",
+            (inc["id"],)).fetchone()
+        assert need is not None
+        assert inc["incident_ref"] in need["title"]
+
+        ki = db.execute(
+            "SELECT * FROM key_issues WHERE title LIKE %s AND status = 'open'",
+            (f"%{inc['incident_ref']}%",)).fetchone()
+        assert ki is not None
+
+    def test_minor_incident_close_does_not_flag_training(self, db):
+        from sheplatform.core import event_handlers  # noqa: F401
+        from sheplatform.modules.incidents import data_service
+        mgr = _mk_user(db, "she_manager", "ta-mgr2@test.com")
+        inc = _mk_incident(db, mgr["id"], severity="low", title="Minor slip")
+        res = data_service.close_incident(db, inc["id"], mgr["id"])
+        assert res["ok"], res
+        need = db.execute(
+            "SELECT * FROM training_needs WHERE source_trigger = 'incident' AND source_id = %s",
+            (inc["id"],)).fetchone()
+        assert need is None

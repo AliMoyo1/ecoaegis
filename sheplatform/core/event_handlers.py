@@ -11,4 +11,5 @@ import sheplatform.modules.community_complaints.event_handlers  # noqa: F401  (g
 import sheplatform.modules.eia.event_handlers  # noqa: F401  (eia.rejected -> risk + alerts)
 import sheplatform.modules.emergency.event_handlers  # noqa: F401  (post_crisis -> EPRP queue)
 import sheplatform.modules.reporting.event_handlers  # noqa: F401  (report.approved -> training need)
+import sheplatform.modules.training.event_handlers  # noqa: F401  (incident.closed -> training need + key issue, BRN-009)
 import sheplatform.modules.integration.sync_handlers  # noqa: F401  (risk.created/updated -> ThemisIQ sync)
