@@ -211,3 +211,56 @@ async def csrf_middleware(request, call_next):
     if not cookie_token or not provided or not hmac.compare_digest(provided, cookie_token):
         return JSONResponse({"detail": "CSRF validation failed"}, status_code=403)
     return await call_next(request)
+
+
+# SEC-SHE-006: machine-to-machine integration endpoints (API-key / webhook auth,
+# no user session) that an IP allowlist should protect when one is configured.
+INTEGRATION_API_PREFIXES = (
+    "/esg/api/ingest", "/assets/api/telemetry",
+    "/channels/whatsapp", "/channels/twilio", "/webhooks/",
+)
+
+
+def _parse_allowlist(raw: str):
+    import ipaddress
+    nets = []
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            nets.append(ipaddress.ip_network(part, strict=False))
+        except ValueError:
+            continue  # ignore malformed entries rather than fail open/closed unexpectedly
+    return nets
+
+
+def _client_ip(request) -> str:
+    from sheplatform.config import settings
+    if settings.TRUST_FORWARDED_FOR:
+        xff = request.headers.get("x-forwarded-for", "")
+        if xff:
+            return xff.split(",")[0].strip()  # left-most = original client
+    return request.client.host if request.client else ""
+
+
+def _ip_allowed(ip_str: str, nets) -> bool:
+    import ipaddress
+    try:
+        ip = ipaddress.ip_address(ip_str)
+    except ValueError:
+        return False
+    return any(ip in net for net in nets)
+
+
+async def integration_ip_middleware(request, call_next):
+    """SEC-SHE-006: restrict machine integration endpoints to an approved IP
+    allowlist. Off by default (empty allowlist = no restriction), so existing
+    deployments are unaffected until an allowlist is configured."""
+    from sheplatform.config import settings
+    raw = settings.INTEGRATION_IP_ALLOWLIST
+    if raw and any(request.url.path.startswith(p) for p in INTEGRATION_API_PREFIXES):
+        nets = _parse_allowlist(raw)
+        if nets and not _ip_allowed(_client_ip(request), nets):
+            return JSONResponse({"detail": "source IP not allowed"}, status_code=403)
+    return await call_next(request)

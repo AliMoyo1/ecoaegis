@@ -18,6 +18,16 @@ class Settings:
     BCRYPT_ROUNDS: int = int(os.getenv("BCRYPT_ROUNDS", "12"))
     SESSION_TTL_HOURS: int = int(os.getenv("SESSION_TTL_HOURS", "24"))
 
+    # SEC-SHE-006: IP allowlist for machine-to-machine integration endpoints
+    # (ESG/asset ingest, channel + integration webhooks). Comma-separated IPs
+    # and/or CIDRs; EMPTY = no restriction (off by default). Set TRUST_FORWARDED_FOR
+    # when behind a reverse proxy so the real client IP is read from X-Forwarded-For.
+    INTEGRATION_IP_ALLOWLIST: str = os.getenv("INTEGRATION_IP_ALLOWLIST", "")
+    TRUST_FORWARDED_FOR: bool = os.getenv("TRUST_FORWARDED_FOR", "false").lower() == "true"
+
+    # NFR-SHE-003: minimum retention period for statutory SHE records (years).
+    RETENTION_YEARS: int = int(os.getenv("RETENTION_YEARS", "7"))
+
     # AI - provider selector: kimi | deepseek | gemini | anthropic | openai-compatible
     AI_PROVIDER: str = os.getenv("AI_PROVIDER", "kimi")
 
