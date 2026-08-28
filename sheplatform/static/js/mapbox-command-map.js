@@ -9,6 +9,10 @@
   const dataStatus = document.getElementById("map-data-status");
   const budgetAdmin = document.getElementById("map-budget-admin");
   const layerOptions = document.getElementById("map-layer-options");
+  const retryButton = document.getElementById("map-data-retry");
+  const summaryLocated = document.getElementById("map-summary-located");
+  const summaryUnlocated = document.getElementById("map-summary-unlocated");
+  const summaryLayers = document.getElementById("map-summary-layers");
   const continuityPanel = document.getElementById("map-continuity");
   const continuityMessage = document.getElementById("map-continuity-message");
   const continuityList = document.getElementById("map-continuity-list");
@@ -69,8 +73,24 @@
     return match ? decodeURIComponent(match[1]) : "";
   }
 
-  function setDataStatus(message) {
-    if (dataStatus) dataStatus.textContent = message;
+  function setDataStatus(message, state) {
+    if (!dataStatus) return;
+    const nextState = state || "ready";
+    dataStatus.textContent = message;
+    dataStatus.dataset.state = nextState;
+    if (retryButton) retryButton.hidden = !["error", "denied"].includes(nextState);
+  }
+
+  function updateSummary(located, unlocated, layerCount) {
+    if (summaryLocated) summaryLocated.textContent = Number(located).toLocaleString();
+    if (summaryUnlocated) summaryUnlocated.textContent = Number(unlocated).toLocaleString();
+    if (summaryLayers) summaryLayers.textContent = Number(layerCount).toLocaleString();
+  }
+
+  function responseError(response, message) {
+    const error = new Error(message);
+    error.dataState = [401, 403].includes(response.status) ? "denied" : "error";
+    return error;
   }
 
   async function loadAdminBudget() {
@@ -248,7 +268,7 @@
     const controller = new AbortController();
     layerControllers.set(spec.key, controller);
     const response = await fetch(layerUrl(spec, bounds), { signal: controller.signal });
-    if (!response.ok) throw new Error(`${spec.label} could not be loaded`);
+    if (!response.ok) throw responseError(response, `${spec.label} could not be loaded`);
     const collection = await response.json();
     if (generation !== loadGeneration) return null;
     layerCache.set(spec.key, collection);
@@ -260,6 +280,9 @@
     layerOptions.replaceChildren();
     for (const spec of manifest.layers) {
       const label = document.createElement("label");
+      label.className = "map-layer-option";
+      label.dataset.layer = spec.key;
+      label.style.setProperty("--layer-color", LAYER_COLORS[spec.key] || LAYER_COLORS.facilities);
       const input = document.createElement("input");
       input.type = "checkbox";
       input.value = spec.key;
@@ -285,9 +308,11 @@
     if (!force && signature === lastQuerySignature) return;
     lastQuerySignature = signature;
     const generation = ++loadGeneration;
-    setDataStatus("Loading authorized records in this view...");
+    setDataStatus("Loading authorized records in this view...", "loading");
     const manifestResponse = await fetch(manifestUrl(bounds));
-    if (!manifestResponse.ok) throw new Error("Authorized map layers could not be loaded");
+    if (!manifestResponse.ok) {
+      throw responseError(manifestResponse, "Authorized map layers could not be loaded");
+    }
     manifest = await manifestResponse.json();
     renderLayerControls();
     const active = manifest.layers.filter((spec) => enabledLayers.has(spec.key));
@@ -300,9 +325,11 @@
     const returned = collections.reduce((total, item) => total + item.meta.returned, 0);
     const unlocated = collections.reduce((total, item) => total + item.meta.unlocated, 0);
     const truncated = collections.some((item) => item.meta.truncated);
+    updateSummary(returned, unlocated, active.length);
     setDataStatus(`${returned} located records in view, ${unlocated} unlocated` +
       `${truncated ? "; one or more layers reached the display limit" : ""}` +
-      `${failures.length ? `; ${failures.length} layer request failed` : ""}.`);
+      `${failures.length ? `; ${failures.length} layer request failed` : ""}.`,
+      failures.length ? "warning" : returned || unlocated ? "ready" : "empty");
   }
 
   function scheduleLoad(force) {
@@ -317,7 +344,10 @@
 
   function showDataError(error) {
     if (error?.name === "AbortError") return;
-    setDataStatus(error?.message || "Operational map data could not be loaded.");
+    setDataStatus(
+      error?.message || "Operational map data could not be loaded.",
+      error?.dataState || "error",
+    );
   }
 
   function renderContinuityRecords(spec, collection) {
@@ -344,18 +374,26 @@
     try {
       const bounds = [-180, -90, 180, 90];
       const response = await fetch(manifestUrl(bounds));
-      if (!response.ok) throw new Error("Operational data could not be loaded");
+      if (!response.ok) throw responseError(response, "Operational data could not be loaded");
       manifest = await response.json();
       renderLayerControls();
       const active = manifest.layers.filter((spec) => enabledLayers.has(spec.key));
+      let located = 0;
+      let unlocated = 0;
       for (const spec of active) {
         const layerResponse = await fetch(layerUrl(spec, bounds));
         if (!layerResponse.ok) continue;
         const collection = await layerResponse.json();
         layerCache.set(spec.key, collection);
+        located += Number(collection.meta?.returned || 0);
+        unlocated += Number(collection.meta?.unlocated || 0);
         renderContinuityRecords(spec, collection);
       }
-      setDataStatus(`${continuityList.children.length} operational records listed without a basemap.`);
+      updateSummary(located, unlocated, active.length);
+      setDataStatus(
+        `${located} operational records listed without a basemap, ${unlocated} unlocated.`,
+        located || unlocated ? "ready" : "empty",
+      );
       if (!continuityList.children.length) {
         const item = document.createElement("li");
         item.textContent = "No located records match the current filters.";
@@ -458,6 +496,13 @@
   });
   document.getElementById("map-feature-close")?.addEventListener("click", function () {
     detailPanel.hidden = true;
+  });
+  retryButton?.addEventListener("click", function () {
+    setDataStatus("Retrying authorized operational data...", "loading");
+    const request = !map && continuityPanel && !continuityPanel.hidden
+      ? showProviderFreeMode(continuityReason)
+      : loadVisibleData(true);
+    request.catch(showDataError);
   });
 
   window.ecoMapRenderer = {

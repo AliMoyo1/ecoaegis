@@ -1,10 +1,15 @@
 {% extends "base_shell.html" %}
 {% block title %}Map - EcoAegis{% endblock %}
+{% block body_class %}map-page{% endblock %}
 {% block content %}
-<h1>Geographic Map</h1>
-<div class="login-sub" style="color:var(--muted);font-size:13px;margin-bottom:16px">
-  Incidents and sites with recorded coordinates. Clustered when zoomed out, click a marker to open the record.
-</div>
+<header class="page-heading-premium map-page-heading">
+  <div>
+    <span class="page-kicker">Geospatial command</span>
+    <h1>Operational command map</h1>
+    <p>Authorized safety, environmental and operational records in their real site context.</p>
+  </div>
+  <span class="live-data-badge"><i></i>Private organization data</span>
+</header>
 
 {% if map_engine == "mapbox" %}
 <link rel="stylesheet" href="/static/vendor/mapbox-gl/3.28.1/mapbox-gl.css">
@@ -14,7 +19,7 @@
 <link rel="stylesheet" href="/static/css/MarkerCluster.Default.css">
 {% endif %}
 
-<div id="map-provider-status" class="card" role="status"
+<div id="map-provider-status" class="card map-provider-panel" role="status"
      style="display:{% if map_engine == 'mapbox' or not tile_url %}block{% else %}none{% endif %};margin-bottom:14px">
   <h2 style="margin-bottom:6px">{% if map_engine == "mapbox" %}Preparing secure basemap{% else %}Basemap not configured{% endif %}</h2>
   <p style="font-size:13px;color:var(--muted);margin:0">
@@ -29,7 +34,7 @@
   </p>
 </div>
 
-<div class="card" style="margin-bottom:14px">
+<div class="card map-filter-panel" style="margin-bottom:14px">
   <div class="filters">
     <select id="f-severity">
       <option value="">All severities</option>
@@ -57,6 +62,7 @@
 </div>
 
 {% if can_edit_coordinates %}
+<h2 class="map-admin-heading">Geospatial administration</h2>
 <div id="site-resolution-review" class="card" style="margin-bottom:14px">
   <h2>Historical site resolution</h2>
   <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
@@ -195,9 +201,9 @@
 
 {% if map_engine == "mapbox" %}
 <section class="map-command-bar card" aria-labelledby="map-command-heading">
-  <div>
+  <div class="map-command-copy">
     <h2 id="map-command-heading">Operational layers</h2>
-    <p id="map-data-status" class="map-muted-status" role="status" aria-live="polite">
+    <p id="map-data-status" class="map-muted-status" data-state="loading" role="status" aria-live="polite">
       Waiting for secure map admission.
     </p>
     {% if can_view_map_budget %}
@@ -205,6 +211,14 @@
       Loading provider budget status...
     </p>
     {% endif %}
+    <button id="map-data-retry" class="btn btn-sm btn-secondary map-retry" type="button" hidden>
+      Retry operational data
+    </button>
+  </div>
+  <div id="map-live-summary" class="map-live-summary" aria-label="Current map response summary">
+    <div><strong id="map-summary-located">Waiting</strong><span>located records</span></div>
+    <div><strong id="map-summary-unlocated">Waiting</strong><span>unlocated records</span></div>
+    <div><strong id="map-summary-layers">Waiting</strong><span>visible authorized layers</span></div>
   </div>
   <fieldset class="map-style-control">
     <legend>Basemap view</legend>
@@ -226,6 +240,7 @@
      data-default-zoom="{{ map_default_zoom }}" data-min-zoom="{{ map_min_zoom }}"
      data-max-zoom="{{ map_max_zoom }}" data-debounce-ms="{{ map_request_debounce_ms }}"
      data-provider-page-nonce="{{ map_provider_page_nonce }}"
+     class="map-canvas" role="region" aria-label="EcoAegis operational command map"
      style="height:600px;border-radius:var(--radius);overflow:hidden"></div>
 
 {% if map_engine == "mapbox" %}

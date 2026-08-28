@@ -1,10 +1,15 @@
 {% extends "base_shell.html" %}
 {% block title %}Dashboard - EcoAegis{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
 {% block content %}
-<h1>Dashboard</h1>
-<div class="login-sub" style="color:var(--muted);font-size:13px;margin-bottom:16px">
-  Operations at a glance - click any tile to drill into the module.
-</div>
+<header class="page-heading-premium">
+  <div>
+    <span class="page-kicker">Enterprise operating position</span>
+    <h1>Operational overview</h1>
+    <p>Live organization-scoped indicators with direct paths to their governed source records.</p>
+  </div>
+  <span class="live-data-badge"><i></i>Authorized workspace</span>
+</header>
 
 <!-- KPI TILES - every tile deep-links to its module with a filter -->
 <div class="kpi-grid">

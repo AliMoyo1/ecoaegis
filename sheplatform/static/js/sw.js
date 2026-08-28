@@ -1,8 +1,11 @@
 /* EcoAegis service worker - caches public shell assets without persisting tenant pages. */
-const CACHE_NAME = 'ecoAegis-shell-v2';
+const CACHE_NAME = 'ecoAegis-shell-v3';
 const SHELL_ASSETS = [
   '/static/css/app.css',
   '/static/js/shell.js',
+  '/static/ui_foundation/foundation.css',
+  '/static/ui_foundation/foundation.js',
+  '/static/ui_foundation/assets/econet-wireless-logo.png',
   '/static/js/offline.js',
   '/static/manifest.json',
 ];

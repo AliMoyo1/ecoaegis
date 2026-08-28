@@ -1,26 +1,61 @@
 {% extends "base_shell.html" %}
-{% block title %}Login - EcoAegis{% endblock %}
+{% block title %}Secure access | EcoAegis{% endblock %}
+{% block body_class %}login-page{% endblock %}
+{% block topbar_title %}Secure access{% endblock %}
 {% block content %}
-<div class="login-wrap">
-  <div class="login-card">
-    <div style="text-align:center;margin-bottom:16px">
-      <div class="brand-mark" style="margin:0 auto;width:56px;height:56px;border-radius:15px">
-        <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" width="30" height="30">
-          <path d="M16 2 L28 6.5 V15 C28 23 22.5 28.5 16 30 C9.5 28.5 4 23 4 15 V6.5 Z" fill="rgba(255,255,255,0.16)" stroke="white" stroke-width="1.6" stroke-linejoin="round"/>
-          <path d="M16 9 L19 15 L25.5 15.5 L20.8 19.6 L22.5 26 L16 22.4 L9.5 26 L11.2 19.6 L6.5 15.5 L13 15 Z" fill="white" opacity="0.95"/>
-        </svg>
+<section class="login-experience" aria-labelledby="login-title">
+  <video class="login-background-video" autoplay muted loop playsinline preload="metadata"
+         poster="/static/ui_foundation/assets/earth-horizon-clean.png" aria-hidden="true">
+    <source src="/static/ui_foundation/assets/earth-horizon.mp4" type="video/mp4">
+  </video>
+  <div class="login-background-overlay" aria-hidden="true"></div>
+
+  <div class="login-brand">
+    <div class="login-logo-plaque">
+      <img src="/static/ui_foundation/assets/econet-wireless-logo.png" alt="Econet Wireless">
+    </div>
+    <div class="login-brand-copy">
+      <strong>EcoAegis</strong>
+      <span>Safety intelligence</span>
+    </div>
+  </div>
+
+  <div class="login-layout">
+    <div class="login-hero-copy">
+      <p class="login-eyebrow">Enterprise safety, connected</p>
+      <h1>Safety, seen <span>end to end.</span></h1>
+      <p class="login-lead"><strong>One operational view of people, places and proof.</strong>
+        EcoAegis turns field activity into accountable action across the Econet Wireless estate.</p>
+      <div class="login-pillars" aria-label="EcoAegis operating model">
+        <div><strong>People</strong><span>Incidents, welfare and competence.</span></div>
+        <div><strong>Places</strong><span>Sites, environmental context and spatial risk.</span></div>
+        <div><strong>Proof</strong><span>Controls, approvals and defensible records.</span></div>
       </div>
     </div>
-    <h1>EcoAegis</h1>
-    <div class="login-sub">Safety, Health &amp; Environment - one integrated system</div>
-    {% if error %}<p class="error">{{ error }}</p>{% endif %}
-    <form method="post" action="/login">
-      <label>Email</label>
-      <input type="email" name="email" required autofocus>
-      <label>Password</label>
-      <input type="password" name="password" required>
-      <button class="btn btn-primary" type="submit">Sign in</button>
-    </form>
+
+    <div class="login-card" id="secure-login-card">
+      <div class="login-card-kicker">
+        <span>Secure sign-in</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3Z"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg>
+      </div>
+      <h2 id="login-title">Welcome back.</h2>
+      <p class="login-sub">Enter your approved Econet credentials to continue to the operational workspace.</p>
+      {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+      <form method="post" action="/login">
+        <label for="login-email">Work email</label>
+        <input id="login-email" type="email" name="email" autocomplete="username" required autofocus>
+        <label for="login-password">Password</label>
+        <input id="login-password" type="password" name="password" autocomplete="current-password" required>
+        <button class="btn btn-primary login-submit" type="submit">
+          Enter EcoAegis
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14 M13 6l6 6-6 6"/></svg>
+        </button>
+      </form>
+      <p class="login-security-note">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3Z"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg>
+        Production access uses role controls, auditable sessions and organization-scoped data.
+      </p>
+    </div>
   </div>
-</div>
+</section>
 {% endblock %}
