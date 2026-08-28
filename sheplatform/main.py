@@ -130,11 +130,13 @@ async def start_scheduler():
         from sheplatform.modules.reporting.scheduler import start_scheduler as start_report_scheduler
         from sheplatform.modules.chemicals.scheduler import start_scheduler as start_chemicals_scheduler
         from sheplatform.modules.lone_worker.scheduler import start_scheduler as start_lone_worker_scheduler
+        from sheplatform.modules.map.scheduler import start_scheduler as start_map_provider_scheduler
         app.state.inc_scheduler = start_inc_scheduler(get_db_background)
         app.state.vendor_scheduler = start_vendor_scheduler(get_db_background)
         app.state.report_scheduler = start_report_scheduler(get_db_background)
         app.state.chemicals_scheduler = start_chemicals_scheduler(get_db_background)
         app.state.lone_worker_scheduler = start_lone_worker_scheduler(get_db_background)
+        app.state.map_provider_scheduler = start_map_provider_scheduler(get_db_background)
 
         # ThemisIQ sync queue drainer (spec 11.4: every 5 minutes)
         from sheplatform.modules.integration.themis_sync import drain_queue
@@ -173,7 +175,7 @@ async def shutdown_schedulers():
     logger = logging.getLogger("sheplatform")
     for name in ("inc_scheduler", "vendor_scheduler", "report_scheduler",
                  "chemicals_scheduler", "lone_worker_scheduler",
-                 "integration_scheduler"):
+                 "map_provider_scheduler", "integration_scheduler"):
         sched = getattr(app.state, name, None)
         if sched is not None:
             try:

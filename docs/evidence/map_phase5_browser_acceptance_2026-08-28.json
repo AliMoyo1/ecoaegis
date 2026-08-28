@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "checked_at": "2026-08-28T15:04:50.743Z",
+  "browser": "152.0.7977.64",
+  "scenarios": [
+    "primary",
+    "reduced-motion",
+    "forced-colors",
+    "mobile"
+  ],
+  "provider_mode": "mapbox selected, public token absent, provider-free continuity"
+}

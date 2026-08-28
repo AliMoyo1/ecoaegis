@@ -77,7 +77,7 @@ async def map_shell(request: Request):
         "map_provider_page_nonce": page_nonce,
         "can_view_map_budget": has_capability(
             request.state.user, "module.settings.access"),
-    })
+    }, headers=PRIVATE_API_HEADERS)
 
 
 @router.post("/api/provider-session")

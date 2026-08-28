@@ -1,0 +1,48 @@
+{
+  "admission_concurrency": {
+    "admitted": 25,
+    "attempts": 50,
+    "denied": 25,
+    "elapsed_ms": 549.074,
+    "errors": [],
+    "limit": 25,
+    "oversubscribed": false,
+    "recorded_loads": 25
+  },
+  "checks": {
+    "admission_has_no_errors": true,
+    "admission_matches_limit": true,
+    "admission_not_oversubscribed": true,
+    "feature_limit_enforced": true,
+    "layer_p95_below_750_ms": true,
+    "payload_below_2_mb": true,
+    "truncation_state_correct": true
+  },
+  "database": "isolated SQLite",
+  "fixture": {
+    "admission_limit": 25,
+    "build_seconds": 2.722,
+    "concurrent_admissions": 50,
+    "located_records": 10000,
+    "moves": 50,
+    "table_rows": 100000
+  },
+  "generated_at_utc": "2026-08-28T12:09:13.412377+00:00",
+  "git_commit": "79cc37a989660e91baf613b48551ae8896c2e038",
+  "git_worktree_dirty": true,
+  "passed": true,
+  "platform": "Windows-11-10.0.26200-SP0",
+  "profile": "release",
+  "python": "3.14.3",
+  "query": {
+    "all_truncated": true,
+    "max_ms": 189.406,
+    "max_payload_bytes": 624433,
+    "max_returned": 2000,
+    "memory_current_delta_bytes": 2500093,
+    "memory_peak_bytes": 5485648,
+    "moves": 50,
+    "p50_ms": 128.114,
+    "p95_ms": 187.664
+  }
+}

@@ -16,6 +16,7 @@ import secrets
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 from sheplatform.config import settings
+from sheplatform.core.audit import log_audit
 
 PROVIDER = "mapbox"
 NONCE_SALT = "ecoaegis-map-provider-v1"
@@ -98,6 +99,23 @@ def _existing_decision(db, admission_id: str, month: str, org_id: int):
     return AdmissionDecision(row["decision"] == "admitted", repeated=True)
 
 
+def _audit_budget_transition(db, *, action: str, user_id: int, org_id: int,
+                             month: str, before: int, after: int) -> None:
+    """Record a privacy-minimal threshold transition in the audit hash chain."""
+    log_audit(
+        db,
+        user_id=user_id,
+        org_id=org_id,
+        action=f"map.provider.{action}",
+        entity_type="map_provider_monthly_usage",
+        old_value={"provider": PROVIDER, "billing_month_utc": month,
+                   "admitted_loads": before},
+        new_value={"provider": PROVIDER, "billing_month_utc": month,
+                   "admitted_loads": after},
+        commit=False,
+    )
+
+
 def admit_provider_session(db, *, nonce: str, user_id: int, org_id: int,
                            session_token: str) -> AdmissionDecision:
     """Atomically admit at most one billed initialization for a page nonce."""
@@ -120,7 +138,7 @@ def admit_provider_session(db, *, nonce: str, user_id: int, org_id: int,
             (PROVIDER, month, now_text),
         )
         lock_sql = (
-            "SELECT admitted_loads FROM map_provider_monthly_usage "
+            "SELECT admitted_loads, blocked_recorded_at FROM map_provider_monthly_usage "
             "WHERE provider = %s AND billing_month_utc = %s"
         )
         if settings.is_postgres():
@@ -138,6 +156,7 @@ def admit_provider_session(db, *, nonce: str, user_id: int, org_id: int,
 
         count = int(usage["admitted_loads"])
         if count >= settings.MAP_PROVIDER_MONTHLY_LIMIT:
+            first_block = usage["blocked_recorded_at"] is None
             db.execute(
                 "INSERT INTO map_provider_admissions "
                 "(admission_id, provider, billing_month_utc, org_id, decision, created_at) "
@@ -150,10 +169,18 @@ def admit_provider_session(db, *, nonce: str, user_id: int, org_id: int,
                 "WHERE provider = %s AND billing_month_utc = %s",
                 (now_text, now_text, PROVIDER, month),
             )
+            if first_block:
+                _audit_budget_transition(
+                    db, action="blocked", user_id=user_id, org_id=org_id,
+                    month=month, before=count, after=count)
             db.commit()
             return AdmissionDecision(False)
 
         new_count = count + 1
+        crossed_warning = (
+            count < settings.MAP_PROVIDER_WARNING_LOADS <= new_count)
+        crossed_critical = (
+            count < settings.MAP_PROVIDER_CRITICAL_LOADS <= new_count)
         db.execute(
             "UPDATE map_provider_monthly_usage SET admitted_loads = %s, "
             "warning_recorded_at = CASE WHEN %s >= %s THEN "
@@ -171,6 +198,14 @@ def admit_provider_session(db, *, nonce: str, user_id: int, org_id: int,
             "VALUES (%s,%s,%s,%s,'admitted',%s)",
             (admission_id, PROVIDER, month, org_id, now_text),
         )
+        if crossed_warning:
+            _audit_budget_transition(
+                db, action="warning", user_id=user_id, org_id=org_id,
+                month=month, before=count, after=new_count)
+        if crossed_critical:
+            _audit_budget_transition(
+                db, action="critical", user_id=user_id, org_id=org_id,
+                month=month, before=count, after=new_count)
         db.commit()
         return AdmissionDecision(True)
     except Exception:
