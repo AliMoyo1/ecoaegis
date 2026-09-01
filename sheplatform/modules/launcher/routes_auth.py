@@ -184,3 +184,45 @@ async def reset_password_submit(request: Request, token: str = Form(...),
         return RedirectResponse(url="/login", status_code=303)
     finally:
         db.close()
+
+
+# ---- Increment D: invitation acceptance (public, tokenized) ----
+
+@router.get("/auth/accept-invite", response_class=HTMLResponse)
+async def accept_invite_page(request: Request, token: str = ""):
+    db = get_db()
+    try:
+        rec = auth.verify_auth_token(db, token, "invite")
+        ctx = {"token": token, "valid": rec is not None}
+        if rec:
+            u = auth.get_user_by_id(db, rec["user_id"])
+            ctx["email"] = u["email"] if u else ""
+        return templates.TemplateResponse(request, "accept_invite.html", ctx)
+    finally:
+        db.close()
+
+
+@router.post("/auth/accept-invite", response_class=HTMLResponse)
+async def accept_invite_submit(request: Request, token: str = Form(...),
+                               new_password: str = Form(...),
+                               confirm_password: str = Form(...)):
+    db = get_db()
+    try:
+        rec = auth.verify_auth_token(db, token, "invite")
+        if rec is None:
+            return templates.TemplateResponse(request, "accept_invite.html",
+                {"token": token, "valid": False,
+                 "error": "This invitation is invalid or has expired"}, status_code=400)
+        if new_password != confirm_password:
+            return templates.TemplateResponse(request, "accept_invite.html",
+                {"token": token, "valid": True, "error": "Passwords do not match"},
+                status_code=400)
+        res = auth.set_password(db, rec["user_id"], new_password)
+        if not res["ok"]:
+            return templates.TemplateResponse(request, "accept_invite.html",
+                {"token": token, "valid": True, "error": res["message"]}, status_code=400)
+        auth.activate_user(db, rec["user_id"])  # pending -> active now it has a real password
+        auth.consume_auth_token(db, rec["id"])
+        return RedirectResponse(url="/login", status_code=303)
+    finally:
+        db.close()

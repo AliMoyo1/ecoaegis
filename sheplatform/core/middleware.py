@@ -193,7 +193,7 @@ def make_csrf_token() -> str:
 # (challenge runs before the session is fully usable, token is sent via JS).
 CSRF_EXEMPT_PREFIXES = (
     "/static", "/login", "/mfa/challenge", "/mfa/api/verify",
-    "/auth/reset",  # public, no session yet; the single-use URL token is the protection
+    "/auth/reset", "/auth/accept-invite",  # public, no session yet; the single-use URL token is the protection
     "/channels/whatsapp", "/channels/twilio", "/esg/api/ingest",
     "/assets/api/telemetry",
     "/webhooks/",

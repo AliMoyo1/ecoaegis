@@ -1,0 +1,30 @@
+{% extends "base_shell.html" %}
+{% block title %}Accept invitation | EcoAegis{% endblock %}
+{% block body_class %}login-page{% endblock %}
+{% block topbar_title %}Accept invitation{% endblock %}
+{% block content %}
+<section class="login-experience" aria-labelledby="invite-title">
+  <div class="login-background-overlay" aria-hidden="true"></div>
+  <div class="login-card" style="margin:auto">
+    <h2 id="invite-title">Set up your account</h2>
+    {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+    {% if valid %}
+    <p class="login-sub">
+      {% if email %}Choose a password for <strong>{{ email }}</strong> to activate your account.
+      {% else %}Choose a password to activate your account.{% endif %}
+    </p>
+    <form method="post" action="/auth/accept-invite">
+      <input type="hidden" name="token" value="{{ token }}">
+      <label for="ai-new">New password</label>
+      <input id="ai-new" type="password" name="new_password" autocomplete="new-password" required autofocus>
+      <label for="ai-confirm">Confirm password</label>
+      <input id="ai-confirm" type="password" name="confirm_password" autocomplete="new-password" required>
+      <button class="btn btn-primary" type="submit">Activate account</button>
+    </form>
+    {% else %}
+    <p class="error">This invitation is invalid or has expired. Ask an administrator to send a new one.</p>
+    <p><a href="/login">Back to sign in</a></p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
