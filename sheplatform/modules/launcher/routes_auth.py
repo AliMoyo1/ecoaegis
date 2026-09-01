@@ -113,3 +113,74 @@ async def revoke_my_other_sessions(request: Request):
         return JSONResponse({"ok": True, "revoked": n})
     finally:
         db.close()
+
+
+# ---- Increment C: password lifecycle ----
+
+@router.get("/account/change-password", response_class=HTMLResponse)
+@require_auth
+async def change_password_page(request: Request):
+    return templates.TemplateResponse(request, "change_password.html",
+                                      {"user": request.state.user})
+
+
+@router.post("/account/change-password", response_class=HTMLResponse)
+@require_auth
+async def change_password_submit(request: Request, current_password: str = Form(...),
+                                 new_password: str = Form(...),
+                                 confirm_password: str = Form(...)):
+    db = get_db()
+    try:
+        uid = request.state.user["id"]
+        full = auth.get_user_by_id(db, uid)
+        if not auth.verify_password(current_password, full["password_hash"]):
+            return templates.TemplateResponse(request, "change_password.html",
+                {"user": request.state.user, "error": "Current password is incorrect"},
+                status_code=400)
+        if new_password != confirm_password:
+            return templates.TemplateResponse(request, "change_password.html",
+                {"user": request.state.user, "error": "New passwords do not match"},
+                status_code=400)
+        res = auth.set_password(db, uid, new_password)
+        if not res["ok"]:
+            return templates.TemplateResponse(request, "change_password.html",
+                {"user": request.state.user, "error": res["message"]}, status_code=400)
+        return RedirectResponse(url="/", status_code=303)  # must_change flag now cleared
+    finally:
+        db.close()
+
+
+@router.get("/auth/reset", response_class=HTMLResponse)
+async def reset_password_page(request: Request, token: str = ""):
+    db = get_db()
+    try:
+        valid = auth.verify_auth_token(db, token, "reset") is not None
+        return templates.TemplateResponse(request, "reset_password.html",
+                                          {"token": token, "valid": valid})
+    finally:
+        db.close()
+
+
+@router.post("/auth/reset", response_class=HTMLResponse)
+async def reset_password_submit(request: Request, token: str = Form(...),
+                                new_password: str = Form(...),
+                                confirm_password: str = Form(...)):
+    db = get_db()
+    try:
+        rec = auth.verify_auth_token(db, token, "reset")
+        if rec is None:
+            return templates.TemplateResponse(request, "reset_password.html",
+                {"token": token, "valid": False,
+                 "error": "This reset link is invalid or has expired"}, status_code=400)
+        if new_password != confirm_password:
+            return templates.TemplateResponse(request, "reset_password.html",
+                {"token": token, "valid": True, "error": "Passwords do not match"},
+                status_code=400)
+        res = auth.set_password(db, rec["user_id"], new_password)
+        if not res["ok"]:
+            return templates.TemplateResponse(request, "reset_password.html",
+                {"token": token, "valid": True, "error": res["message"]}, status_code=400)
+        auth.consume_auth_token(db, rec["id"])
+        return RedirectResponse(url="/login", status_code=303)
+    finally:
+        db.close()

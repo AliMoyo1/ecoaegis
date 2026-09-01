@@ -26,6 +26,64 @@ def verify_password(plain: str, hashed: str) -> bool:
         return False
 
 
+# ---- Password lifecycle + single-use tokens (Tier-1C) ----
+PASSWORD_MIN_LENGTH = 8
+RESET_TOKEN_TTL_HOURS = 1
+INVITE_TOKEN_TTL_HOURS = 72
+
+
+def validate_password_strength(pw: str) -> str | None:
+    """Baseline policy; returns an error message or None if acceptable."""
+    if pw is None or len(pw) < PASSWORD_MIN_LENGTH:
+        return f"password must be at least {PASSWORD_MIN_LENGTH} characters"
+    if not any(c.isalpha() for c in pw) or not any(c.isdigit() for c in pw):
+        return "password must contain at least one letter and one digit"
+    return None
+
+
+def set_password(db, user_id: int, new_password: str) -> dict:
+    """Set a user's password and clear the force-change flag. Validates strength."""
+    err = validate_password_strength(new_password)
+    if err:
+        return {"ok": False, "message": err}
+    db.execute(
+        "UPDATE users SET password_hash = %s, must_change_password = FALSE, updated_at = %s "
+        "WHERE id = %s",
+        (hash_password(new_password), datetime.now(timezone.utc).isoformat(), user_id))
+    db.commit()
+    return {"ok": True}
+
+
+def issue_auth_token(db, user_id: int, purpose: str, ttl_hours: int) -> str:
+    """Create a single-use, expiring token; store only its hash. Returns the raw
+    token (to embed in a delivered link) - never persisted in the clear."""
+    raw = secrets.token_urlsafe(32)
+    db.execute(
+        "INSERT INTO auth_tokens (user_id, token_hash, purpose, expires_at) VALUES (%s,%s,%s,%s)",
+        (user_id, hashlib.sha256(raw.encode()).hexdigest(), purpose,
+         (datetime.now(timezone.utc) + timedelta(hours=ttl_hours)).isoformat()))
+    db.commit()
+    return raw
+
+
+def verify_auth_token(db, raw_token: str, purpose: str) -> dict | None:
+    """Return {id, user_id} for a valid unused non-expired token of this purpose,
+    else None."""
+    if not raw_token:
+        return None
+    row = db.execute(
+        "SELECT id, user_id FROM auth_tokens WHERE token_hash = %s AND purpose = %s "
+        "AND used = FALSE AND expires_at > %s",
+        (hashlib.sha256(raw_token.encode()).hexdigest(), purpose,
+         datetime.now(timezone.utc).isoformat())).fetchone()
+    return dict(row) if row else None
+
+
+def consume_auth_token(db, token_id: int) -> None:
+    db.execute("UPDATE auth_tokens SET used = TRUE WHERE id = %s", (token_id,))
+    db.commit()
+
+
 def create_session(db, user_id: int, ip: str = "", user_agent: str = "") -> str:
     raw = secrets.token_urlsafe(48)
     token_hash = hashlib.sha256(raw.encode()).hexdigest()
@@ -45,7 +103,8 @@ def get_session_user(db, raw_token: str) -> dict | None:
     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
     row = db.execute(
         "SELECT s.id AS session_id, u.id AS id, u.email, u.first_name, u.last_name, "
-        "u.role_key, u.org_id, u.is_active, u.mfa_enabled, s.mfa_verified, s.expires_at "
+        "u.role_key, u.org_id, u.is_active, u.mfa_enabled, u.must_change_password, "
+        "s.mfa_verified, s.expires_at "
         "FROM sessions s JOIN users u ON u.id = s.user_id "
         "WHERE s.token_hash = %s AND s.expires_at > %s AND u.is_active = TRUE",
         (token_hash, datetime.now(timezone.utc).isoformat()),

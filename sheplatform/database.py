@@ -68,6 +68,17 @@ SCHEMA = [
         used            BOOLEAN DEFAULT FALSE,
         created_at      TIMESTAMPTZ DEFAULT NOW()
     )""",
+    # Single-use, expiring tokens for password reset + invitation (NFR-004 lifecycle).
+    """
+    CREATE TABLE IF NOT EXISTS auth_tokens (
+        id              SERIAL PRIMARY KEY,
+        user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token_hash      TEXT UNIQUE NOT NULL,
+        purpose         TEXT NOT NULL CHECK (purpose IN ('reset','invite')),
+        expires_at      TIMESTAMPTZ NOT NULL,
+        used            BOOLEAN DEFAULT FALSE,
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+    )""",
     """
     CREATE TABLE IF NOT EXISTS login_attempts (
         id              SERIAL PRIMARY KEY,
