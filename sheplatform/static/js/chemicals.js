@@ -37,7 +37,7 @@ async function loadChemicals() {
     tr.innerHTML = `
       <td>${c.chem_ref}</td>
       <td>${c.name}</td>
-      <td style="font-family:var(--mono);font-size:12px">${c.cas_number || "-"}</td>
+      <td style="font-family:var(--font);font-size:12px;font-variant-numeric:tabular-nums">${c.cas_number || "-"}</td>
       <td class="${hazardClass}"><strong>${c.hazard_class || "-"}</strong></td>
       <td>${c.supplier || "-"}</td>
       <td>${c.site_name || "-"}</td>

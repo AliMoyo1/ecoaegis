@@ -24,6 +24,22 @@ def test_theme_is_applied_before_css_and_login_is_dark_only():
     assert ".login-page .theme-toggle" in foundation
 
 
+def test_navigation_hides_unenhanced_workspace_until_foundation_is_ready():
+    shell = _read("sheplatform/templates/base_shell.html")
+    boot = _read("sheplatform/static/js/theme-boot.js")
+    source = _read("sheplatform/static/ui_foundation/foundation.js")
+    css = _read("sheplatform/static/ui_foundation/foundation.css")
+
+    assert 'class="workspace-boot"' in shell
+    assert 'root.classList.add("ui-booting")' in boot
+    assert "__ecoaegisRevealUI" in boot
+    assert "2500" in boot
+    assert "html.ui-booting #main-content" in css
+    assert "html.ui-booting .sidebar-groups" in css
+    assert "restoreSidebarState(revealUI)" in source
+    assert source.index("enhanceInputTrays();") < source.index("restoreSidebarState(revealUI)")
+
+
 def test_sidebar_groups_persist_state_and_keep_users_in_settings():
     shell = _read("sheplatform/templates/base_shell.html")
     foundation = _read("sheplatform/static/ui_foundation/foundation.js")
@@ -86,3 +102,81 @@ def test_form_first_pages_receive_progressive_input_trays():
     assert ".input-tray.is-open" in css
     assert ".input-tray-overlay" in css
     assert "prefers-reduced-motion" in css
+
+
+def test_asset_assurance_starts_the_analytics_first_register_pattern():
+    template = _read("sheplatform/modules/assets/templates/index.html")
+    source = _read("sheplatform/static/js/assets.js")
+
+    assert "{% block topbar_title %}Asset assurance{% endblock %}" in template
+    assert 'class="command-metrics asset-metrics"' in template
+    assert 'role="tablist"' in template
+    for panel in ("asset-overview-panel", "asset-register-panel", "asset-maintenance-panel"):
+        assert f'id="{panel}"' in template
+    assert 'id="asset-health-donut"' in template
+    assert 'data-input-tray-open="asset-register-tray"' in template
+    assert 'id="asset-register-tray" data-input-tray' in template
+    assert 'id="asset-key-tray" data-input-tray' in template
+    assert "Promise.all" in source
+    assert "renderAssetMix" in source
+    assert "renderMaintenancePreview" in source
+    assert ".innerHTML" not in source
+    assert "Math.random" not in source
+
+
+def test_user_management_is_an_authenticated_settings_workspace():
+    routes = _read("sheplatform/modules/launcher/routes_admin.py")
+    template = _read("sheplatform/modules/launcher/templates/users.html")
+    source = _read("sheplatform/static/js/users.js")
+
+    assert '"user": request.state.user' in routes
+    assert "RedirectResponse" in routes
+    assert "user_summary" in routes
+    assert "{% block topbar_title %}Identity and access{% endblock %}" in template
+    assert 'data-input-tray-open="create-user-tray"' in template
+    assert 'data-input-tray-label="Add user"' in template
+    assert 'action="/admin/users/create"' in template
+    assert 'name="csrf_token"' in template
+    assert 'id="user-search"' in template
+    assert "Math.random" not in source
+    assert "innerHTML" not in source
+
+
+def test_first_party_typography_uses_premium_sans_fonts_only():
+    fonts = _read("sheplatform/static/fonts/fonts.css")
+    app = _read("sheplatform/static/css/app.css")
+    foundation = _read("sheplatform/static/ui_foundation/foundation.css")
+    service_worker = _read("sheplatform/static/js/sw.js")
+
+    assert "font-family: 'Plus Jakarta Sans'" in fonts
+    assert "font-family: 'DM Sans'" in fonts
+    assert "plus-jakarta-sans-400.woff2" in fonts
+    assert "jetbrains-mono" not in fonts.casefold()
+    assert not (ROOT / "sheplatform/static/fonts/jetbrains-mono-400.woff2").exists()
+    assert "--display: 'Plus Jakarta Sans'" in app
+    assert "font-family: var(--font)" in app
+    assert "text-transform: none" in app
+    assert "--display: \"Plus Jakarta Sans\"" in foundation
+    assert "ecoAegis-shell-v6" in service_worker
+    assert "/static/fonts/fonts.css?v=20260901-ui3" in _read(
+        "sheplatform/templates/base_shell.html"
+    )
+    assert "/static/ui_foundation/foundation.css?v=20260901-ui3" in _read(
+        "sheplatform/templates/base_shell.html"
+    )
+
+    forbidden = (
+        "JetBrains Mono",
+        "jetbrains-mono",
+        "var(--mono)",
+        "Bahnschrift",
+        "Arial Narrow",
+        "font-stretch: semi-condensed",
+    )
+    for path in (ROOT / "sheplatform").rglob("*"):
+        if path.suffix not in {".css", ".html", ".js", ".py"}:
+            continue
+        if "vendor" in path.parts:
+            continue
+        source = path.read_text(encoding="utf-8")
+        assert not any(token in source for token in forbidden), path

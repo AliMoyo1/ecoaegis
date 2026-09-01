@@ -1,37 +1,148 @@
 {% extends "base_shell.html" %}
-{% block title %}Users - EcoAegis{% endblock %}
+{% block title %}User Management - EcoAegis{% endblock %}
+{% block topbar_title %}Identity and access{% endblock %}
+{% block body_class %}users-page{% endblock %}
 {% block content %}
-<h1>User Management</h1>
-<form method="post" action="/admin/users/create" class="card">
-  {% if user and user.csrf_token %}<input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">{% endif %}
-  <h2>Create user</h2>
-  <label>Email <input type="email" name="email" required></label>
-  <label>First name <input type="text" name="first_name" required></label>
-  <label>Last name <input type="text" name="last_name" required></label>
-  <label>Phone <input type="text" name="phone"></label>
-  <label>Role
-    <select name="role_key">
-      {% for key, name in roles.items() %}
-      <option value="{{ key }}">{{ name }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label>Password <input type="password" name="password" required minlength="8"></label>
-  <button class="btn btn-primary" type="submit">Create</button>
-</form>
-<table class="data-table">
-  <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Active</th><th>Last login</th></tr></thead>
-  <tbody>
-    {% for u in users %}
-    <tr>
-      <td>{{ u.id }}</td>
-      <td>{{ u.first_name }} {{ u.last_name }}</td>
-      <td>{{ u.email }}</td>
-      <td>{{ u.role_key }}</td>
-      <td>{{ 'Yes' if u.is_active else 'No' }}</td>
-      <td>{{ u.last_login or '' }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<header class="page-heading-premium user-admin-heading">
+  <div>
+    <span class="page-kicker">Settings / Identity and access</span>
+    <h1>User management</h1>
+    <p>Manage who can enter the workspace, review access posture, and add colleagues without leaving the operational shell.</p>
+  </div>
+  <div class="heading-actions">
+    <a class="btn btn-ghost" href="/mfa/setup">Security and 2FA</a>
+    <button class="btn btn-primary" type="button" data-input-tray-open="create-user-tray">
+      <span aria-hidden="true">+</span>
+      <span>Add user</span>
+    </button>
+  </div>
+</header>
+
+<section class="user-admin-stats" aria-label="User access summary">
+  <article class="user-admin-stat premium-hover">
+    <span class="user-admin-stat-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M16 15.5a5 5 0 0 1 5.5 4.5"/></svg>
+    </span>
+    <span><strong>{{ user_summary.total }}</strong><small>Total users</small></span>
+  </article>
+  <article class="user-admin-stat premium-hover">
+    <span class="user-admin-stat-icon is-positive" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M12 3 20 7v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7Z"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg>
+    </span>
+    <span><strong>{{ user_summary.active }}</strong><small>Active accounts</small></span>
+  </article>
+  <article class="user-admin-stat premium-hover">
+    <span class="user-admin-stat-icon is-privileged" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M12 3 20 7v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7Z"/><path d="M12 8v4M12 16h.01"/></svg>
+    </span>
+    <span><strong>{{ user_summary.privileged }}</strong><small>Privileged roles</small></span>
+  </article>
+  <article class="user-admin-stat premium-hover">
+    <span class="user-admin-stat-icon is-security" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+    </span>
+    <span><strong>{{ user_summary.mfa_enabled }}</strong><small>MFA protected</small></span>
+  </article>
+</section>
+
+<section class="card user-admin-panel" data-no-input-tray data-workspace-surface aria-labelledby="user-directory-title">
+  <div class="user-admin-toolbar">
+    <div>
+      <span class="page-kicker">Directory</span>
+      <h2 id="user-directory-title">Workspace access</h2>
+      <p id="user-result-count" aria-live="polite">{{ user_summary.total }} user{{ '' if user_summary.total == 1 else 's' }}</p>
+    </div>
+    <div class="user-admin-filters" role="search">
+      <label class="user-search-field">
+        <span class="sr-only">Search users</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+        <input id="user-search" type="search" placeholder="Search name or email" autocomplete="off">
+      </label>
+      <label>
+        <span class="sr-only">Filter by role</span>
+        <select id="user-role-filter" aria-label="Filter users by role">
+          <option value="">All roles</option>
+          {% for key, name in roles.items() %}
+          <option value="{{ key }}">{{ name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <div class="user-table-scroll">
+    <table class="data-table user-directory-table">
+      <thead>
+        <tr><th>User</th><th>Role</th><th>Status</th><th>Security</th><th>Last access</th></tr>
+      </thead>
+      <tbody id="user-directory-body">
+        {% for u in users %}
+        <tr data-user-row data-role="{{ u.role_key }}">
+          <td>
+            <span class="user-identity-cell">
+              <span class="user-directory-avatar" aria-hidden="true">{{ u.first_name[0] if u.first_name else 'U' }}{{ u.last_name[0] if u.last_name else '' }}</span>
+              <span><strong>{{ u.first_name }} {{ u.last_name }}</strong><small>{{ u.email }}</small></span>
+            </span>
+          </td>
+          <td><span class="role-chip">{{ u.role_label }}</span></td>
+          <td>
+            <span class="account-state {{ 'is-active' if u.is_active else 'is-inactive' }}">
+              <span aria-hidden="true"></span>{{ 'Active' if u.is_active else 'Inactive' }}
+            </span>
+          </td>
+          <td>
+            <span class="security-state {{ 'is-enabled' if u.mfa_enabled else '' }}">
+              {{ 'MFA enabled' if u.mfa_enabled else 'Password only' }}
+            </span>
+          </td>
+          <td><time class="data-value" title="{{ u.last_login or 'No recorded login' }}">{{ u.last_login_label }}</time></td>
+        </tr>
+        {% endfor %}
+        <tr id="user-no-results" hidden>
+          <td class="table-empty" colspan="5">No users match these filters.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="create-user-tray" class="card user-create-tray" data-input-tray data-input-tray-label="Add user">
+  <h2>Add a workspace user</h2>
+  <p class="input-tray-intro">Create an account inside your organisation and assign only the access needed for the person’s role.</p>
+  <form method="post" action="/admin/users/create">
+    {% if user and user.csrf_token %}<input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">{% endif %}
+    <label>Email address
+      <input type="email" name="email" autocomplete="email" required>
+    </label>
+    <div class="input-grid">
+      <label>First name
+        <input type="text" name="first_name" autocomplete="given-name" required>
+      </label>
+      <label>Last name
+        <input type="text" name="last_name" autocomplete="family-name" required>
+      </label>
+    </div>
+    <label>Phone number
+      <input type="tel" name="phone" autocomplete="tel">
+    </label>
+    <label>Role
+      <select name="role_key" required>
+        {% for key, name in roles.items() %}
+        <option value="{{ key }}">{{ name }}</option>
+        {% endfor %}
+      </select>
+      <small>Role permissions are enforced across the sidebar and protected actions.</small>
+    </label>
+    <label>Temporary password
+      <input type="password" name="password" autocomplete="new-password" required minlength="8">
+      <small>Use at least 8 characters and share it through a secure channel.</small>
+    </label>
+    <div class="tray-form-actions">
+      <button class="btn btn-primary" type="submit">Create user</button>
+      <button class="btn btn-ghost" type="button" data-input-tray-close>Cancel</button>
+    </div>
+  </form>
+</section>
+
+<script src="/static/js/users.js"></script>
 {% endblock %}

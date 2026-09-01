@@ -15,6 +15,15 @@
   let trayOpener = null;
   let restoringSidebar = false;
 
+  function revealUI() {
+    if (typeof window.__ecoaegisRevealUI === "function") {
+      window.__ecoaegisRevealUI();
+      return;
+    }
+    root.classList.remove("ui-booting");
+    root.classList.add("ui-ready");
+  }
+
   function currentTheme() {
     return root.getAttribute("data-theme") === "light" ? "light" : "dark";
   }
@@ -92,8 +101,11 @@
     }
   }
 
-  function restoreSidebarState() {
-    if (!sidebar) return;
+  function restoreSidebarState(onReady) {
+    if (!sidebar) {
+      onReady?.();
+      return;
+    }
     restoringSidebar = true;
     let state = {};
     let savedScroll = 0;
@@ -128,6 +140,7 @@
             applySavedScroll();
             restoringSidebar = false;
           }, 120);
+          onReady?.();
         });
       });
       let scrollFrame = 0;
@@ -137,6 +150,7 @@
       }, { passive: true });
     } else {
       restoringSidebar = false;
+      onReady?.();
     }
   }
 
@@ -188,6 +202,11 @@
     closing.classList.remove("is-open");
     closing.setAttribute("aria-hidden", "true");
     closing.setAttribute("inert", "");
+    if (closing.id) {
+      document.querySelectorAll('[data-input-tray-open="' + closing.id + '"]').forEach(function (launcher) {
+        launcher.setAttribute("aria-expanded", "false");
+      });
+    }
     const overlay = document.querySelector("[data-input-tray-overlay]");
     overlay?.classList.remove("is-open");
     body.classList.remove("input-tray-open");
@@ -238,7 +257,9 @@
     close.innerHTML = "<span aria-hidden=\"true\">&times;</span>";
     trayHeader.append(eyebrow, close);
     card.prepend(trayHeader);
-    close.addEventListener("click", closeInputTray);
+    card.querySelectorAll("[data-input-tray-close]").forEach(function (button) {
+      button.addEventListener("click", closeInputTray);
+    });
 
     let launchers = Array.from(document.querySelectorAll('[data-input-tray-open="' + card.id + '"]'));
     if (!launchers.length) {
@@ -314,10 +335,11 @@
 
   themeButton?.addEventListener("click", syncThemePresentation);
   syncThemePresentation();
-  restoreSidebarState();
   enhanceInputTrays();
   preparePremiumHover();
   prepareTabs();
+  body.classList.add("foundation-ready");
+  restoreSidebarState(revealUI);
 
   document.addEventListener("keydown", function (event) {
     if (event.key === "Escape" && activeTray) {
@@ -362,5 +384,4 @@
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   if (backgroundVideo && reducedMotion.matches) backgroundVideo.pause();
 
-  body.classList.add("foundation-ready");
 })();

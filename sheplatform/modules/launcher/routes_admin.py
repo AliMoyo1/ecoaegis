@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from sheplatform.core import auth
 from sheplatform.core.audit import log_audit, verify_audit_chain
@@ -68,9 +68,14 @@ async def retention_set_api(request: Request,
 async def users_api(request: Request):
     db = get_db()
     try:
+        org_id = request.state.user.get("org_id")
+        if not org_id:
+            return JSONResponse({"users": []})
         rows = db.execute(
             "SELECT id, email, first_name, last_name, role_key FROM users "
-            "WHERE is_active = TRUE ORDER BY first_name").fetchall()
+            "WHERE is_active = TRUE AND org_id = %s ORDER BY first_name",
+            (org_id,),
+        ).fetchall()
         return JSONResponse({"users": [dict(r) for r in rows]})
     finally:
         db.close()
@@ -81,12 +86,38 @@ async def users_api(request: Request):
 async def users_list(request: Request):
     db = get_db()
     try:
+        org_id = request.state.user.get("org_id")
         rows = db.execute(
-            "SELECT id, email, first_name, last_name, role_key, org_id, is_active, last_login "
-            "FROM users ORDER BY id"
-        ).fetchall()
-        return templates.TemplateResponse(request, "users.html",
-                                          {"users": [dict(r) for r in rows], "roles": ROLES})
+            "SELECT id, email, first_name, last_name, role_key, org_id, is_active, "
+            "mfa_enabled, last_login "
+            "FROM users WHERE org_id = %s ORDER BY id",
+            (org_id,),
+        ).fetchall() if org_id else []
+        users = [dict(row) for row in rows]
+        for user in users:
+            last_login = user.get("last_login")
+            user["last_login_label"] = str(last_login)[:10] if last_login else "Never"
+            user["role_label"] = ROLES.get(user.get("role_key"), user.get("role_key", "Unknown"))
+
+        summary = {
+            "total": len(users),
+            "active": sum(bool(user.get("is_active")) for user in users),
+            "privileged": sum(
+                user.get("role_key") in {"super_admin", "she_manager", "she_hod"}
+                for user in users
+            ),
+            "mfa_enabled": sum(bool(user.get("mfa_enabled")) for user in users),
+        }
+        return templates.TemplateResponse(
+            request,
+            "users.html",
+            {
+                "user": request.state.user,
+                "users": users,
+                "roles": ROLES,
+                "user_summary": summary,
+            },
+        )
     finally:
         db.close()
 
@@ -114,7 +145,7 @@ async def user_create(request: Request,
             (email, hashed, first_name, last_name, phone, role_key, org_id),
         )
         db.commit()
-        log_audit(db, request.state.user["id"], None, "user.create", "users",
+        log_audit(db, request.state.user["id"], org_id, "user.create", "users",
                   new_value={"email": email, "role_key": role_key})
         return RedirectResponse(url="/admin/users", status_code=303)
     finally:

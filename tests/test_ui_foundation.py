@@ -89,8 +89,8 @@ def test_command_map_uses_private_live_contracts_and_explicit_states():
 def test_service_worker_precaches_public_foundation_not_tenant_pages():
     source = _read(ROOT / "sheplatform" / "static" / "js" / "sw.js")
     precache = source.split("const SHELL_ASSETS = [", 1)[1].split("];", 1)[0]
-    assert "'/static/ui_foundation/foundation.css'" in precache
-    assert "'/static/ui_foundation/foundation.js'" in precache
+    assert "/static/ui_foundation/foundation.css" in precache
+    assert "/static/ui_foundation/foundation.js" in precache
     assert "'/static/ui_foundation/assets/econet-wireless-logo.png'" in precache
     assert "'/dashboard'" not in precache
     assert "'/map'" not in precache

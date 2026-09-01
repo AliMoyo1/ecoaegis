@@ -31,7 +31,7 @@ async function loadDocuments() {
       <td>${d.version}</td>
       <td><strong>${d.status}</strong></td>
       <td>${d.approver_email || "-"}</td>
-      <td style="font-family:var(--mono);font-size:12px">${d.review_due_date ? d.review_due_date.slice(0, 10) : "-"}</td>
+      <td style="font-family:var(--font);font-size:12px;font-variant-numeric:tabular-nums">${d.review_due_date ? d.review_due_date.slice(0, 10) : "-"}</td>
       <td>${d.ack_count}</td>
       <td>${btns || "-"}</td>`;
     tbody.appendChild(tr);

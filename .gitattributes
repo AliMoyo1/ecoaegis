@@ -1,2 +1,5 @@
 # Preserve reviewed third-party Mapbox distributions byte-for-byte on Windows.
 sheplatform/static/vendor/mapbox-gl/** text eol=lf
+
+# Linux containers execute these files directly, so Windows checkouts must retain LF.
+*.sh text eol=lf

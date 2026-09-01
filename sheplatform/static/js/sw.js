@@ -1,13 +1,17 @@
 /* EcoAegis service worker - caches public shell assets without persisting tenant pages. */
-const CACHE_NAME = 'ecoAegis-shell-v4';
+const CACHE_NAME = 'ecoAegis-shell-v6';
 const SHELL_ASSETS = [
-  '/static/css/app.css',
-  '/static/js/theme-boot.js',
-  '/static/js/shell.js',
+  '/static/fonts/fonts.css?v=20260901-ui3',
+  '/static/fonts/plus-jakarta-sans-400.woff2',
+  '/static/fonts/dm-sans-400.woff2',
+  '/static/css/app.css?v=20260901-ui3',
+  '/static/js/theme-boot.js?v=20260901-ui3',
+  '/static/js/shell.js?v=20260901-ui3',
   '/static/js/dashboard.js',
   '/static/js/permits.js',
-  '/static/ui_foundation/foundation.css',
-  '/static/ui_foundation/foundation.js',
+  '/static/js/assets.js?v=20260901-ui3',
+  '/static/ui_foundation/foundation.css?v=20260901-ui3',
+  '/static/ui_foundation/foundation.js?v=20260901-ui3',
   '/static/ui_foundation/assets/econet-wireless-logo.png',
   '/static/js/offline.js',
   '/static/manifest.json',

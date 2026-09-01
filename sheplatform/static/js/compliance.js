@@ -38,7 +38,7 @@ async function loadObligations() {
       <td>${o.regulator}</td>
       <td>${o.owner_email || "-"}</td>
       <td>${o.frequency}</td>
-      <td class="${dueClass}" style="font-family:var(--mono);font-size:12px">${o.next_due_date ? o.next_due_date.slice(0, 10) : "-"}</td>
+      <td class="${dueClass}" style="font-family:var(--font);font-size:12px;font-variant-numeric:tabular-nums">${o.next_due_date ? o.next_due_date.slice(0, 10) : "-"}</td>
       <td><strong>${o.status}</strong></td>
       <td>${btns || "-"}</td>`;
     tbody.appendChild(tr);

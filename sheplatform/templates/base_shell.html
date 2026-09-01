@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}EcoAegis{% endblock %}</title>
   <meta name="theme-color" content="#090a0b">
-  <script src="/static/js/theme-boot.js"></script>
+  <script src="/static/js/theme-boot.js?v=20260901-ui3"></script>
   <link rel="manifest" href="/static/manifest.json">
   <link rel="icon" type="image/png" href="/static/ui_foundation/assets/econet-wireless-logo.png">
-  <link rel="stylesheet" href="/static/fonts/fonts.css">
-  <link rel="stylesheet" href="/static/css/app.css">
-  <link rel="stylesheet" href="/static/ui_foundation/foundation.css">
+  <link rel="stylesheet" href="/static/fonts/fonts.css?v=20260901-ui3">
+  <link rel="stylesheet" href="/static/css/app.css?v=20260901-ui3">
+  <link rel="stylesheet" href="/static/ui_foundation/foundation.css?v=20260901-ui3">
 </head>
 <body data-theme="{{ theme or 'dark' }}" class="{% block body_class %}{% endblock %}">
 {% macro nav_link(href, label, icon) -%}
@@ -158,12 +158,17 @@
   </aside>
   {% endif %}
   <div class="main-wrap">
+    <div class="workspace-boot" role="status" aria-label="Preparing workspace">
+      <div class="workspace-boot-heading"><span></span><strong>Preparing workspace</strong></div>
+      <div class="workspace-boot-metrics"><span></span><span></span><span></span><span></span></div>
+      <div class="workspace-boot-panel"><span></span><span></span><span></span></div>
+    </div>
     <main class="content" id="main-content" tabindex="-1">{% block content %}{% endblock %}</main>
   </div>
 </div>
 
-<script src="/static/js/shell.js"></script>
-<script src="/static/ui_foundation/foundation.js"></script>
+<script src="/static/js/shell.js?v=20260901-ui3"></script>
+<script src="/static/ui_foundation/foundation.js?v=20260901-ui3"></script>
 <script src="/static/js/particles.js"></script>
 <script src="/static/js/offline.js"></script>
 </body>

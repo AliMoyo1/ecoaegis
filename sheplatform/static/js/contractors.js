@@ -36,7 +36,7 @@ async function loadReadiness() {
     tr.innerHTML = `
       <td>${v.company_name}</td>
       <td>${v.status}</td>
-      <td style="font-family:var(--mono);font-size:12px">${v.insurance_expiry ? v.insurance_expiry.slice(0, 10) : "-"}</td>
+      <td style="font-family:var(--font);font-size:12px;font-variant-numeric:tabular-nums">${v.insurance_expiry ? v.insurance_expiry.slice(0, 10) : "-"}</td>
       <td>${v.certification_status}</td>
       <td>${v.ptw_eligible ? "Yes" : "No"}</td>
       <td id="ready-${v.id}" style="font-weight:600">Checking...</td>
@@ -70,8 +70,8 @@ async function loadInductions() {
       <td>${i.vendor_name || "-"}</td>
       <td>${i.site_name || "-"}</td>
       <td>${i.induction_type}</td>
-      <td style="font-family:var(--mono);font-size:12px">${i.induction_date ? i.induction_date.slice(0, 10) : "-"}</td>
-      <td style="font-family:var(--mono);font-size:12px">${i.valid_until ? i.valid_until.slice(0, 10) : "-"}</td>
+      <td style="font-family:var(--font);font-size:12px;font-variant-numeric:tabular-nums">${i.induction_date ? i.induction_date.slice(0, 10) : "-"}</td>
+      <td style="font-family:var(--font);font-size:12px;font-variant-numeric:tabular-nums">${i.valid_until ? i.valid_until.slice(0, 10) : "-"}</td>
       <td>${i.trainer_email || "-"}</td>
       <td><strong>${i.status}</strong></td>`;
     tbody.appendChild(tr);

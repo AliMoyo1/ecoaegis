@@ -1,10 +1,4 @@
-/* ════════════════════════════════════════════════════════════════
-   SHE PLATFORM - RESTAURANT DASHBOARD THEME
-   Palette + style copied from the reference dashboard:
-   white sidebar, #F5F7FA content bg, blue accent #4A90E2,
-   red/green/yellow status colors, white cards with soft shadows,
-   DM Sans geometric typography, bold dark headings (#2C3E50).
-   ════════════════════════════════════════════════════════════════ */
+/* EcoAegis operational SaaS foundation. */
 :root {
   --accent: #4a90e2;
   --accent-mid: #3a7bc8;
@@ -53,9 +47,8 @@
   --topbar-h: 60px;
   --sidebar-w: 240px;
 
-  --font: 'DM Sans', sans-serif;
-  --display: 'DM Sans', sans-serif;
-  --mono: 'JetBrains Mono', monospace;
+  --font: 'DM Sans', 'Segoe UI Variable', sans-serif;
+  --display: 'Plus Jakarta Sans', 'DM Sans', sans-serif;
 
   --particle-color-rgb: 74, 144, 226;
   --glass-bg: rgba(255, 255, 255, 0.35);
@@ -200,13 +193,13 @@ input, select, textarea { font-family: var(--font); }
   letter-spacing: -0.02em; color: var(--text); line-height: 1.15;
 }
 .brand-sub {
-  font-size: 9.5px; color: var(--muted); font-family: var(--mono);
+  font-size: 9.5px; color: var(--muted); font-family: var(--font);
   text-transform: uppercase; letter-spacing: 0.14em; margin-top: 2px;
 }
 .sidebar-section { padding: 14px 10px 4px; }
 .sidebar-label {
   font-size: 10px; font-weight: 700; letter-spacing: 0.12em; color: var(--dim);
-  text-transform: uppercase; padding: 0 8px 8px; font-family: var(--mono);
+  text-transform: uppercase; padding: 0 8px 8px; font-family: var(--font);
 }
 .side-nav a {
   display: flex; align-items: center; gap: 10px;
@@ -365,9 +358,9 @@ input:focus, select:focus, textarea:focus {
   border-bottom: 1px solid var(--border); font-size: 13px;
 }
 .data-table th {
-  background: var(--surface2); font-family: var(--mono);
-  font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted);
-  font-weight: 600;
+  background: var(--surface2); font-family: var(--font);
+  font-size: 11px; text-transform: none; letter-spacing: 0.015em; color: var(--muted);
+  font-weight: 700;
 }
 .data-table tr:last-child td { border-bottom: none; }
 .data-table tbody tr { transition: background 0.15s ease; }

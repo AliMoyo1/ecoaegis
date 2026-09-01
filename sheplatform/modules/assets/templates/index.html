@@ -1,19 +1,141 @@
 {% extends "base_shell.html" %}
-{% block title %}Assets - EcoAegis{% endblock %}
+{% block title %}Asset Assurance | EcoAegis{% endblock %}
+{% block topbar_title %}Asset assurance{% endblock %}
+{% block body_class %}asset-page{% endblock %}
 {% block content %}
-<h1>Asset Register</h1>
-<div class="login-sub" style="color:var(--muted);font-size:13px;margin-bottom:16px">
-  Generators, vehicles, and tower equipment. Telemetry (run hours, fuel level) posted by a field
-  device or gateway script auto-updates usage and raises maintenance when a service interval is due.
+<header class="page-heading-premium asset-heading">
+  <div>
+    <span class="page-kicker">Risk and assurance / Connected assets</span>
+    <h1>Asset assurance</h1>
+    <p>See fleet readiness, maintenance pressure and telemetry coverage before opening the operational register.</p>
+  </div>
+  {% if user.can_assets_manage %}
+  <div class="heading-actions">
+    <button class="btn btn-primary" type="button" data-input-tray-open="asset-register-tray">
+      <span aria-hidden="true">+</span> Register asset
+    </button>
+    <button class="btn btn-ghost" type="button" data-input-tray-open="asset-key-tray">Issue telemetry key</button>
+  </div>
+  {% endif %}
+</header>
+
+<section class="command-metrics asset-metrics" aria-label="Asset assurance summary">
+  <article class="command-metric premium-hover">
+    <span class="metric-icon metric-blue" aria-hidden="true">A</span>
+    <span><small>Total assets</small><strong id="asset-total-count">0</strong><em>Registered in this organisation</em></span>
+  </article>
+  <article class="command-metric premium-hover">
+    <span class="metric-icon metric-success" aria-hidden="true">✓</span>
+    <span><small>Active fleet</small><strong id="asset-active-count">0</strong><em>Available for operations</em></span>
+  </article>
+  <article class="command-metric premium-hover">
+    <span class="metric-icon metric-warning" aria-hidden="true">!</span>
+    <span><small>Maintenance due</small><strong id="asset-maintenance-count">0</strong><em>Open service actions</em></span>
+  </article>
+  <article class="command-metric premium-hover">
+    <span class="metric-icon metric-blue" aria-hidden="true">↗</span>
+    <span><small>Telemetry reporting</small><strong id="asset-reporting-count">0</strong><em>Assets with run-hour data</em></span>
+  </article>
+</section>
+
+<div class="workspace-tabs" role="tablist" aria-label="Asset assurance views">
+  <button role="tab" id="asset-overview-tab" aria-selected="true" aria-controls="asset-overview-panel" type="button">Overview</button>
+  <button role="tab" id="asset-register-tab" aria-selected="false" aria-controls="asset-register-panel" tabindex="-1" type="button">Asset register</button>
+  <button role="tab" id="asset-maintenance-tab" aria-selected="false" aria-controls="asset-maintenance-panel" tabindex="-1" type="button">Maintenance</button>
 </div>
 
+<section id="asset-overview-panel" class="workspace-tab-panel" role="tabpanel" aria-labelledby="asset-overview-tab" tabindex="-1">
+  <div class="asset-overview-grid">
+    <article class="command-panel premium-hover">
+      <header class="panel-heading">
+        <div><span class="telemetry-label">Current posture</span><h2>Fleet readiness</h2></div>
+      </header>
+      <div class="asset-health-visual">
+        <div class="asset-health-donut" id="asset-health-donut">
+          <span><strong id="asset-health-score">100%</strong><small>ready</small></span>
+        </div>
+        <div class="asset-health-legend">
+          <span><i class="is-ready"></i>Ready <strong id="asset-ready-count">0</strong></span>
+          <span><i class="is-due"></i>Maintenance due <strong id="asset-due-count">0</strong></span>
+          <span><i class="is-unscheduled"></i>No service interval <strong id="asset-unscheduled-count">0</strong></span>
+        </div>
+      </div>
+    </article>
+
+    <article class="command-panel premium-hover">
+      <header class="panel-heading">
+        <div><span class="telemetry-label">Portfolio mix</span><h2>Assets by type</h2></div>
+      </header>
+      <div class="asset-mix-bars" id="asset-mix-bars">
+        <div class="command-empty"><span>◇</span><p>Asset mix will appear when records are available.</p></div>
+      </div>
+    </article>
+  </div>
+
+  <article class="command-panel asset-maintenance-preview-panel">
+    <header class="panel-heading">
+      <div><span class="telemetry-label">Priority work</span><h2>Open maintenance</h2></div>
+      <button class="panel-link" type="button" data-select-tab="asset-maintenance-tab">Open maintenance queue</button>
+    </header>
+    <div class="asset-maintenance-preview" id="asset-maintenance-preview">
+      <div class="command-empty"><span>✓</span><p>No open maintenance actions.</p></div>
+    </div>
+  </article>
+</section>
+
+<section id="asset-register-panel" class="workspace-tab-panel" role="tabpanel" aria-labelledby="asset-register-tab" tabindex="-1" hidden>
+  <article class="command-panel asset-register-panel">
+    <header class="panel-heading asset-register-heading">
+      <div><span class="telemetry-label">Governed records</span><h2>Asset register</h2></div>
+      <div class="asset-register-filters">
+        <label class="asset-search-field">
+          <span class="sr-only">Search assets</span>
+          <input id="asset-search" type="search" placeholder="Search reference or asset name" autocomplete="off">
+        </label>
+        <label>
+          <span class="sr-only">Filter asset status</span>
+          <select id="asset-status-filter">
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="maintenance">Maintenance</option>
+          </select>
+        </label>
+      </div>
+    </header>
+    <div class="asset-result-count" id="asset-result-count" aria-live="polite">0 assets</div>
+    <div class="table-scroll">
+      <table class="data-table asset-table" id="asset-table">
+        <thead><tr><th>Reference</th><th>Asset</th><th>Type</th><th>Run hours</th><th>Service position</th><th>Status</th></tr></thead>
+        <tbody><tr><td colspan="6" class="table-empty">Loading asset register...</td></tr></tbody>
+      </table>
+    </div>
+  </article>
+</section>
+
+<section id="asset-maintenance-panel" class="workspace-tab-panel" role="tabpanel" aria-labelledby="asset-maintenance-tab" tabindex="-1" hidden>
+  <article class="command-panel asset-maintenance-panel">
+    <header class="panel-heading">
+      <div><span class="telemetry-label">Service control</span><h2>Maintenance queue</h2></div>
+      <span class="asset-result-count" id="maintenance-result-count" aria-live="polite">0 open actions</span>
+    </header>
+    <div class="table-scroll">
+      <table class="data-table asset-table" id="maintenance-table">
+        <thead><tr><th>Asset</th><th>Reason</th><th>Raised</th><th>Action</th></tr></thead>
+        <tbody><tr><td colspan="4" class="table-empty">Loading maintenance queue...</td></tr></tbody>
+      </table>
+    </div>
+  </article>
+</section>
+
 {% if user.can_assets_manage %}
-<div class="card">
+<section class="card asset-input-tray" id="asset-register-tray" data-input-tray data-input-tray-label="Register asset">
   <h2>Register asset</h2>
+  <p class="input-tray-intro">Add an operational asset and define the service interval used to raise maintenance automatically.</p>
   <form id="asset-form">
     <label>Asset reference <input type="text" name="asset_ref" placeholder="e.g. GEN-001" required></label>
-    <label>Name <input type="text" name="name" required></label>
-    <div class="filters">
+    <label>Asset name <input type="text" name="name" required></label>
+    <div class="input-grid">
       <label>Type
         <select name="asset_type">
           <option value="generator">Generator</option>
@@ -23,39 +145,24 @@
         </select>
       </label>
       <label>Install date <input type="date" name="install_date"></label>
-      <label>Service interval (run hours) <input type="number" name="service_interval_hours" min="0" step="0.1"></label>
     </div>
-    <label>Feeds ESG KPI code, optional <input type="text" name="esg_kpi_code" placeholder="e.g. ESG-ENV-05"></label>
-    <button class="btn btn-primary" type="submit">Register</button>
+    <label>Service interval in run hours <input type="number" name="service_interval_hours" min="0" step="0.1"></label>
+    <label>ESG KPI code, optional <input type="text" name="esg_kpi_code" placeholder="e.g. ESG-ENV-05"></label>
+    <button class="btn btn-primary" type="submit">Register asset</button>
   </form>
-</div>
+</section>
 
-<div class="card">
-  <h2>Telemetry API key</h2>
-  <p style="font-size:13px;color:var(--muted)">Give this to the field device or gateway script. Shown once - it cannot be retrieved again.</p>
+<section class="card asset-input-tray" id="asset-key-tray" data-input-tray data-input-tray-label="Issue telemetry key">
+  <h2>Issue telemetry key</h2>
+  <p class="input-tray-intro">Create a key for a field device or gateway. The secret is displayed once and cannot be retrieved later.</p>
   <form id="api-key-form">
     <label>Key name <input type="text" name="name" placeholder="e.g. Bulawayo Tower 1 gateway" required></label>
-    <button class="btn btn-sm" type="submit">Create key</button>
+    <button class="btn btn-primary" type="submit">Create key</button>
   </form>
-  <div id="api-key-result" style="display:none;margin-top:10px;font-family:var(--mono);font-size:13px;word-break:break-all"></div>
-</div>
+  <div id="api-key-result" class="asset-key-result" role="status" hidden></div>
+</section>
 {% endif %}
 
-<div class="card">
-  <h2>Open maintenance</h2>
-  <table class="data-table" id="maintenance-table">
-    <thead><tr><th>Asset</th><th>Reason</th><th>Raised</th><th></th></tr></thead>
-    <tbody></tbody>
-  </table>
-</div>
-
-<div class="card">
-  <h2>Assets</h2>
-  <table class="data-table" id="asset-table">
-    <thead><tr><th>Ref</th><th>Name</th><th>Type</th><th>Run hours</th><th>Since service</th><th>Status</th></tr></thead>
-    <tbody></tbody>
-  </table>
-</div>
-
-<script src="/static/js/assets.js"></script>
+<div class="permit-feedback" id="asset-feedback" role="status" hidden></div>
+<script src="/static/js/assets.js?v=20260901-ui3"></script>
 {% endblock %}

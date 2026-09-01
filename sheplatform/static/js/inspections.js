@@ -38,7 +38,7 @@ async function loadInspections() {
       <td>${i.inspection_type}</td>
       <td class="site-cell"></td>
       <td>${i.site_location || "-"}</td>
-      <td style="font-family:var(--mono);font-size:12px">${i.scheduled_date ? i.scheduled_date.slice(0, 10) : "-"}</td>
+      <td style="font-family:var(--font);font-size:12px;font-variant-numeric:tabular-nums">${i.scheduled_date ? i.scheduled_date.slice(0, 10) : "-"}</td>
       <td>${i.inspector_email || "-"}</td>
       <td><strong>${i.status}</strong></td>
       <td>${btns || "-"}</td>`;

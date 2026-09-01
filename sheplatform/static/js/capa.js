@@ -42,7 +42,7 @@ async function loadActions() {
       <td>${a.source_type}${a.source_id ? " #" + a.source_id : ""}</td>
       <td class="${pclass}">${a.priority}</td>
       <td>${a.assignee_first || ""} ${a.assignee_last || ""}</td>
-      <td style="font-family:var(--mono);font-size:12px">${a.due_date ? a.due_date.slice(0, 10) : "-"}</td>
+      <td style="font-family:var(--font);font-size:12px;font-variant-numeric:tabular-nums">${a.due_date ? a.due_date.slice(0, 10) : "-"}</td>
       <td><strong>${a.status}</strong></td>
       <td>${a.verifier_email || "-"}</td>
       <td>${btns}</td>`;

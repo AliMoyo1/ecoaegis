@@ -56,6 +56,6 @@ def test_service_worker_never_caches_authenticated_pages():
     assert "'/dashboard'" not in precache
     assert "'/incidents'" not in precache
     assert "'/observations'" not in precache
-    assert "'/static/css/app.css'" in precache
+    assert "/static/css/app.css" in precache
     assert "request.mode === 'navigate'" in source
     assert "caches.match('/dashboard')" not in source

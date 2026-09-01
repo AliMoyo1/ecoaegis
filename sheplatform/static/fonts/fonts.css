@@ -1,15 +1,15 @@
-/* Self-hosted fonts - restaurant dashboard style (DM Sans primary, JetBrains Mono for data) */
+/* Self-hosted premium SaaS typography: Plus Jakarta Sans display, DM Sans interface. */
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/static/fonts/plus-jakarta-sans-400.woff2') format('woff2');
+}
 @font-face {
   font-family: 'DM Sans';
   font-style: normal;
   font-weight: 400 700;
   font-display: swap;
   src: url('/static/fonts/dm-sans-400.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'JetBrains Mono';
-  font-style: normal;
-  font-weight: 400 700;
-  font-display: swap;
-  src: url('/static/fonts/jetbrains-mono-400.woff2') format('woff2');
 }
