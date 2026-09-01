@@ -1,14 +1,20 @@
 """Launcher module: admin routes (user management, guide 7)."""
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 from sheplatform.core import auth
 from sheplatform.core.audit import log_audit, verify_audit_chain
 from sheplatform.core.middleware import require_capability
 from sheplatform.core.retention import retention_report, set_retention_policy
-from sheplatform.core.rbac import ROLES
+from sheplatform.core.rbac import CAPABILITIES, ROLES
 from sheplatform.database import get_db
 from sheplatform.templating import templates
 
@@ -150,3 +156,125 @@ async def user_create(request: Request,
         return RedirectResponse(url="/admin/users", status_code=303)
     finally:
         db.close()
+
+
+# ---- Increment A: user lifecycle + per-user audit + role preview ----
+
+def _target_user(db, user_id: int, actor_org_id: int | None):
+    """Fetch a user only within the actor's org (tenant isolation, fail closed)."""
+    if not actor_org_id:
+        return None
+    row = db.execute("SELECT * FROM users WHERE id = %s AND org_id = %s",
+                     (user_id, actor_org_id)).fetchone()
+    return dict(row) if row else None
+
+
+def _active_super_admins(db) -> int:
+    row = db.execute(
+        "SELECT COUNT(*) AS c FROM users WHERE role_key = 'super_admin' AND is_active = TRUE"
+    ).fetchone()
+    return int(row["c"])
+
+
+@router.post("/users/{user_id}/deactivate")
+@require_capability("admin.users.manage")
+async def user_deactivate(request: Request, user_id: int):
+    db = get_db()
+    try:
+        actor = request.state.user
+        target = _target_user(db, user_id, actor.get("org_id"))
+        if target is None:
+            return JSONResponse({"ok": False, "message": "user not found"}, status_code=404)
+        if user_id == actor["id"]:
+            return JSONResponse({"ok": False, "message": "you cannot deactivate your own account"},
+                                status_code=400)
+        if target["role_key"] == "super_admin" and _active_super_admins(db) <= 1:
+            return JSONResponse({"ok": False, "message": "cannot deactivate the last active super admin"},
+                                status_code=400)
+        db.execute("UPDATE users SET is_active = FALSE, updated_at = %s WHERE id = %s AND org_id = %s",
+                   (_now(), user_id, actor.get("org_id")))
+        db.commit()
+        revoked = auth.revoke_user_sessions(db, user_id)  # kill live sessions immediately
+        log_audit(db, actor["id"], actor.get("org_id"), "user.deactivate", "users", user_id,
+                  old_value={"is_active": True}, new_value={"is_active": False, "sessions_revoked": revoked})
+        return JSONResponse({"ok": True, "sessions_revoked": revoked})
+    finally:
+        db.close()
+
+
+@router.post("/users/{user_id}/reactivate")
+@require_capability("admin.users.manage")
+async def user_reactivate(request: Request, user_id: int):
+    db = get_db()
+    try:
+        actor = request.state.user
+        target = _target_user(db, user_id, actor.get("org_id"))
+        if target is None:
+            return JSONResponse({"ok": False, "message": "user not found"}, status_code=404)
+        db.execute("UPDATE users SET is_active = TRUE, updated_at = %s WHERE id = %s AND org_id = %s",
+                   (_now(), user_id, actor.get("org_id")))
+        db.commit()
+        log_audit(db, actor["id"], actor.get("org_id"), "user.reactivate", "users", user_id,
+                  old_value={"is_active": False}, new_value={"is_active": True})
+        return JSONResponse({"ok": True})
+    finally:
+        db.close()
+
+
+@router.post("/users/{user_id}/role")
+@require_capability("admin.users.manage")
+async def user_set_role(request: Request, user_id: int, role_key: str = Form(...)):
+    db = get_db()
+    try:
+        actor = request.state.user
+        if role_key not in ROLES:
+            return JSONResponse({"ok": False, "message": "unknown role"}, status_code=400)
+        target = _target_user(db, user_id, actor.get("org_id"))
+        if target is None:
+            return JSONResponse({"ok": False, "message": "user not found"}, status_code=404)
+        if (target["role_key"] == "super_admin" and role_key != "super_admin"
+                and _active_super_admins(db) <= 1):
+            return JSONResponse({"ok": False, "message": "cannot demote the last active super admin"},
+                                status_code=400)
+        old_role = target["role_key"]
+        db.execute("UPDATE users SET role_key = %s, updated_at = %s WHERE id = %s AND org_id = %s",
+                   (role_key, _now(), user_id, actor.get("org_id")))
+        db.commit()
+        # role_key is read live from users on every request (get_session_user), so
+        # the change takes effect immediately without revoking sessions.
+        log_audit(db, actor["id"], actor.get("org_id"), "user.role_change", "users", user_id,
+                  old_value={"role_key": old_role}, new_value={"role_key": role_key})
+        return JSONResponse({"ok": True, "role_key": role_key})
+    finally:
+        db.close()
+
+
+@router.get("/users/{user_id}/audit")
+@require_capability("admin.users.manage")
+async def user_audit_history(request: Request, user_id: int, limit: int = 100):
+    """Per-user audit history: what the user did + changes made to their account."""
+    db = get_db()
+    try:
+        actor = request.state.user
+        target = _target_user(db, user_id, actor.get("org_id"))
+        if target is None:
+            return JSONResponse({"ok": False, "message": "user not found"}, status_code=404)
+        rows = db.execute(
+            "SELECT id, user_id, action, entity_type, entity_id, created_at "
+            "FROM audit_log WHERE org_id = %s AND (user_id = %s OR "
+            "(entity_type = 'users' AND entity_id = %s)) ORDER BY id DESC LIMIT %s",
+            (actor.get("org_id"), user_id, user_id, min(max(limit, 1), 500))).fetchall()
+        return JSONResponse({"ok": True, "history": [dict(r) for r in rows]})
+    finally:
+        db.close()
+
+
+@router.get("/api/roles/{role_key}/preview")
+@require_capability("admin.users.manage")
+async def role_preview(request: Request, role_key: str):
+    """Read-only preview of the capabilities a role grants (from rbac.CAPABILITIES)."""
+    if role_key not in ROLES:
+        return JSONResponse({"ok": False, "message": "unknown role"}, status_code=404)
+    caps = sorted(cap for cap, roles in CAPABILITIES.items() if role_key in roles)
+    return JSONResponse({"ok": True, "role_key": role_key, "label": ROLES[role_key],
+                         "capabilities": caps})

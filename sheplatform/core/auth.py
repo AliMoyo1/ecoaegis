@@ -47,7 +47,7 @@ def get_session_user(db, raw_token: str) -> dict | None:
         "SELECT s.id AS session_id, u.id AS id, u.email, u.first_name, u.last_name, "
         "u.role_key, u.org_id, u.is_active, u.mfa_enabled, s.mfa_verified, s.expires_at "
         "FROM sessions s JOIN users u ON u.id = s.user_id "
-        "WHERE s.token_hash = %s AND s.expires_at > %s",
+        "WHERE s.token_hash = %s AND s.expires_at > %s AND u.is_active = TRUE",
         (token_hash, datetime.now(timezone.utc).isoformat()),
     ).fetchone()
     if row is None:
@@ -73,6 +73,14 @@ def update_last_login(db, user_id: int) -> None:
     db.execute("UPDATE users SET last_login = %s WHERE id = %s",
                (datetime.now(timezone.utc).isoformat(), user_id))
     db.commit()
+
+
+def revoke_user_sessions(db, user_id: int) -> int:
+    """Delete all of a user's active sessions (e.g. on deactivation). Returns
+    the number revoked."""
+    cur = db.execute("DELETE FROM sessions WHERE user_id = %s", (user_id,))
+    db.commit()
+    return cur.rowcount if cur.rowcount is not None and cur.rowcount > 0 else 0
 
 
 def destroy_session(db, raw_token: str) -> None:
