@@ -327,3 +327,35 @@ async def user_revoke_all_sessions(request: Request, user_id: int):
         return JSONResponse({"ok": True, "revoked": n})
     finally:
         db.close()
+
+
+@router.post("/users/{user_id}/reset-password")
+@require_capability("admin.users.manage")
+async def user_reset_password(request: Request, user_id: int):
+    """Admin-triggered reset: issue a single-use token link, force a change,
+    revoke live sessions, and email the link (console provider in dev)."""
+    from sheplatform.config import settings
+    from sheplatform.core.notifications import queue_email
+    db = get_db()
+    try:
+        actor = request.state.user
+        target = _target_user(db, user_id, actor.get("org_id"))
+        if target is None:
+            return JSONResponse({"ok": False, "message": "user not found"}, status_code=404)
+        raw = auth.issue_auth_token(db, user_id, "reset", auth.RESET_TOKEN_TTL_HOURS)
+        db.execute("UPDATE users SET must_change_password = TRUE, updated_at = %s "
+                   "WHERE id = %s AND org_id = %s", (_now(), user_id, actor.get("org_id")))
+        db.commit()
+        revoked = auth.revoke_user_sessions(db, user_id)
+        link = f"/auth/reset?token={raw}"
+        queue_email(db, target["email"], "EcoAegis password reset",
+                    f"A password reset was requested. Set a new password here: {link} "
+                    f"(link expires in {auth.RESET_TOKEN_TTL_HOURS} hour(s)).")
+        log_audit(db, actor["id"], actor.get("org_id"), "user.password_reset", "users", user_id,
+                  new_value={"sessions_revoked": revoked})
+        resp = {"ok": True, "sessions_revoked": revoked}
+        if settings.DEBUG:
+            resp["reset_link"] = link  # dev convenience only; never exposed in prod
+        return JSONResponse(resp)
+    finally:
+        db.close()

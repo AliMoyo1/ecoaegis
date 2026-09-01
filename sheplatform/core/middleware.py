@@ -67,6 +67,18 @@ def mfa_challenge_required(request: Request, user: dict) -> bool:
     return not any(path.startswith(p) for p in MFA_ALLOWED_PATHS)
 
 
+# Tier-1C: paths a user with must_change_password may still reach.
+PASSWORD_CHANGE_ALLOWED_PATHS = ("/account/change-password", "/logout", "/static", "/mfa")
+
+
+def password_change_required(request: Request, user: dict) -> bool:
+    """True when the user must set a new password before using anything else."""
+    if not user or not user.get("must_change_password"):
+        return False
+    path = request.url.path
+    return not any(path.startswith(p) for p in PASSWORD_CHANGE_ALLOWED_PATHS)
+
+
 def get_current_user(request: Request) -> dict | None:
     raw = request.cookies.get(SESSION_COOKIE)
     if not raw:
@@ -92,6 +104,8 @@ def require_auth(func):
             return RedirectResponse(url="/login", status_code=303)
         if mfa_challenge_required(request, user):
             return RedirectResponse(url="/mfa/challenge", status_code=303)
+        if password_change_required(request, user):
+            return RedirectResponse(url="/account/change-password", status_code=303)
         request.state.user = _attach_csrf(with_nav_flags(user), request)
         return await func(request, *args, **kwargs)
     return wrapper
@@ -107,6 +121,8 @@ def require_capability(capability: str):
                 return RedirectResponse(url="/login", status_code=303)
             if mfa_challenge_required(request, user):
                 return RedirectResponse(url="/mfa/challenge", status_code=303)
+            if password_change_required(request, user):
+                return RedirectResponse(url="/account/change-password", status_code=303)
             if not has_capability(user, capability):
                 raise HTTPException(status_code=403, detail="Forbidden")
             request.state.user = _attach_csrf(with_nav_flags(user), request)
@@ -177,6 +193,7 @@ def make_csrf_token() -> str:
 # (challenge runs before the session is fully usable, token is sent via JS).
 CSRF_EXEMPT_PREFIXES = (
     "/static", "/login", "/mfa/challenge", "/mfa/api/verify",
+    "/auth/reset",  # public, no session yet; the single-use URL token is the protection
     "/channels/whatsapp", "/channels/twilio", "/esg/api/ingest",
     "/assets/api/telemetry",
     "/webhooks/",
