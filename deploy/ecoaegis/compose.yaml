@@ -1,0 +1,269 @@
+name: ecoaegis
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  db:
+    image: postgres:16.15-alpine3.24@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ecoaegis
+      POSTGRES_DB: ecoaegis
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_INITDB_ARGS: --data-checksums --auth-host=scram-sha-256
+      TZ: UTC
+    secrets:
+      - db_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    expose:
+      - "5432"
+    shm_size: 256m
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - effective_cache_size=1GB
+      - -c
+      - password_encryption=scram-sha-256
+      - -c
+      - log_connections=on
+      - -c
+      - log_disconnections=on
+      - -c
+      - log_statement=ddl
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    stop_grace_period: 60s
+    mem_limit: 2g
+    mem_reservation: 512m
+    cpus: 2.0
+    pids_limit: 256
+    logging: *default-logging
+    labels:
+      com.alimoyo.application: ecoaegis
+      com.alimoyo.role: database
+
+  app:
+    image: ${ECOAEGIS_IMAGE:-ecoaegis:3240203}
+    build:
+      context: ../..
+      dockerfile: deploy/ecoaegis/Dockerfile
+      target: production
+      args:
+        VCS_REF: ${ECOAEGIS_VCS_REF:-3240203e27230173cbc223cc8e9d0d15ca13b0d5}
+    restart: unless-stopped
+    init: true
+    env_file:
+      - ${ECOAEGIS_CONFIG_FILE:-/srv/ecoaegis/config/ecoaegis.env}
+    environment:
+      POSTGRES_USER: ecoaegis
+      POSTGRES_DB: ecoaegis
+      DATABASE_HOST: db
+      DATABASE_PORT: "5432"
+      DATABASE_PASSWORD_FILE: /run/secrets/db_password
+      APP_SECRET_FILE: /run/secrets/app_secret
+      TZ: UTC
+    secrets:
+      - db_password
+      - app_secret
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - attachments_data:/app/sheplatform/data
+      - evidence_data:/app/sheplatform/modules/data
+    networks:
+      backend: {}
+      edge:
+        aliases:
+          - ecoaegis-app
+    expose:
+      - "8080"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "/usr/local/bin/ecoaegis-healthcheck.py"]
+      interval: 30s
+      timeout: 8s
+      retries: 5
+      start_period: 45s
+    stop_grace_period: 30s
+    mem_limit: 1536m
+    mem_reservation: 256m
+    cpus: 1.5
+    pids_limit: 256
+    logging: *default-logging
+    labels:
+      com.alimoyo.application: ecoaegis
+      com.alimoyo.role: application
+      org.opencontainers.image.revision: ${ECOAEGIS_VCS_REF:-3240203e27230173cbc223cc8e9d0d15ca13b0d5}
+
+  backup:
+    image: postgres:16.15-alpine3.24@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    profiles: ["maintenance"]
+    user: "10001:10001"
+    environment:
+      POSTGRES_USER: ecoaegis
+      POSTGRES_DB: ecoaegis
+      DATABASE_HOST: db
+      DATABASE_PASSWORD_FILE: /run/secrets/db_password
+      BACKUP_DIR: /backups
+      BACKUP_RETENTION_DAYS: "14"
+      TZ: UTC
+    secrets:
+      - db_password
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/usr/local/bin/ecoaegis-backup"]
+    volumes:
+      - ./backup.sh:/usr/local/bin/ecoaegis-backup:ro
+      - attachments_data:/attachments:ro
+      - evidence_data:/evidence:ro
+      - ${ECOAEGIS_BACKUP_DIR:-/var/backups/ecoaegis}:/backups
+    networks:
+      - backend
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+    mem_limit: 512m
+    cpus: 0.5
+    pids_limit: 128
+    logging: *default-logging
+    labels:
+      com.alimoyo.application: ecoaegis
+      com.alimoyo.role: backup
+
+  test-db:
+    image: postgres:16.15-alpine3.24@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    profiles: ["test"]
+    environment:
+      POSTGRES_USER: ecoaegis_test
+      POSTGRES_DB: ecoaegis_test
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_INITDB_ARGS: --data-checksums --auth-host=scram-sha-256
+      TZ: UTC
+    secrets:
+      - db_password
+    tmpfs:
+      - /var/lib/postgresql/data:rw,noexec,nosuid,size=1024m
+      - /tmp:rw,noexec,nosuid,size=64m
+    networks:
+      - test_backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: "no"
+    mem_limit: 1536m
+    cpus: 1.5
+    pids_limit: 256
+    logging: *default-logging
+
+  test:
+    image: ${ECOAEGIS_TEST_IMAGE:-ecoaegis-test:3240203}
+    profiles: ["test"]
+    build:
+      context: ../..
+      dockerfile: deploy/ecoaegis/Dockerfile
+      target: test
+      args:
+        VCS_REF: ${ECOAEGIS_VCS_REF:-3240203e27230173cbc223cc8e9d0d15ca13b0d5}
+    init: true
+    env_file:
+      - ${ECOAEGIS_CONFIG_FILE:-/srv/ecoaegis/config/ecoaegis.env}
+    environment:
+      POSTGRES_USER: ecoaegis_test
+      POSTGRES_DB: ecoaegis_test
+      DATABASE_HOST: test-db
+      DATABASE_PORT: "5432"
+      DATABASE_PASSWORD_FILE: /run/secrets/db_password
+      APP_SECRET_FILE: /run/secrets/app_secret
+      ECOAEGIS_VCS_REF: ${ECOAEGIS_VCS_REF:-3240203e27230173cbc223cc8e9d0d15ca13b0d5}
+      ECOAEGIS_TEST_MODE: "true"
+      DEBUG: "true"
+      TZ: UTC
+    secrets:
+      - db_password
+      - app_secret
+    depends_on:
+      test-db:
+        condition: service_healthy
+    networks:
+      - test_backend
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=1024m
+      - /app/sheplatform/data:rw,noexec,nosuid,uid=10001,gid=10001,mode=0750,size=256m
+      - /app/sheplatform/modules/data:rw,noexec,nosuid,uid=10001,gid=10001,mode=0750,size=256m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+    mem_limit: 2g
+    cpus: 2.0
+    pids_limit: 256
+    logging: *default-logging
+
+networks:
+  backend:
+    name: ecoaegis_backend
+    internal: true
+    labels:
+      com.alimoyo.application: ecoaegis
+  edge:
+    name: edge
+    external: true
+  test_backend:
+    name: ecoaegis_test_backend
+    internal: true
+    labels:
+      com.alimoyo.application: ecoaegis-test
+
+volumes:
+  postgres_data:
+    name: ecoaegis_postgres_data
+    labels:
+      com.alimoyo.application: ecoaegis
+      com.alimoyo.data-class: database
+  attachments_data:
+    name: ecoaegis_attachments_data
+    labels:
+      com.alimoyo.application: ecoaegis
+      com.alimoyo.data-class: attachments
+  evidence_data:
+    name: ecoaegis_evidence_data
+    labels:
+      com.alimoyo.application: ecoaegis
+      com.alimoyo.data-class: evidence
+
+secrets:
+  db_password:
+    file: ${ECOAEGIS_SECRETS_DIR:-/srv/ecoaegis/secrets}/db_password
+  app_secret:
+    file: ${ECOAEGIS_SECRETS_DIR:-/srv/ecoaegis/secrets}/app_secret

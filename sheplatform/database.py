@@ -1833,7 +1833,14 @@ class _PgConn:
 
     def execute(self, sql, params=None):
         cur = self._conn.cursor()
-        cur.execute(sql, params or ())
+        # Passing an empty tuple makes psycopg2 apply its ``%`` interpolation
+        # even when the statement has no placeholders. Literal SQL patterns
+        # such as ``LIKE 'map.provider.%'`` then raise IndexError. Omit the
+        # parameter argument entirely when the caller supplied none.
+        if params is None:
+            cur.execute(sql)
+        else:
+            cur.execute(sql, params)
         return cur
 
     def executescript(self, sql):

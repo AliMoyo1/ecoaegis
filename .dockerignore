@@ -1,0 +1,29 @@
+.git
+.github
+.venv
+venv
+env
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.coverage
+htmlcov
+
+# Never place workstation credentials or data in an image.
+.env
+.env.*
+!.env.example
+*.db
+*.sqlite
+*.sqlite3
+sheplatform/data/**
+sheplatform/modules/data/**
+uploads/**
+
+# Build only the application and its explicit deployment inputs.
+docs
+*.docx
+*.pdf
+*.tar
+*.tar.gz
+*.zip

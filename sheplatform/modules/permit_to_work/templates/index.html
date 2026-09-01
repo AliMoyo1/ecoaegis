@@ -1,14 +1,108 @@
 {% extends "base_shell.html" %}
-{% block title %}Permit to Work - EcoAegis{% endblock %}
+{% block title %}Permit to work | EcoAegis{% endblock %}
+{% block body_class %}permit-page{% endblock %}
+{% block topbar_title %}Permit to work{% endblock %}
 {% block content %}
-<h1>Permit to Work (PTW)</h1>
+<header class="page-heading-premium">
+  <div>
+    <span class="page-kicker">Controlled work authorization</span>
+    <h1>Permit to work</h1>
+    <p>A governed approval chain where each decision, dependency and handover remains visible.</p>
+  </div>
+  {% if can_create %}
+  <div class="heading-actions">
+    <button class="btn btn-primary" type="button" data-input-tray-open="permit-input-tray"><span aria-hidden="true">+</span> New permit</button>
+  </div>
+  {% endif %}
+</header>
 
-<div class="card">
-  <h2>Issue permit (requires approved risk assessment - BRN-001)</h2>
+<section class="permit-hero premium-hover" data-workspace-surface aria-labelledby="permit-hero-title">
+  <div>
+    <span class="telemetry-label">Approval integrity</span>
+    <h2 id="permit-hero-title">No work begins before the right people have said yes.</h2>
+    <p>Permit state, control evidence and specialist approval move together as one governed record.</p>
+  </div>
+  <div class="permit-hero-stat"><strong id="permit-awaiting-count">0</strong><span>awaiting authorized review</span></div>
+</section>
+
+<section class="permit-metrics" aria-label="Permit status summary">
+  <article class="permit-metric premium-hover"><span>Total permits</span><strong id="permit-total-count">0</strong><small>All governed records</small></article>
+  <article class="permit-metric premium-hover"><span>Active</span><strong id="permit-active-count">0</strong><small>Authorized work in scope</small></article>
+  <article class="permit-metric premium-hover"><span>Pending approval</span><strong id="permit-pending-count">0</strong><small>Waiting in the approval chain</small></article>
+  <article class="permit-metric premium-hover"><span>Closed or revoked</span><strong id="permit-terminal-count">0</strong><small>Retained for audit evidence</small></article>
+</section>
+
+<div class="workspace-tabs" role="tablist" aria-label="Permit workspace views">
+  <button role="tab" id="permit-overview-tab" aria-selected="true" aria-controls="permit-overview-panel" type="button">Overview</button>
+  <button role="tab" id="permit-register-tab" aria-selected="false" aria-controls="permit-register-panel" tabindex="-1" type="button">Permit register</button>
+</div>
+
+<section id="permit-overview-panel" class="workspace-tab-panel" role="tabpanel" aria-labelledby="permit-overview-tab" tabindex="-1">
+  <div class="permit-overview-grid">
+    <article class="command-panel permit-priority-panel premium-hover">
+      <header class="panel-heading">
+        <div><span class="telemetry-label">Current handover</span><h2>Priority permit</h2></div>
+      </header>
+      <div id="permit-priority"><div class="command-empty"><span>&#10003;</span><p>No permit records are available yet.</p></div></div>
+    </article>
+
+    <article class="command-panel permit-status-panel premium-hover">
+      <header class="panel-heading"><div><span class="telemetry-label">Portfolio shape</span><h2>Status distribution</h2></div></header>
+      <div class="permit-status-visual">
+        <div class="permit-status-donut" id="permit-status-donut"><span><strong id="permit-donut-total">0</strong><small>permits</small></span></div>
+        <div class="permit-status-legend">
+          <span><i class="status-active"></i>Active <strong id="permit-legend-active">0</strong></span>
+          <span><i class="status-pending"></i>Pending <strong id="permit-legend-pending">0</strong></span>
+          <span><i class="status-terminal"></i>Closed / revoked <strong id="permit-legend-terminal">0</strong></span>
+          <span><i class="status-other"></i>Other <strong id="permit-legend-other">0</strong></span>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <article class="command-panel permit-recent-panel">
+    <header class="panel-heading">
+      <div><span class="telemetry-label">Recent activity</span><h2>Permit queue</h2></div>
+      <button class="panel-link" type="button" data-select-tab="permit-register-tab">Open full register</button>
+    </header>
+    <div class="permit-card-grid" id="permit-card-grid"><div class="command-empty"><span>&#10003;</span><p>No permit records are available yet.</p></div></div>
+  </article>
+</section>
+
+<section id="permit-register-panel" class="workspace-tab-panel" role="tabpanel" aria-labelledby="permit-register-tab" tabindex="-1" hidden>
+  <article class="command-panel permit-register-panel">
+    <header class="panel-heading">
+      <div><span class="telemetry-label">Governed records</span><h2>Permit register</h2></div>
+      <label class="permit-filter">Status
+        <select id="permit-status-filter">
+          <option value="">All statuses</option>
+          <option value="pending_approval">Pending approval</option>
+          <option value="active">Active</option>
+          <option value="closed">Closed</option>
+          <option value="revoked">Revoked</option>
+        </select>
+      </label>
+    </header>
+    <div class="table-scroll">
+      <table class="data-table" id="permit-table">
+        <thead><tr><th>Reference</th><th>Permit</th><th>Site</th><th>Vendor</th><th>Status</th><th>Valid until</th><th>Workflow</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="table-empty" id="permit-table-empty" hidden>No permits match this view.</div>
+  </article>
+</section>
+
+<div class="permit-feedback" id="permit-feedback" role="status" aria-live="polite" hidden></div>
+
+{% if can_create %}
+<div class="card" id="permit-input-tray" data-input-tray data-input-tray-label="New permit">
+  <h2>Issue a permit</h2>
+  <p class="input-tray-intro">BRN-001 requires an approved risk assessment before the permit can enter its approval chain.</p>
   <form id="permit-form">
     <label>Title <input type="text" name="title" required></label>
-    <label>Description <textarea name="description" rows="2"></textarea></label>
-    <label>Type
+    <label>Description <textarea name="description" rows="3"></textarea></label>
+    <label>Permit type
       <select name="permit_type">
         <option value="hot_work">Hot work</option>
         <option value="confined_space">Confined space</option>
@@ -18,34 +112,32 @@
         <option value="general">General</option>
       </select>
     </label>
-    <label>Vendor ID <input type="number" name="vendor_id" required></label>
-    <label>Risk assessment ID (must be approved) <input type="number" name="risk_assessment_id" required></label>
+    <div class="input-grid">
+      <label>Vendor ID <input type="number" name="vendor_id" min="1" required></label>
+      <label>Approved risk assessment ID <input type="number" name="risk_assessment_id" min="1" required></label>
+    </div>
     <label>Canonical site
       <select name="site_id" aria-describedby="permit-site-help">
-        <option value="">Not linked / site not yet identified</option>
+        <option value="">Not linked or not yet identified</option>
         {% for site in sites %}
-        <option value="{{ site.id }}">{{ site.site_code }} — {{ site.site_name }}{% if site.city %} ({{ site.city }}){% endif %}</option>
+        <option value="{{ site.id }}">{{ site.site_code }} - {{ site.site_name }}{% if site.city %} ({{ site.city }}){% endif %}</option>
         {% endfor %}
       </select>
-      <small id="permit-site-help" style="display:block;color:var(--muted);margin-top:4px">Only active sites in your organisation are shown. This link supplies the map location.</small>
+      <small id="permit-site-help">Only active sites in your organization are shown. This link supplies the map location.</small>
     </label>
-    <label>Location details (optional)
-      <input type="text" name="site_location" placeholder="e.g. north loading bay, level 2">
-      <small style="display:block;color:var(--muted);margin-top:4px">Description only; it does not set map coordinates.</small>
+    <label>Location details
+      <input type="text" name="site_location" placeholder="Example: north loading bay, level 2">
+      <small>Description only. It does not set map coordinates.</small>
     </label>
-    <label>Valid from <input type="datetime-local" name="valid_from"></label>
-    <label>Valid until <input type="datetime-local" name="valid_until"></label>
+    <label>Scope boundary <textarea name="scope_boundary" rows="2" placeholder="Define the physical and operational work boundary"></textarea></label>
+    <div class="input-grid">
+      <label>Valid from <input type="datetime-local" name="valid_from"></label>
+      <label>Valid until <input type="datetime-local" name="valid_until"></label>
+    </div>
     <button class="btn btn-primary" type="submit">Submit for approval</button>
   </form>
 </div>
-
-<div class="card">
-  <h2>Permit list</h2>
-  <table class="data-table" id="permit-table">
-    <thead><tr><th>Ref</th><th>Title</th><th>Type</th><th>Site</th><th>Location details</th><th>Vendor</th><th>Status</th><th>Valid until</th><th>Actions</th></tr></thead>
-    <tbody></tbody>
-  </table>
-</div>
+{% endif %}
 
 <script src="/static/js/permits.js"></script>
 {% endblock %}

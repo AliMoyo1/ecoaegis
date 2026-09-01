@@ -1,0 +1,19 @@
+[Unit]
+Description=EcoAegis isolated PostgreSQL and file backup
+Requires=docker.service
+After=docker.service network-online.target
+ConditionPathExists=/srv/ecoaegis/current/deploy/ecoaegis/compose.yaml
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/ecoaegis/current/deploy/ecoaegis
+Environment=DOCKER_CONFIG=/tmp/docker-config
+ExecStart=/usr/bin/docker compose --project-name ecoaegis --profile maintenance -f /srv/ecoaegis/current/deploy/ecoaegis/compose.yaml run --rm -T backup
+TimeoutStartSec=30min
+UMask=0077
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectHome=true
+ProtectSystem=strict
+LockPersonality=true
+RestrictSUIDSGID=true

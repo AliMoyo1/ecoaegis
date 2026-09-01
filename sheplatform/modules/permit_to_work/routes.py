@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 from sheplatform.core.audit import log_audit
 from sheplatform.core.middleware import require_auth, require_capability
+from sheplatform.core.rbac import has_capability
 from sheplatform.database import get_db
 from sheplatform.modules.map.site_relationship_service import list_active_sites
 from sheplatform.modules.permit_to_work import data_service
@@ -23,7 +24,11 @@ async def permits_shell(request: Request):
         sites = list_active_sites(db, request.state.user.get("org_id"))
         return templates.TemplateResponse(
             request, "permit_to_work/templates/index.html",
-            {"user": request.state.user, "sites": sites},
+            {
+                "user": request.state.user,
+                "sites": sites,
+                "can_create": has_capability(request.state.user, "ptw.create"),
+            },
         )
     finally:
         db.close()

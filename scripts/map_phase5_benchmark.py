@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 import gc
 import json
 import math
+import os
 from pathlib import Path
 import platform
 import statistics
@@ -37,24 +38,33 @@ def _percentile(values: list[float], percentile: float) -> float:
 
 
 def _git_commit() -> str:
-    result = subprocess.run(
-        ["git", "-c", "safe.directory=C:/Projects/ecoaegis", "rev-parse", "HEAD"],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    configured_revision = os.getenv("ECOAEGIS_VCS_REF", "").strip()
+    if configured_revision:
+        return configured_revision
+    try:
+        result = subprocess.run(
+            ["git", "-c", "safe.directory=C:/Projects/ecoaegis", "rev-parse", "HEAD"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return "unavailable"
     return result.stdout.strip() if result.returncode == 0 else "unavailable"
 
 
 def _git_worktree_dirty() -> bool | None:
-    result = subprocess.run(
-        ["git", "-c", "safe.directory=C:/Projects/ecoaegis", "status", "--porcelain"],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        result = subprocess.run(
+            ["git", "-c", "safe.directory=C:/Projects/ecoaegis", "status", "--porcelain"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return None
     return bool(result.stdout.strip()) if result.returncode == 0 else None
 
 

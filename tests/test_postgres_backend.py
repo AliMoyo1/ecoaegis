@@ -52,6 +52,13 @@ def test_string_key_access(pg):
     assert pg.execute("SELECT 7 AS answer").fetchone()["answer"] == 7
 
 
+def test_literal_percent_without_parameters(pg):
+    row = pg.execute(
+        "SELECT 'map.provider.warning' LIKE 'map.provider.%' AS matched"
+    ).fetchone()
+    assert row["matched"] is True
+
+
 def test_integer_index_access(pg):
     # ~19 call sites read COUNT(*) via fetchone()[0]; this is the pattern
     # RealDictCursor would have broken and DictCursor preserves.

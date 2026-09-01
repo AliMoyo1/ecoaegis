@@ -20,13 +20,16 @@
     return originalFetch(url, opts);
   };
 
+  const darkOnlyPage = window.location.pathname === "/login";
+
   function applyTheme(theme) {
-    document.documentElement.setAttribute("data-theme", theme);
-    document.body.setAttribute("data-theme", theme);
+    const selected = darkOnlyPage ? "dark" : theme;
+    document.documentElement.setAttribute("data-theme", selected);
+    document.documentElement.style.colorScheme = selected;
+    document.body.setAttribute("data-theme", selected);
   }
-  const stored = localStorage.getItem("she-theme");
-  const initial = stored === "dark" ||
-    (!stored && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+  const bootTheme = document.documentElement.getAttribute("data-theme");
+  const initial = bootTheme === "light" ? "light" : "dark";
   applyTheme(initial);
   const themeButton = document.getElementById("theme-toggle");
   if (themeButton) themeButton.addEventListener("click", function () {
@@ -37,16 +40,23 @@
 
   const navToggle = document.getElementById("nav-toggle");
   if (navToggle) navToggle.addEventListener("click", function () {
-    document.getElementById("sidebar")?.classList.toggle("open");
+    const sidebar = document.getElementById("sidebar");
+    const open = sidebar?.classList.toggle("open") || false;
+    navToggle.setAttribute("aria-expanded", String(open));
+    navToggle.setAttribute("aria-label", open ? "Close navigation" : "Open navigation");
   });
 
   const path = window.location.pathname;
-  document.querySelectorAll(".side-nav a[data-nav]").forEach(function (link) {
-    const nav = link.getAttribute("data-nav");
-    if ((nav !== "/" && path.indexOf(nav) === 0) || (nav === "/" && path === "/")) {
-      link.classList.add("active");
-    }
-  });
+  const navLinks = Array.from(document.querySelectorAll(".side-nav a[data-nav]"));
+  const activeLink = navLinks
+    .filter(function (link) {
+      const nav = link.getAttribute("data-nav");
+      return nav === "/" ? path === "/" : path === nav || path.indexOf(nav + "/") === 0;
+    })
+    .sort(function (left, right) {
+      return right.getAttribute("data-nav").length - left.getAttribute("data-nav").length;
+    })[0];
+  activeLink?.classList.add("active");
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/static/js/sw.js")
