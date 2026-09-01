@@ -359,3 +359,55 @@ async def user_reset_password(request: Request, user_id: int):
         return JSONResponse(resp)
     finally:
         db.close()
+
+
+# ---- Increment D: invitation flow (reuses C's auth_tokens, 'invite' purpose) ----
+
+@router.post("/users/invite")
+@require_capability("admin.users.manage")
+async def user_invite(request: Request,
+                      email: str = Form(...),
+                      first_name: str = Form(...),
+                      last_name: str = Form(...),
+                      role_key: str = Form(...),
+                      phone: str = Form("")):
+    """Invite a new user: create a pending (inactive, no usable password) account
+    in the inviter's org and email a tokenized set-password link. The account only
+    becomes usable once the invitee accepts, so an unaccepted invite can never
+    authenticate."""
+    from sheplatform.config import settings
+    from sheplatform.core.notifications import queue_email
+    db = get_db()
+    try:
+        actor = request.state.user
+        org_id = actor.get("org_id")
+        if not org_id:
+            return JSONResponse({"ok": False, "message": "cannot invite without organisation"},
+                                status_code=400)
+        if role_key not in ROLES:
+            return JSONResponse({"ok": False, "message": "unknown role"}, status_code=400)
+        email = email.strip().lower()
+        if db.execute("SELECT id FROM users WHERE email = %s", (email,)).fetchone():
+            return JSONResponse({"ok": False, "message": "a user with that email already exists"},
+                                status_code=400)
+        # pending account: inactive + an unusable random hash (password_hash is
+        # NOT NULL); the invitee sets a real password and activates on accept.
+        new_id = db.execute(
+            "INSERT INTO users (email, password_hash, first_name, last_name, phone, role_key, "
+            "org_id, is_active) VALUES (%s,%s,%s,%s,%s,%s,%s, FALSE) RETURNING id",
+            (email, auth.unusable_password_hash(), first_name, last_name, phone, role_key,
+             org_id)).fetchone()["id"]
+        db.commit()
+        raw = auth.issue_auth_token(db, new_id, "invite", auth.INVITE_TOKEN_TTL_HOURS)
+        link = f"/auth/accept-invite?token={raw}"
+        queue_email(db, email, "You have been invited to EcoAegis",
+                    f"An EcoAegis account was created for you. Set your password to activate it: "
+                    f"{link} (link expires in {auth.INVITE_TOKEN_TTL_HOURS} hour(s)).")
+        log_audit(db, actor["id"], org_id, "user.invite", "users", new_id,
+                  new_value={"email": email, "role_key": role_key})
+        resp = {"ok": True, "user_id": new_id}
+        if settings.DEBUG:
+            resp["invite_link"] = link  # dev convenience only; never exposed in prod
+        return JSONResponse(resp)
+    finally:
+        db.close()

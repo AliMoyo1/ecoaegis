@@ -84,6 +84,20 @@ def consume_auth_token(db, token_id: int) -> None:
     db.commit()
 
 
+def unusable_password_hash() -> str:
+    """A bcrypt hash of a random secret nobody holds - for pending/invited
+    accounts that need a NOT NULL password_hash but must not be loginable until
+    the invitee sets a real password (Tier-1D invitation flow)."""
+    return hash_password(secrets.token_urlsafe(32))
+
+
+def activate_user(db, user_id: int) -> None:
+    """Mark an account active so it can authenticate (e.g. on invite accept)."""
+    db.execute("UPDATE users SET is_active = TRUE, updated_at = %s WHERE id = %s",
+               (datetime.now(timezone.utc).isoformat(), user_id))
+    db.commit()
+
+
 def create_session(db, user_id: int, ip: str = "", user_agent: str = "") -> str:
     raw = secrets.token_urlsafe(48)
     token_hash = hashlib.sha256(raw.encode()).hexdigest()
