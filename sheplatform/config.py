@@ -25,6 +25,15 @@ class Settings:
     INTEGRATION_IP_ALLOWLIST: str = os.getenv("INTEGRATION_IP_ALLOWLIST", "")
     TRUST_FORWARDED_FOR: bool = os.getenv("TRUST_FORWARDED_FOR", "false").lower() == "true"
 
+    # SEC-SHE-001: role_keys that MUST have MFA enrolled before using the
+    # platform (comma-separated). EMPTY = enforcement OFF (default), so existing
+    # deployments are unaffected until configured - same off-by-default pattern
+    # as the IP allowlist above, and avoids locking out a live admin who cannot
+    # enrol immediately. Recommended production value: super_admin,cro,she_manager
+    MFA_REQUIRED_ROLES: frozenset = field(
+        default_factory=lambda: frozenset(
+            r.strip() for r in os.getenv("MFA_REQUIRED_ROLES", "").split(",") if r.strip()))
+
     # NFR-SHE-003: minimum retention period for statutory SHE records (years).
     RETENTION_YEARS: int = int(os.getenv("RETENTION_YEARS", "7"))
 
