@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from sheplatform.core import auth
 from sheplatform.core.middleware import (
@@ -71,3 +71,45 @@ async def logout(request: Request):
     response = RedirectResponse(url="/login", status_code=303)
     response.delete_cookie(SESSION_COOKIE)
     return response
+
+
+# ---- Increment B: self-service session / device management (any user) ----
+
+@router.get("/account/sessions")
+@require_auth
+async def my_sessions(request: Request):
+    """List my own active sessions (device = user-agent, IP), flag the current."""
+    current = request.state.user["session_id"]
+    db = get_db()
+    try:
+        sessions = auth.list_sessions(db, request.state.user["id"])
+        for s in sessions:
+            s["is_current"] = (s["id"] == current)
+        return JSONResponse({"ok": True, "sessions": sessions})
+    finally:
+        db.close()
+
+
+@router.delete("/account/sessions/{session_id}")
+@require_auth
+async def revoke_my_session(request: Request, session_id: int):
+    """Revoke one of my own sessions (scoped to me, so I can't touch others')."""
+    db = get_db()
+    try:
+        ok = auth.revoke_session(db, session_id, request.state.user["id"])
+        return JSONResponse({"ok": ok}, status_code=200 if ok else 404)
+    finally:
+        db.close()
+
+
+@router.post("/account/sessions/revoke-others")
+@require_auth
+async def revoke_my_other_sessions(request: Request):
+    """Sign out everywhere except the current session."""
+    db = get_db()
+    try:
+        n = auth.revoke_other_sessions(db, request.state.user["id"],
+                                       request.state.user["session_id"])
+        return JSONResponse({"ok": True, "revoked": n})
+    finally:
+        db.close()

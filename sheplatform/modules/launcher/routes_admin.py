@@ -278,3 +278,52 @@ async def role_preview(request: Request, role_key: str):
     caps = sorted(cap for cap, roles in CAPABILITIES.items() if role_key in roles)
     return JSONResponse({"ok": True, "role_key": role_key, "label": ROLES[role_key],
                          "capabilities": caps})
+
+
+# ---- Increment B: admin session/device oversight (org-scoped) ----
+
+@router.get("/api/users/{user_id}/sessions")
+@require_capability("admin.users.manage")
+async def user_sessions(request: Request, user_id: int):
+    db = get_db()
+    try:
+        if _target_user(db, user_id, request.state.user.get("org_id")) is None:
+            return JSONResponse({"ok": False, "message": "user not found"}, status_code=404)
+        return JSONResponse({"ok": True, "sessions": auth.list_sessions(db, user_id)})
+    finally:
+        db.close()
+
+
+@router.delete("/api/users/{user_id}/sessions/{session_id}")
+@require_capability("admin.users.manage")
+async def user_revoke_session(request: Request, user_id: int, session_id: int):
+    db = get_db()
+    try:
+        actor = request.state.user
+        if _target_user(db, user_id, actor.get("org_id")) is None:
+            return JSONResponse({"ok": False, "message": "user not found"}, status_code=404)
+        ok = auth.revoke_session(db, session_id, user_id)  # scoped to that user
+        if ok:
+            log_audit(db, actor["id"], actor.get("org_id"), "user.session_revoke", "users", user_id,
+                      new_value={"session_id": session_id})
+        return JSONResponse({"ok": ok}, status_code=200 if ok else 404)
+    finally:
+        db.close()
+
+
+@router.post("/users/{user_id}/sessions/revoke-all")
+@require_capability("admin.users.manage")
+async def user_revoke_all_sessions(request: Request, user_id: int):
+    """Force sign-out of all a user's sessions without deactivating them
+    (e.g. suspected compromise)."""
+    db = get_db()
+    try:
+        actor = request.state.user
+        if _target_user(db, user_id, actor.get("org_id")) is None:
+            return JSONResponse({"ok": False, "message": "user not found"}, status_code=404)
+        n = auth.revoke_user_sessions(db, user_id)
+        log_audit(db, actor["id"], actor.get("org_id"), "user.sessions_revoke_all", "users", user_id,
+                  new_value={"sessions_revoked": n})
+        return JSONResponse({"ok": True, "revoked": n})
+    finally:
+        db.close()

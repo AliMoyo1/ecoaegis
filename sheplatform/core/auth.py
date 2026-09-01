@@ -83,6 +83,33 @@ def revoke_user_sessions(db, user_id: int) -> int:
     return cur.rowcount if cur.rowcount is not None and cur.rowcount > 0 else 0
 
 
+def list_sessions(db, user_id: int) -> list[dict]:
+    """A user's currently-active (non-expired) sessions, newest first, with the
+    device/IP metadata captured at login."""
+    rows = db.execute(
+        "SELECT id, ip_address, user_agent, mfa_verified, created_at, expires_at "
+        "FROM sessions WHERE user_id = %s AND expires_at > %s ORDER BY created_at DESC",
+        (user_id, datetime.now(timezone.utc).isoformat())).fetchall()
+    return [dict(r) for r in rows]
+
+
+def revoke_session(db, session_id: int, user_id: int) -> bool:
+    """Delete one session, scoped to its owner so a user can only revoke their
+    own (an admin passes the target user's id). Returns True if one was removed."""
+    cur = db.execute("DELETE FROM sessions WHERE id = %s AND user_id = %s",
+                     (session_id, user_id))
+    db.commit()
+    return bool(cur.rowcount and cur.rowcount > 0)
+
+
+def revoke_other_sessions(db, user_id: int, keep_session_id: int) -> int:
+    """Sign out everywhere except the current session. Returns the count revoked."""
+    cur = db.execute("DELETE FROM sessions WHERE user_id = %s AND id != %s",
+                     (user_id, keep_session_id))
+    db.commit()
+    return cur.rowcount if cur.rowcount is not None and cur.rowcount > 0 else 0
+
+
 def destroy_session(db, raw_token: str) -> None:
     if not raw_token:
         return
