@@ -411,3 +411,121 @@ async def user_invite(request: Request,
         return JSONResponse(resp)
     finally:
         db.close()
+
+
+# ---- Increment F: bulk user actions (partial-failure report) ----
+
+BULK_ACTIONS = {"deactivate", "reactivate", "role", "reset_password"}
+BULK_MAX = 500
+
+
+@router.post("/users/bulk")
+@require_capability("admin.users.manage")
+async def users_bulk(request: Request):
+    """Apply one admin action to many in-org users at once, returning a
+    partial-failure report ({user_id, ok, message} per user). Each sub-action is
+    audited exactly like its single-user counterpart (tagged bulk:True). Guards
+    (self, last super-admin) are re-checked per user against LIVE state committed
+    each iteration, so a batch can never remove the final active super-admin."""
+    from sheplatform.config import settings  # noqa: F401 (parity with sibling routes)
+    from sheplatform.core.notifications import queue_email
+    try:
+        payload = await request.json()
+    except Exception:
+        return JSONResponse({"ok": False, "message": "invalid JSON body"}, status_code=400)
+    action = payload.get("action")
+    role_key = payload.get("role_key")
+    raw_ids = payload.get("user_ids")
+    if action not in BULK_ACTIONS:
+        return JSONResponse({"ok": False, "message": "unknown action"}, status_code=400)
+    if not isinstance(raw_ids, list) or not raw_ids:
+        return JSONResponse({"ok": False, "message": "user_ids must be a non-empty list"},
+                            status_code=400)
+    if len(raw_ids) > BULK_MAX:
+        return JSONResponse({"ok": False, "message": f"batch too large (max {BULK_MAX})"},
+                            status_code=400)
+    try:
+        user_ids = [int(x) for x in raw_ids]
+    except (TypeError, ValueError):
+        return JSONResponse({"ok": False, "message": "user_ids must be integers"}, status_code=400)
+    if action == "role" and role_key not in ROLES:
+        return JSONResponse({"ok": False, "message": "unknown role"}, status_code=400)
+
+    db = get_db()
+    try:
+        actor = request.state.user
+        org_id = actor.get("org_id")
+        results: list[dict] = []
+        seen: set[int] = set()
+        for uid in user_ids:
+            if uid in seen:
+                continue           # de-dupe, keep first-seen order
+            seen.add(uid)
+            target = _target_user(db, uid, org_id)   # org-scoped, fail closed
+            if target is None:
+                results.append({"user_id": uid, "ok": False, "message": "user not found"})
+                continue
+
+            if action == "deactivate":
+                if uid == actor["id"]:
+                    results.append({"user_id": uid, "ok": False,
+                                    "message": "cannot deactivate your own account"})
+                    continue
+                if target["role_key"] == "super_admin" and _active_super_admins(db) <= 1:
+                    results.append({"user_id": uid, "ok": False,
+                                    "message": "cannot deactivate the last active super admin"})
+                    continue
+                db.execute("UPDATE users SET is_active = FALSE, updated_at = %s "
+                           "WHERE id = %s AND org_id = %s", (_now(), uid, org_id))
+                db.commit()
+                revoked = auth.revoke_user_sessions(db, uid)
+                log_audit(db, actor["id"], org_id, "user.deactivate", "users", uid,
+                          old_value={"is_active": True},
+                          new_value={"is_active": False, "sessions_revoked": revoked, "bulk": True})
+                results.append({"user_id": uid, "ok": True,
+                                "message": f"deactivated, {revoked} session(s) revoked"})
+
+            elif action == "reactivate":
+                db.execute("UPDATE users SET is_active = TRUE, updated_at = %s "
+                           "WHERE id = %s AND org_id = %s", (_now(), uid, org_id))
+                db.commit()
+                log_audit(db, actor["id"], org_id, "user.reactivate", "users", uid,
+                          old_value={"is_active": False},
+                          new_value={"is_active": True, "bulk": True})
+                results.append({"user_id": uid, "ok": True, "message": "reactivated"})
+
+            elif action == "role":
+                if (target["role_key"] == "super_admin" and role_key != "super_admin"
+                        and _active_super_admins(db) <= 1):
+                    results.append({"user_id": uid, "ok": False,
+                                    "message": "cannot demote the last active super admin"})
+                    continue
+                old_role = target["role_key"]
+                db.execute("UPDATE users SET role_key = %s, updated_at = %s "
+                           "WHERE id = %s AND org_id = %s", (role_key, _now(), uid, org_id))
+                db.commit()
+                log_audit(db, actor["id"], org_id, "user.role_change", "users", uid,
+                          old_value={"role_key": old_role},
+                          new_value={"role_key": role_key, "bulk": True})
+                results.append({"user_id": uid, "ok": True, "message": f"role set to {role_key}"})
+
+            elif action == "reset_password":
+                raw = auth.issue_auth_token(db, uid, "reset", auth.RESET_TOKEN_TTL_HOURS)
+                db.execute("UPDATE users SET must_change_password = TRUE, updated_at = %s "
+                           "WHERE id = %s AND org_id = %s", (_now(), uid, org_id))
+                db.commit()
+                revoked = auth.revoke_user_sessions(db, uid)
+                link = f"/auth/reset?token={raw}"
+                queue_email(db, target["email"], "EcoAegis password reset",
+                            f"A password reset was requested. Set a new password here: {link} "
+                            f"(link expires in {auth.RESET_TOKEN_TTL_HOURS} hour(s)).")
+                log_audit(db, actor["id"], org_id, "user.password_reset", "users", uid,
+                          new_value={"sessions_revoked": revoked, "bulk": True})
+                results.append({"user_id": uid, "ok": True,
+                                "message": f"reset link sent, {revoked} session(s) revoked"})
+
+        succeeded = sum(1 for r in results if r["ok"])
+        return JSONResponse({"ok": True, "action": action, "succeeded": succeeded,
+                             "failed": len(results) - succeeded, "results": results})
+    finally:
+        db.close()
