@@ -71,6 +71,12 @@ async def api_confirm(request: Request, code: str = Form(...)):
         result = mfa.confirm_enroll(db, request.state.user["id"], code)
         if not result["ok"]:
             return JSONResponse(result, status_code=400)
+        # The valid code just proved possession, so mark THIS session verified
+        # too - otherwise a forced-enrolment user (SEC-SHE-001) is bounced
+        # straight to /mfa/challenge to re-enter a code they just entered.
+        raw = request.cookies.get(SESSION_COOKIE)
+        if raw:
+            mfa.verify_session(db, request.state.user["id"], raw)
         return JSONResponse(result)
     finally:
         db.close()

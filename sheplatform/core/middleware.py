@@ -79,6 +79,24 @@ def password_change_required(request: Request, user: dict) -> bool:
     return not any(path.startswith(p) for p in PASSWORD_CHANGE_ALLOWED_PATHS)
 
 
+# SEC-SHE-001: paths a not-yet-enrolled user in a MFA-required role may reach
+# (the whole /mfa area covers setup + enrol + confirm + challenge).
+MFA_SETUP_ALLOWED_PATHS = ("/mfa", "/logout", "/static")
+
+
+def mfa_enrollment_required(request: Request, user: dict) -> bool:
+    """SEC-SHE-001: True when the user's role mandates MFA but they have not
+    enrolled yet. Off unless MFA_REQUIRED_ROLES is configured (empty = no-op)."""
+    if not user or user.get("mfa_enabled"):
+        return False
+    from sheplatform.config import settings
+    required = settings.MFA_REQUIRED_ROLES
+    if not required or user.get("role_key") not in required:
+        return False
+    path = request.url.path
+    return not any(path.startswith(p) for p in MFA_SETUP_ALLOWED_PATHS)
+
+
 def get_current_user(request: Request) -> dict | None:
     raw = request.cookies.get(SESSION_COOKIE)
     if not raw:
@@ -106,6 +124,8 @@ def require_auth(func):
             return RedirectResponse(url="/mfa/challenge", status_code=303)
         if password_change_required(request, user):
             return RedirectResponse(url="/account/change-password", status_code=303)
+        if mfa_enrollment_required(request, user):
+            return RedirectResponse(url="/mfa/setup", status_code=303)
         request.state.user = _attach_csrf(with_nav_flags(user), request)
         return await func(request, *args, **kwargs)
     return wrapper
@@ -123,6 +143,8 @@ def require_capability(capability: str):
                 return RedirectResponse(url="/mfa/challenge", status_code=303)
             if password_change_required(request, user):
                 return RedirectResponse(url="/account/change-password", status_code=303)
+            if mfa_enrollment_required(request, user):
+                return RedirectResponse(url="/mfa/setup", status_code=303)
             if not has_capability(user, capability):
                 raise HTTPException(status_code=403, detail="Forbidden")
             request.state.user = _attach_csrf(with_nav_flags(user), request)
